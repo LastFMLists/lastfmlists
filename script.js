@@ -1382,68 +1382,68 @@ if (confirmGridExportButton) {
 }
   
 async function fetchListeningHistory(username) {
-	const baseUrl = `https://ws.audioscrobbler.com/2.0/?method=user.getrecenttracks&user=${username}&api_key=${API_KEY}&format=json&extended=1&limit=200&autocorrect=0`;
+    const baseUrl = `https://ws.audioscrobbler.com/2.0/?method=user.getrecenttracks&user=${username}&api_key=${API_KEY}&format=json&extended=1&limit=200&autocorrect=0`;
 
-	// First request to get total pages
-	const firstResponse = await fetch(baseUrl);
-	const firstData = await firstResponse.json();
+    // 1. Use the retry helper for the INITIAL request too
+    const firstData = await fetchJsonWithRetry(baseUrl);
 
-	// ** Debugging: Log the full response **
-	console.log("API Response:", firstData);
+    if (!firstData || !firstData.recenttracks || !Array.isArray(firstData.recenttracks.track)) {
+        console.error("Error: Could not connect to Last.fm or user not found.");
+        loadingDiv.innerHTML = `<p style="color: #ff6b6b;">Failed to connect to Last.fm. Please try again.</p>`;
+        return [];
+    }
 
-	// Ensure recenttracks and track are present
-	if (!firstData.recenttracks || !Array.isArray(firstData.recenttracks.track)) {
-		console.error("Error: No tracks found in the first response.");
-		return [];
-	}
+    const totalPages = parseInt(firstData.recenttracks["@attr"].totalPages, 10) || 1;
+    console.log(`Total Pages: ${totalPages}`);
 
-	const totalPages = parseInt(firstData.recenttracks["@attr"].totalPages, 10) || 1;
-	console.log(`Total Pages: ${totalPages}`);
-
-	// Process the first page of data
-	let lastfmData = firstData.recenttracks.track.map((track) => {
-		const timestamp = track.date?.uts ? parseInt(track.date.uts) * 1000 : null;
-
-		return {
-			Artist: track.artist?.name || track.artist?.["#text"] || "Unknown", // Handle both name and #text
-			Album: track.album?.["#text"] || "Unknown",
-			Track: track.name || "Unknown",
-			Date: timestamp
-		};
-	});
+    // 2. Process first page
+    let lastfmData = firstData.recenttracks.track.map((track) => {
+        const timestamp = track.date?.uts ? parseInt(track.date.uts) * 1000 : null;
+        return {
+            Artist: track.artist?.name || track.artist?.["#text"] || "Unknown",
+            Album: track.album?.["#text"] || "Unknown",
+            Track: track.name || "Unknown",
+            Date: timestamp
+        };
+    });
 
     loadingDiv.innerHTML = `<p>Loading data... Page 1 of ${totalPages}</p>`;
 
-	// Fetch and process remaining pages
-	for (let page = 2; page <= totalPages; page++) {
-		const response = await fetch(`${baseUrl}&page=${page}`);
-		const data = await response.json();
+    // 3. Process remaining pages
+    for (let page = 2; page <= totalPages; page++) {
+        const data = await fetchJsonWithRetry(`${baseUrl}&page=${page}`);
 
-		// ** Debugging: Log the full response for each page **
-		console.log(`API Response for Page ${page}:`, data);
+        if (data && data.recenttracks && Array.isArray(data.recenttracks.track)) {
+            const pageTracks = data.recenttracks.track.map((track) => {
+                const timestamp = track.date?.uts ? parseInt(track.date.uts) * 1000 : null;
+                return {
+                    Artist: track.artist?.name || track.artist?.["#text"] || "Unknown",
+                    Album: track.album?.["#text"] || "Unknown",
+                    Track: track.name || "Unknown",
+                    Date: timestamp
+                };
+            });
 
-		// Ensure the track data is present
-		if (data.recenttracks && Array.isArray(data.recenttracks.track)) {
-			// Process the tracks for the current page and append to lastfmData
-			lastfmData = lastfmData.concat(data.recenttracks.track.map((track) => {
-				const timestamp = track.date?.uts ? parseInt(track.date.uts) * 1000 : null;
-
-				return {
-					Artist: track.artist?.name || track.artist?.["#text"] || "Unknown",
-					Album: track.album?.["#text"] || "Unknown",
-					Track: track.name || "Unknown",
-					Date: timestamp
-				};
-			}));
-			console.log(`Fetched Page ${page}, Total Tracks: ${lastfmData.length}`);
+            // OPTIMIZATION: Use .push(...array) instead of .concat()
+            // .concat() creates a new array in memory every loop. 
+            // .push() modifies the existing one, which is much faster for 100k scrobbles.
+            lastfmData.push(...pageTracks);
+            
             loadingDiv.innerHTML = `<p>Loading data... Page ${page} of ${totalPages}</p>`;
-		} else {
-			console.warn(`Skipping Page ${page} due to missing track data.`);
-		}
-	}
 
-	console.log(`Fetched ${lastfmData.length} total tracks.`);
-	return lastfmData;
+            // 4. Throttling - Give the browser/API a breather every 15 pages
+            if (page % 15 === 0) { 
+                await new Promise(resolve => setTimeout(resolve, 150)); 
+            }
+
+        } else {
+            // If it still fails after retries, we warn but don't crash.
+            console.warn(`Skipping Page ${page} after multiple failed attempts.`);
+        }
+    }
+
+    console.log(`Fetched ${lastfmData.length} total tracks.`);
+    return lastfmData;
 }
 
 async function fetchRecentTracksSince(username, latestTimestamp) {
