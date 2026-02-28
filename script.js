@@ -995,12 +995,12 @@ document.getElementById("username-form").addEventListener("submit", async (event
             if (ts > latestTimestamp) latestTimestamp = ts;
         });
     
-        // Fetch recent tracks from Last.fm that occurred after the latest saved track.
-        loadingDiv.innerHTML = "<p>Fetching recent tracks...</p>";
+        // Fetch recent tracks - The function now handles its own progress messages
         let newTracks = await fetchRecentTracksSince(username, latestTimestamp);
-    
+
         // Merge new tracks with the saved tracks, keeping chronological order.
         allTracks = newTracks.concat(savedAllTracks);
+        
     } else {
         // No saved data exists, fetch all history.
         allTracks = await fetchListeningHistory(username);
@@ -1452,49 +1452,52 @@ async function fetchRecentTracksSince(username, latestTimestamp) {
     let page = 1;
     let totalPages = 1;
     let keepFetching = true;
-  
+
     while (keepFetching && page <= totalPages) {
-      const response = await fetch(`${baseUrl}&page=${page}`);
-      const data = await response.json();
-  
-      if (!data.recenttracks || !Array.isArray(data.recenttracks.track)) {
-        console.error(`No tracks found on page ${page}.`);
-        break;
-      }
-  
-      // On the first page, determine the total number of pages.
-      if (page === 1 && data.recenttracks['@attr'] && data.recenttracks['@attr'].totalPages) {
-        totalPages = parseInt(data.recenttracks['@attr'].totalPages, 10);
-      }
-  
-      // Process each track on this page.
-      for (const track of data.recenttracks.track) {
-        // Some tracks (e.g., currently playing) might not have a date.
-        if (!track.date || !track.date.uts) continue;
-  
-        // Convert Last.fm's uts (seconds) to a JavaScript timestamp (ms)
-        const ts = parseInt(track.date.uts, 10) * 1000;
-  
-        // If the track is newer than latestTimestamp, include it.
-        if (ts > latestTimestamp) {
-          newTracks.push({
-            Artist: track.artist?.name || track.artist?.["#text"] || "Unknown",
-            Album: track.album?.["#text"] || "Unknown",
-            Track: track.name || "Unknown",
-            Date: ts
-          });
-        } else {
-          // We've reached tracks older than our saved latest timestamp; stop processing.
-          keepFetching = false;
-          break;
+        // Use your existing retry helper for stability
+        const data = await fetchJsonWithRetry(`${baseUrl}&page=${page}`);
+
+        if (!data || !data.recenttracks || !Array.isArray(data.recenttracks.track)) {
+            console.error(`No tracks found on page ${page}.`);
+            break;
         }
-      }
-      page++;
+
+        if (page === 1 && data.recenttracks['@attr'] && data.recenttracks['@attr'].totalPages) {
+            totalPages = parseInt(data.recenttracks['@attr'].totalPages, 10);
+        }
+
+        // UPDATE UI: Show progress
+        loadingDiv.innerHTML = `<p>Fetching recent tracks... Page ${page} of ${totalPages}</p>`;
+
+        for (const track of data.recenttracks.track) {
+            if (!track.date || !track.date.uts) continue;
+
+            const ts = parseInt(track.date.uts, 10) * 1000;
+
+            if (ts > latestTimestamp) {
+                newTracks.push({
+                    Artist: track.artist?.name || track.artist?.["#text"] || "Unknown",
+                    Album: track.album?.["#text"] || "Unknown",
+                    Track: track.name || "Unknown",
+                    Date: ts
+                });
+            } else {
+                keepFetching = false;
+                break;
+            }
+        }
+
+        // Throttling breather
+        if (page % 10 === 0) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+        }
+
+        page++;
     }
-  
+
     console.log(`Fetched ${newTracks.length} new tracks since timestamp ${latestTimestamp}`);
     return newTracks;
-  }
+}
 
 async function fetchJsonWithRetry(url, maxRetries = 3, delayMs = 1000) {
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
