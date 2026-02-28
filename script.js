@@ -1496,23 +1496,38 @@ async function fetchRecentTracksSince(username, latestTimestamp) {
     return newTracks;
   }
 
-async function fetchJsonWithRetry(url, maxRetries = 2, delayMs = 500) {
+async function fetchJsonWithRetry(url, maxRetries = 3, delayMs = 1000) {
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
         try {
             const response = await fetch(url);
+            
+            // Check for HTTP errors (500, 503, etc.)
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}`);
             }
+
+            // CHECK CONTENT TYPE: This is the critical fix
+            const contentType = response.headers.get("content-type");
+            if (!contentType || !contentType.includes("application/json")) {
+                const text = await response.text(); // Read the HTML to clear the buffer
+                console.warn(`Attempt ${attempt + 1}: Expected JSON but got HTML/Text. Full response starts with: ${text.substring(0, 50)}`);
+                throw new Error("Invalid Content-Type: Received HTML instead of JSON");
+            }
+
             return await response.json();
+            
         } catch (error) {
             if (attempt === maxRetries) {
-                console.warn(`Request failed after ${maxRetries + 1} attempts: ${url}`, error);
+                console.error(`Final failure after ${maxRetries + 1} attempts: ${url}`, error);
                 return null;
             }
-            await new Promise(resolve => setTimeout(resolve, delayMs * (attempt + 1)));
+            
+            // Wait longer for each subsequent retry (Exponential Backoff)
+            const waitTime = delayMs * Math.pow(2, attempt); 
+            console.log(`Retrying in ${waitTime}ms... (Attempt ${attempt + 1}/${maxRetries})`);
+            await new Promise(resolve => setTimeout(resolve, waitTime));
         }
     }
-
     return null;
 }
 
