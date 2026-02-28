@@ -1000,7 +1000,7 @@ document.getElementById("username-form").addEventListener("submit", async (event
 
         // Merge new tracks with the saved tracks, keeping chronological order.
         allTracks = newTracks.concat(savedAllTracks);
-        
+
     } else {
         // No saved data exists, fetch all history.
         allTracks = await fetchListeningHistory(username);
@@ -1384,65 +1384,51 @@ if (confirmGridExportButton) {
 async function fetchListeningHistory(username) {
     const baseUrl = `https://ws.audioscrobbler.com/2.0/?method=user.getrecenttracks&user=${username}&api_key=${API_KEY}&format=json&extended=1&limit=200&autocorrect=0`;
 
-    // 1. Use the retry helper for the INITIAL request too
     const firstData = await fetchJsonWithRetry(baseUrl);
 
     if (!firstData || !firstData.recenttracks || !Array.isArray(firstData.recenttracks.track)) {
-        console.error("Error: Could not connect to Last.fm or user not found.");
-        loadingDiv.innerHTML = `<p style="color: #ff6b6b;">Failed to connect to Last.fm. Please try again.</p>`;
+        console.error("Error: Could not connect to Last.fm.");
         return [];
     }
 
     const totalPages = parseInt(firstData.recenttracks["@attr"].totalPages, 10) || 1;
-    console.log(`Total Pages: ${totalPages}`);
+    console.log(`Total Pages to fetch: ${totalPages}`); // Log total count
 
-    // 2. Process first page
-    let lastfmData = firstData.recenttracks.track.map((track) => {
-        const timestamp = track.date?.uts ? parseInt(track.date.uts) * 1000 : null;
-        return {
-            Artist: track.artist?.name || track.artist?.["#text"] || "Unknown",
-            Album: track.album?.["#text"] || "Unknown",
-            Track: track.name || "Unknown",
-            Date: timestamp
-        };
-    });
+    let lastfmData = firstData.recenttracks.track.map((track) => ({
+        Artist: track.artist?.name || track.artist?.["#text"] || "Unknown",
+        Album: track.album?.["#text"] || "Unknown",
+        Track: track.name || "Unknown",
+        Date: track.date?.uts ? parseInt(track.date.uts) * 1000 : null
+    }));
 
     loadingDiv.innerHTML = `<p>Loading data... Page 1 of ${totalPages}</p>`;
 
-    // 3. Process remaining pages
     for (let page = 2; page <= totalPages; page++) {
         const data = await fetchJsonWithRetry(`${baseUrl}&page=${page}`);
 
         if (data && data.recenttracks && Array.isArray(data.recenttracks.track)) {
-            const pageTracks = data.recenttracks.track.map((track) => {
-                const timestamp = track.date?.uts ? parseInt(track.date.uts) * 1000 : null;
-                return {
-                    Artist: track.artist?.name || track.artist?.["#text"] || "Unknown",
-                    Album: track.album?.["#text"] || "Unknown",
-                    Track: track.name || "Unknown",
-                    Date: timestamp
-                };
-            });
+            const pageTracks = data.recenttracks.track.map((track) => ({
+                Artist: track.artist?.name || track.artist?.["#text"] || "Unknown",
+                Album: track.album?.["#text"] || "Unknown",
+                Track: track.name || "Unknown",
+                Date: track.date?.uts ? parseInt(track.date.uts) * 1000 : null
+            }));
 
-            // OPTIMIZATION: Use .push(...array) instead of .concat()
-            // .concat() creates a new array in memory every loop. 
-            // .push() modifies the existing one, which is much faster for 100k scrobbles.
             lastfmData.push(...pageTracks);
             
+            // RESTORED LOGS HERE
+            console.log(`Fetched Page ${page}/${totalPages}, Total Tracks now: ${lastfmData.length}`);
             loadingDiv.innerHTML = `<p>Loading data... Page ${page} of ${totalPages}</p>`;
 
-            // 4. Throttling - Give the browser/API a breather every 15 pages
             if (page % 15 === 0) { 
                 await new Promise(resolve => setTimeout(resolve, 150)); 
             }
-
         } else {
-            // If it still fails after retries, we warn but don't crash.
             console.warn(`Skipping Page ${page} after multiple failed attempts.`);
         }
     }
 
-    console.log(`Fetched ${lastfmData.length} total tracks.`);
+    console.log(`Fetch complete. Total tracks: ${lastfmData.length}`);
     return lastfmData;
 }
 
@@ -1454,24 +1440,24 @@ async function fetchRecentTracksSince(username, latestTimestamp) {
     let keepFetching = true;
 
     while (keepFetching && page <= totalPages) {
-        // Use your existing retry helper for stability
         const data = await fetchJsonWithRetry(`${baseUrl}&page=${page}`);
 
         if (!data || !data.recenttracks || !Array.isArray(data.recenttracks.track)) {
-            console.error(`No tracks found on page ${page}.`);
+            console.error(`Sync Error: No tracks found on page ${page}.`);
             break;
         }
 
         if (page === 1 && data.recenttracks['@attr'] && data.recenttracks['@attr'].totalPages) {
             totalPages = parseInt(data.recenttracks['@attr'].totalPages, 10);
+            console.log(`Syncing started. Total pages to check: ${totalPages}`);
         }
 
-        // UPDATE UI: Show progress
+        // ADDED LOGS FOR SYNC
+        console.log(`Syncing: Processing page ${page}/${totalPages}...`);
         loadingDiv.innerHTML = `<p>Fetching recent tracks... Page ${page} of ${totalPages}</p>`;
 
         for (const track of data.recenttracks.track) {
             if (!track.date || !track.date.uts) continue;
-
             const ts = parseInt(track.date.uts, 10) * 1000;
 
             if (ts > latestTimestamp) {
@@ -1487,15 +1473,11 @@ async function fetchRecentTracksSince(username, latestTimestamp) {
             }
         }
 
-        // Throttling breather
-        if (page % 10 === 0) {
-            await new Promise(resolve => setTimeout(resolve, 100));
-        }
-
+        if (page % 10 === 0) await new Promise(resolve => setTimeout(resolve, 100));
         page++;
     }
 
-    console.log(`Fetched ${newTracks.length} new tracks since timestamp ${latestTimestamp}`);
+    console.log(`Sync complete. Found ${newTracks.length} new tracks.`);
     return newTracks;
 }
 
@@ -1725,52 +1707,51 @@ async function fetchAllAlbumDetails(albums, limit) {
   
 // Fetch the user's top tracks from Last.fm
 async function fetchTopTracks(username) {
-    const baseUrl = `https://ws.audioscrobbler.com/2.0/?method=user.getTopTracks&api_key=${API_KEY}&user=${encodeURIComponent(username)}&limit=200&format=json&autocorrect=0`;
+    const limit = 200; // Define limit explicitly for math
+    const baseUrl = `https://ws.audioscrobbler.com/2.0/?method=user.getTopTracks&api_key=${API_KEY}&user=${encodeURIComponent(username)}&limit=${limit}&format=json&autocorrect=0`;
   
     try {
-      // Fetch the first page
-            const firstData = await fetchJsonWithRetry(baseUrl);
-            if (!firstData) {
-                return [];
-            }
+        const firstData = await fetchJsonWithRetry(baseUrl);
+        if (!firstData || !firstData.toptracks) return [];
   
-      if (firstData.toptracks && firstData.toptracks.track) {
-        // Optionally update progress display
-        const totalTracks = parseInt(firstData.toptracks['@attr'].total, 10) || firstData.toptracks.track.length;
-        loadingDiv.innerHTML = `<p>Loading data... Track 1 of ${totalTracks}</p>`;
-  
-        // Start with the tracks from the first page.
-        let allTracksFetched = firstData.toptracks.track;
-  
-        // Determine total pages
+        const totalTracks = parseInt(firstData.toptracks['@attr'].total, 10) || 0;
         const totalPages = parseInt(firstData.toptracks['@attr'].totalPages, 10) || 1;
         
-                // If more than one page, fetch the rest with limited concurrency and retries.
+        // Start with the tracks from the first page
+        let allTracksFetched = [...firstData.toptracks.track];
+        
+        // Accurate UI update for Page 1
+        loadingDiv.innerHTML = `<p>Loading top tracks... ${allTracksFetched.length} of ${totalTracks}</p>`;
+        console.log(`Top Tracks: Page 1/${totalPages} fetched (${allTracksFetched.length} tracks).`);
+
         if (totalPages > 1) {
-                    const pageNumbers = Array.from({ length: totalPages - 1 }, (_, idx) => idx + 2);
-                    const pagesData = await mapWithConcurrency(
-                        pageNumbers,
-                        (page) => fetchJsonWithRetry(`${baseUrl}&page=${page}`),
-                        3
-                    );
-          pagesData.forEach((pageData, idx) => {
-            if (pageData.toptracks && pageData.toptracks.track) {
-              loadingDiv.innerHTML = `<p>Loading data... Track ${idx + 2} of ${totalTracks}</p>`;
-              allTracksFetched = allTracksFetched.concat(pageData.toptracks.track);
-            }
-          });
+            const pageNumbers = Array.from({ length: totalPages - 1 }, (_, idx) => idx + 2);
+            
+            // Fetch remaining pages with concurrency
+            const pagesData = await mapWithConcurrency(
+                pageNumbers,
+                (page) => fetchJsonWithRetry(`${baseUrl}&page=${page}`),
+                3
+            );
+
+            pagesData.forEach((pageData, idx) => {
+                if (pageData && pageData.toptracks && pageData.toptracks.track) {
+                    allTracksFetched.push(...pageData.toptracks.track);
+                    
+                    // Logic: Current track count is simply the array length
+                    const currentCount = allTracksFetched.length;
+                    loadingDiv.innerHTML = `<p>Loading top tracks... ${currentCount} of ${totalTracks}</p>`;
+                    console.log(`Top Tracks: Page ${idx + 2}/${totalPages} fetched (${currentCount}/${totalTracks}).`);
+                }
+            });
         }
         
-        // Map the tracks to the required format.
         return allTracksFetched.map(track => ({
           name: track.name,
           artist: track.artist.name,
           user_scrobbles: parseInt(track.playcount, 10)
         }));
-      } else {
-        console.warn("No top tracks found for user:", username);
-        return [];
-      }
+
     } catch (error) {
       console.error(`Error fetching top tracks for ${username}:`, error);
       return [];
