@@ -6337,7 +6337,18 @@ document.getElementById("filters-section-toggle").addEventListener("click", func
     syncSidebarLayoutState();
 
     // Change arrow direction
-    this.innerHTML = sidebar.classList.contains("closed") ? "&#9654;" : "&#9664;";
+    this.innerHTML = sidebar.classList.contains("closed") ? "&#10095;" : "&#10094;";
 });
+
+// Start with the filter drawer collapsed on small touchscreens so it
+// doesn't cover the results when data first loads.
+(function initResponsiveSidebarState() {
+    const sidebar = document.getElementById("filters-section");
+    const toggle = document.getElementById("filters-section-toggle");
+    if (sidebar && toggle && window.matchMedia("(max-width: 768px)").matches) {
+        sidebar.classList.add("closed");
+        toggle.innerHTML = "&#10095;";
+    }
+})();
 
 syncSidebarLayoutState();
