@@ -50,23 +50,29 @@ const API_KEY = "edbd779d54b373b8710af5c346148ae3";
 // empty/invalid, so raising this can only ever speed things up, never lose data.
 const HISTORY_PAGE_SIZE_LARGE = 1000;
 const HISTORY_PAGE_SIZE_SAFE = 200;
-// How many history pages to fetch in parallel. Last.fm's practical rate limit is
-// ~5 req/s per API key (shared across all users of this site), so keep this
-// modest. It is lowered automatically when the API starts returning 429s.
+// How many history pages to fetch in parallel. This caps in-flight requests;
+// the token bucket below caps the request rate. It is lowered automatically
+// when the API starts returning 429s.
 const HISTORY_FETCH_CONCURRENCY = 5;
 const MIN_FETCH_CONCURRENCY = 1;
-// Set to true whenever the API rate-limits us, so concurrent fetchers back off.
+// Set to a future timestamp whenever the API rate-limits us, so all fetchers back off.
 let rateLimitBackoffUntil = 0;
 let currentFetchConcurrency = HISTORY_FETCH_CONCURRENCY;
 
-// Last.fm's documented limit is 5 requests per originating IP per second
-// (averaged over 5 minutes). Every API request is paced through a global
-// limiter so request *starts* never exceed this, no matter how many are in
-// flight. Requests originate from each visitor's own browser, so this budget
-// is per-user. Nudge the target down slightly if you ever see stray 429s.
-const TARGET_REQUESTS_PER_SECOND = 5;
-const MIN_REQUEST_INTERVAL_MS = 1000 / TARGET_REQUESTS_PER_SECOND;
-let rateLimiterNextSlot = 0;
+// Last.fm's documented limit is 5 requests per originating IP per second,
+// AVERAGED over a 5-minute period. Averaged means the compliant budget for any
+// 5-minute window is ~1500 requests, not a hard 5-per-second tick — so a burst
+// is fine as long as the average holds. This token bucket models exactly that:
+// it starts full, each request spends a token, and tokens refill at 5/s. Until
+// the bucket runs dry, requests fire with no artificial delay (with 1000-track
+// pages that one-shots libraries up to ~1M scrobbles); after that, everything
+// settles to the sustainable 5/s rate. Requests originate from each visitor's
+// own browser, so this budget is per-user. A 429 empties the bucket on top of
+// the usual backoff. Shrink RATE_BURST_CAPACITY if stray 429s show up in the wild.
+const RATE_REFILL_PER_SECOND = 5;
+const RATE_BURST_CAPACITY = 1000;
+let rateTokens = RATE_BURST_CAPACITY;
+let rateLastRefillAt = Date.now();
 
 // True once any detailed Last.fm metadata (durations, tags, global stats) has
 // been loaded. Metadata-only filters/sorts stay disabled until this is set.
@@ -1688,19 +1694,30 @@ async function waitOutRateLimitBackoff() {
     }
 }
 
-// Global leaky-bucket limiter: hand out one request "slot" every
-// MIN_REQUEST_INTERVAL_MS so that request starts never exceed the target rate,
-// regardless of how many callers are running concurrently. The synchronous
-// slot bookkeeping runs to completion before any await, so concurrent callers
-// reserve distinct, evenly-spaced slots. Any active 429 backoff is honoured too.
-async function acquireRateSlot() {
-    await waitOutRateLimitBackoff();
+// Global token-bucket limiter (see the RATE_* constants for the reasoning).
+// Each request spends one token; while tokens remain, requests start with no
+// delay, and once the bucket is empty callers queue up at the refill rate.
+// The token bookkeeping is synchronous between awaits, so concurrent callers
+// can't double-spend a token. Any active 429 backoff is honoured on top.
+function refillRateTokens() {
     const now = Date.now();
-    const slot = Math.max(now, rateLimiterNextSlot);
-    rateLimiterNextSlot = slot + MIN_REQUEST_INTERVAL_MS;
-    const wait = slot - now;
-    if (wait > 0) {
-        await new Promise(resolve => setTimeout(resolve, wait));
+    const elapsedSeconds = (now - rateLastRefillAt) / 1000;
+    rateTokens = Math.min(RATE_BURST_CAPACITY, rateTokens + elapsedSeconds * RATE_REFILL_PER_SECOND);
+    rateLastRefillAt = now;
+}
+
+async function acquireRateSlot() {
+    while (true) {
+        await waitOutRateLimitBackoff();
+        refillRateTokens();
+        if (rateTokens >= 1) {
+            rateTokens -= 1;
+            return;
+        }
+        // Wait for the next token, then loop to re-check (another caller or a
+        // fresh 429 backoff may have intervened while we slept).
+        const waitMs = ((1 - rateTokens) / RATE_REFILL_PER_SECOND) * 1000;
+        await new Promise(resolve => setTimeout(resolve, waitMs));
     }
 }
 
@@ -1716,7 +1733,8 @@ async function fetchJsonWithRetry(url, maxRetries = 3, delayMs = 1000) {
         try {
             const response = await rateLimitedFetch(url);
 
-            // Handle rate limiting explicitly: back every worker off for a bit
+            // Handle rate limiting explicitly: back every worker off for a bit,
+            // empty the token bucket so no burst allowance survives the 429,
             // and shrink the concurrency ceiling so we settle under the limit.
             if (response.status === 429) {
                 const retryAfterHeader = parseInt(response.headers.get("retry-after"), 10);
@@ -1724,6 +1742,8 @@ async function fetchJsonWithRetry(url, maxRetries = 3, delayMs = 1000) {
                     ? retryAfterHeader * 1000
                     : delayMs * Math.pow(2, attempt);
                 rateLimitBackoffUntil = Date.now() + backoff;
+                rateTokens = 0;
+                rateLastRefillAt = Date.now();
                 currentFetchConcurrency = Math.max(MIN_FETCH_CONCURRENCY, currentFetchConcurrency - 1);
                 console.warn(`Rate limited (429). Backing off ${backoff}ms, concurrency now ${currentFetchConcurrency}.`);
                 if (attempt === maxRetries) return null;
