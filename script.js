@@ -59,6 +59,15 @@ const MIN_FETCH_CONCURRENCY = 1;
 let rateLimitBackoffUntil = 0;
 let currentFetchConcurrency = HISTORY_FETCH_CONCURRENCY;
 
+// Last.fm's documented limit is 5 requests per originating IP per second
+// (averaged over 5 minutes). Every API request is paced through a global
+// limiter so request *starts* never exceed this, no matter how many are in
+// flight. Requests originate from each visitor's own browser, so this budget
+// is per-user. Nudge the target down slightly if you ever see stray 429s.
+const TARGET_REQUESTS_PER_SECOND = 5;
+const MIN_REQUEST_INTERVAL_MS = 1000 / TARGET_REQUESTS_PER_SECOND;
+let rateLimiterNextSlot = 0;
+
 // True once any detailed Last.fm metadata (durations, tags, global stats) has
 // been loaded. Metadata-only filters/sorts stay disabled until this is set.
 let extendedDataLoaded = false;
@@ -167,7 +176,7 @@ async function updateSessionAvatar(username) {
     avatarFallback.style.display = 'inline';
 
     try {
-        const response = await fetch(`https://ws.audioscrobbler.com/2.0/?method=user.getinfo&user=${encodeURIComponent(username)}&api_key=${API_KEY}&format=json&autocorrect=0`);
+        const response = await rateLimitedFetch(`https://ws.audioscrobbler.com/2.0/?method=user.getinfo&user=${encodeURIComponent(username)}&api_key=${API_KEY}&format=json&autocorrect=0`);
         const data = await response.json();
         const images = Array.isArray(data?.user?.image) ? data.user.image : [];
         const preferred = images.find(img => img.size === 'extralarge' || img.size === 'large') || images[images.length - 1];
@@ -578,7 +587,7 @@ async function fetchAlbumCoverUrl(albumName, artistName) {
 
     try {
         const url = `https://ws.audioscrobbler.com/2.0/?method=album.getinfo&album=${encodeURIComponent(albumName)}&artist=${encodeURIComponent(artistName)}&api_key=${API_KEY}&format=json&autocorrect=0`;
-        const response = await fetch(url);
+        const response = await rateLimitedFetch(url);
         const data = await response.json();
         const images = Array.isArray(data?.album?.image) ? data.album.image : [];
         const preferred =
@@ -1679,11 +1688,33 @@ async function waitOutRateLimitBackoff() {
     }
 }
 
+// Global leaky-bucket limiter: hand out one request "slot" every
+// MIN_REQUEST_INTERVAL_MS so that request starts never exceed the target rate,
+// regardless of how many callers are running concurrently. The synchronous
+// slot bookkeeping runs to completion before any await, so concurrent callers
+// reserve distinct, evenly-spaced slots. Any active 429 backoff is honoured too.
+async function acquireRateSlot() {
+    await waitOutRateLimitBackoff();
+    const now = Date.now();
+    const slot = Math.max(now, rateLimiterNextSlot);
+    rateLimiterNextSlot = slot + MIN_REQUEST_INTERVAL_MS;
+    const wait = slot - now;
+    if (wait > 0) {
+        await new Promise(resolve => setTimeout(resolve, wait));
+    }
+}
+
+// fetch() wrapper that every Last.fm API call goes through, so all of them
+// share the one global rate budget.
+async function rateLimitedFetch(url, options) {
+    await acquireRateSlot();
+    return fetch(url, options);
+}
+
 async function fetchJsonWithRetry(url, maxRetries = 3, delayMs = 1000) {
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
         try {
-            await waitOutRateLimitBackoff();
-            const response = await fetch(url);
+            const response = await rateLimitedFetch(url);
 
             // Handle rate limiting explicitly: back every worker off for a bit
             // and shrink the concurrency ceiling so we settle under the limit.
@@ -1782,7 +1813,7 @@ async function fetchArtistDetails(artistName) {
     const url = `https://ws.audioscrobbler.com/2.0/?method=artist.getinfo&artist=${encodeURIComponent(artistName)}&api_key=${API_KEY}&format=json&autocorrect=0`;
 
     try {
-        const response = await fetch(url);
+        const response = await rateLimitedFetch(url);
         const data = await response.json();
 
         if (!data.artist || !data.artist.stats) {
@@ -1886,7 +1917,7 @@ async function fetchAlbumDetails(album) {
     const url = `https://ws.audioscrobbler.com/2.0/?method=album.getInfo&api_key=${API_KEY}&artist=${encodeURIComponent(album.artist)}&album=${encodeURIComponent(album.name)}&format=json&autocorrect=0`;
 
     try {
-        const response = await fetch(url);
+        const response = await rateLimitedFetch(url);
         const data = await response.json();
 
         if (data.album) {
@@ -1979,7 +2010,7 @@ async function fetchTrackDetails(track) {
 	let attempts = 0;
 	while (attempts < 2) {
 		try {
-			const response = await fetch(url);
+			const response = await rateLimitedFetch(url);
 			const data = await response.json();
 
 			// Rate limit detection (Last.fm sometimes returns errors when limited)
