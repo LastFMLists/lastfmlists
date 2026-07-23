@@ -1,6 +1,16 @@
 # lastfmlists
 A small project to create lists based on last.fm data
 
+Version 2.1 changelog:
+
+- Faster first load: history pages are now fetched in parallel instead of one at a time. Big accounts (hundreds of thousands of scrobbles) load much quicker.
+- Bigger page requests when Last.fm allows them, with an automatic fall back to the safe size. The page count is worked out from what the server actually returns, so no scrobbles get dropped either way.
+- Live preview while loading: your top tracks or artists start filling in from the scrobbles fetched so far, so you're not staring at a blank screen. The real filtered list replaces it once loading finishes.
+- Top artist, album and track stats are fetched at the same time instead of one after another.
+- Added a request rate limiter that keeps loading within Last.fm's limit of 5 requests per second (per IP), with automatic back off if the API returns a rate-limit error. Since everything runs in your browser, each user has their own budget.
+- Filters and sorts that need detailed metadata (track length, tags, global listeners/playcount, time spent listening, percentage of global scrobbles) are now disabled until you load detailed data. Hovering a locked filter tells you how to turn it on.
+- Reworded the Load Details and Load All Details buttons so hovering them explains what they download and which lists they turn on.
+
 Version 2.0 changelog:
 
 - Full UI rework: redesigned top panel, Base Settings, and responsive layout for desktop and mobile.
