@@ -65,6 +65,11 @@
             </div>
         </section>
 
+        <nav id="view-tabs" class="view-tabs" aria-label="Switch view">
+            <button type="button" id="tab-lists" class="view-tab is-active" data-view="lists" aria-pressed="true"><i class="fas fa-list" aria-hidden="true"></i><span>Lists</span></button>
+            <button type="button" id="tab-games" class="view-tab" data-view="games" aria-pressed="false" disabled title="Load your data first to play"><i class="fas fa-gamepad" aria-hidden="true"></i><span>Games</span></button>
+        </nav>
+
         <div id="loading-stats" class="content-block"></div>
 
         <section id="filters-section">
@@ -592,6 +597,71 @@
         <section id="results-section" class="content-block">
             <h2>Top Tracks</h2>
             <div id="results"></div>
+        </section>
+
+        <section id="games-section" class="content-block">
+            <div id="games-home" class="games-home">
+                <h2>Games</h2>
+                <p class="games-intro">Play with your own listening data. No extra loading — these run on the library you already have.</p>
+                <div class="games-grid">
+                    <button type="button" class="game-card" id="open-higherlower">
+                        <span class="game-card-icon"><i class="fas fa-arrow-up-wide-short" aria-hidden="true"></i></span>
+                        <span class="game-card-title">Higher or Lower</span>
+                        <span class="game-card-desc">Two picks from your library. Guess which one you've scrobbled more, and keep the streak going.</span>
+                    </button>
+                    <div class="game-card game-card-soon" aria-disabled="true">
+                        <span class="game-card-icon"><i class="fas fa-list-ol" aria-hidden="true"></i></span>
+                        <span class="game-card-title">Fill the List</span>
+                        <span class="game-card-desc">Coming soon.</span>
+                    </div>
+                </div>
+            </div>
+
+            <div id="hl-game" class="hl-game" hidden>
+                <button type="button" class="hl-back" id="hl-back"><i class="fas fa-arrow-left" aria-hidden="true"></i> All games</button>
+
+                <div id="hl-setup" class="hl-setup">
+                    <h2>Higher or Lower</h2>
+                    <p>Which have you scrobbled more? Pick what you want to play with:</p>
+                    <div class="hl-type-choice">
+                        <button type="button" class="hl-type" data-type="artist"><i class="fas fa-microphone" aria-hidden="true"></i>Artists</button>
+                        <button type="button" class="hl-type" data-type="album"><i class="fas fa-compact-disc" aria-hidden="true"></i>Albums</button>
+                        <button type="button" class="hl-type" data-type="track"><i class="fas fa-music" aria-hidden="true"></i>Tracks</button>
+                    </div>
+                    <p id="hl-setup-note" class="hl-setup-note" hidden></p>
+                </div>
+
+                <div id="hl-play" class="hl-play" hidden>
+                    <div class="hl-scorebar">
+                        <span class="hl-score">Streak <strong id="hl-streak">0</strong></span>
+                        <span class="hl-score">Best <strong id="hl-best">0</strong></span>
+                    </div>
+                    <div class="hl-round">
+                        <button type="button" class="hl-option" data-side="left">
+                            <span class="hl-option-name"></span>
+                            <span class="hl-option-sub"></span>
+                            <span class="hl-option-count"></span>
+                        </button>
+                        <div class="hl-vs">vs</div>
+                        <button type="button" class="hl-option" data-side="right">
+                            <span class="hl-option-name"></span>
+                            <span class="hl-option-sub"></span>
+                            <span class="hl-option-count"></span>
+                        </button>
+                    </div>
+                    <p class="hl-prompt">Tap the one with more scrobbles</p>
+                    <div id="hl-feedback" class="hl-feedback" aria-live="polite"></div>
+                </div>
+
+                <div id="hl-over" class="hl-over" hidden>
+                    <h2>Streak over</h2>
+                    <p class="hl-over-score">You reached <strong id="hl-final">0</strong>. Best this session: <strong id="hl-best-2">0</strong>.</p>
+                    <div class="hl-over-actions">
+                        <button type="button" id="hl-again" class="hl-primary">Play again</button>
+                        <button type="button" id="hl-change-type" class="hl-secondary">Change type</button>
+                    </div>
+                </div>
+            </div>
         </section>
 
         <div id="export-modal" class="modal-overlay" aria-hidden="true">
