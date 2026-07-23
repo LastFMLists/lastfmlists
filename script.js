@@ -40,6 +40,42 @@ const DB_NAME = 'lastfmDataDB';
 const DB_VERSION = 1;
 const STORE_NAME = 'userData';
 const API_KEY = "edbd779d54b373b8710af5c346148ae3";
+
+// --- History fetching / performance tuning ---
+// Aspirational page size for user.getRecentTracks. Last.fm reliably serves 200
+// per page with extended=1; larger values MAY be honoured (fewer requests) but
+// are not guaranteed. The fetch logic never trusts this blindly: it derives the
+// real page count from the number of tracks the server actually returns and
+// falls back to HISTORY_PAGE_SIZE_SAFE if a large-limit request comes back
+// empty/invalid, so raising this can only ever speed things up, never lose data.
+const HISTORY_PAGE_SIZE_LARGE = 1000;
+const HISTORY_PAGE_SIZE_SAFE = 200;
+// How many history pages to fetch in parallel. Last.fm's practical rate limit is
+// ~5 req/s per API key (shared across all users of this site), so keep this
+// modest. It is lowered automatically when the API starts returning 429s.
+const HISTORY_FETCH_CONCURRENCY = 5;
+const MIN_FETCH_CONCURRENCY = 1;
+// Set to true whenever the API rate-limits us, so concurrent fetchers back off.
+let rateLimitBackoffUntil = 0;
+let currentFetchConcurrency = HISTORY_FETCH_CONCURRENCY;
+
+// Last.fm's documented limit is 5 requests per originating IP per second
+// (averaged over 5 minutes). Every API request is paced through a global
+// limiter so request *starts* never exceed this, no matter how many are in
+// flight. Requests originate from each visitor's own browser, so this budget
+// is per-user. Nudge the target down slightly if you ever see stray 429s.
+const TARGET_REQUESTS_PER_SECOND = 5;
+const MIN_REQUEST_INTERVAL_MS = 1000 / TARGET_REQUESTS_PER_SECOND;
+let rateLimiterNextSlot = 0;
+
+// True once any detailed Last.fm metadata (durations, tags, global stats) has
+// been loaded. Metadata-only filters/sorts stay disabled until this is set.
+let extendedDataLoaded = false;
+
+// Tooltips for the two metadata-loading buttons, kept in sync with index.html.
+const LOAD_DETAILS_TOOLTIP = "Load extended data for your top artists, albums and tracks — Last.fm metadata like track length, genre/country tags, and global listeners/playcount. This unlocks the duration, tags and global-stats filters plus the “Time spent listening” and “Percentage of global scrobbles” sorts. Enough for most stats and much faster than “Load All Details”.";
+const LOAD_ALL_DETAILS_TOOLTIP = "Same extended metadata (track length, tags, global listeners/playcount) but for EVERY song you've ever scrobbled, not just your top ones. Unlocks the duration, tags and global-stats filters and the “Time spent listening” / “Percentage of global scrobbles” sorts for your whole library. This makes thousands of requests and can take a very long time.";
+
 const resultsDiv = document.getElementById("results");
 const loadingDiv = document.getElementById("loading-stats");
 const albumCoverCache = new Map();
@@ -84,6 +120,50 @@ function setAppLoadedState(username) {
     }
 }
 
+// Message shown when hovering a control that needs extended metadata.
+const EXTENDED_LOCKED_MSG = "🔒 Needs extended data. Click “Load Details” (or “Load All Details”) at the top first — this uses Last.fm metadata (track length, tags, global listeners/playcount) that isn't downloaded with your basic history.";
+
+// Enable/disable every control that only works once detailed Last.fm metadata
+// has been loaded, and explain via tooltip how to unlock it. Called on init,
+// after metadata loads, and after restoring saved data that already has it.
+function updateExtendedDataUI() {
+    const locked = !extendedDataLoaded;
+
+    document.querySelectorAll(".requires-extended").forEach(group => {
+        group.classList.toggle("locked", locked);
+        group.title = locked ? EXTENDED_LOCKED_MSG : "";
+        group.querySelectorAll("input, select, textarea").forEach(control => {
+            control.disabled = locked;
+            control.title = locked ? EXTENDED_LOCKED_MSG : "";
+        });
+    });
+
+    // Sorting options that depend on metadata (duration, global playcount).
+    const sortingSelect = document.getElementById("sorting-basis");
+    if (sortingSelect) {
+        ["time-spent-listening", "highest-listening-percentage"].forEach(value => {
+            const option = sortingSelect.querySelector(`option[value="${value}"]`);
+            if (!option) return;
+            option.disabled = locked;
+            const base = option.textContent.replace(/\s*🔒.*$/, "");
+            option.textContent = locked ? `${base} 🔒` : base;
+        });
+        // If a now-locked option was somehow selected, revert to the default.
+        if (locked && sortingSelect.selectedOptions[0]?.disabled) {
+            sortingSelect.value = "scrobbles";
+        }
+    }
+}
+
+// Detect whether an already-loaded dataset (e.g. restored from the browser)
+// contains detailed metadata, so gated controls unlock without a re-fetch.
+function datasetHasExtendedMetadata() {
+    const hasTags = Array.isArray(artistsData) && artistsData.some(a => Array.isArray(a?.tags) && a.tags.length > 0);
+    const hasDuration = Array.isArray(tracksData) && tracksData.some(t => parseInt(t?.duration, 10) > 0);
+    const hasGlobal = Array.isArray(artistsData) && artistsData.some(a => parseInt(a?.listeners, 10) > 0 || parseInt(a?.playcount, 10) > 0);
+    return hasTags || hasDuration || hasGlobal;
+}
+
 async function updateSessionAvatar(username) {
     const avatar = document.getElementById('session-avatar');
     const avatarFallback = document.getElementById('session-avatar-fallback');
@@ -96,7 +176,7 @@ async function updateSessionAvatar(username) {
     avatarFallback.style.display = 'inline';
 
     try {
-        const response = await fetch(`https://ws.audioscrobbler.com/2.0/?method=user.getinfo&user=${encodeURIComponent(username)}&api_key=${API_KEY}&format=json&autocorrect=0`);
+        const response = await rateLimitedFetch(`https://ws.audioscrobbler.com/2.0/?method=user.getinfo&user=${encodeURIComponent(username)}&api_key=${API_KEY}&format=json&autocorrect=0`);
         const data = await response.json();
         const images = Array.isArray(data?.user?.image) ? data.user.image : [];
         const preferred = images.find(img => img.size === 'extralarge' || img.size === 'large') || images[images.length - 1];
@@ -507,7 +587,7 @@ async function fetchAlbumCoverUrl(albumName, artistName) {
 
     try {
         const url = `https://ws.audioscrobbler.com/2.0/?method=album.getinfo&album=${encodeURIComponent(albumName)}&artist=${encodeURIComponent(artistName)}&api_key=${API_KEY}&format=json&autocorrect=0`;
-        const response = await fetch(url);
+        const response = await rateLimitedFetch(url);
         const data = await response.json();
         const images = Array.isArray(data?.album?.image) ? data.album.image : [];
         const preferred =
@@ -987,7 +1067,14 @@ document.getElementById("username-form").addEventListener("submit", async (event
         artistsData = savedArtistsData || [];
         albumsData = savedAlbumsData || [];
         tracksData = savedTracksData || [];
-    
+
+        // If the saved dataset already contains detailed metadata, unlock the
+        // gated filters/sorts so the user doesn't have to re-download it.
+        if (datasetHasExtendedMetadata()) {
+            extendedDataLoaded = true;
+            updateExtendedDataUI();
+        }
+
         // Find the latest track date in the saved allTracks.
         let latestTimestamp = 0;
         savedAllTracks.forEach(track => {
@@ -1002,8 +1089,8 @@ document.getElementById("username-form").addEventListener("submit", async (event
         allTracks = newTracks.concat(savedAllTracks);
 
     } else {
-        // No saved data exists, fetch all history.
-        allTracks = await fetchListeningHistory(username);
+        // No saved data exists, fetch all history (with a live preview as pages arrive).
+        allTracks = await fetchListeningHistory(username, renderLoadingPreview);
     }
     
     allTracks = allTracks.filter(track => {
@@ -1027,9 +1114,12 @@ document.getElementById("username-form").addEventListener("submit", async (event
     ensureRaceDateDefaults(true);
 
 	// ✅ ALWAYS re-fetch the top stats to update rankings and counts!
-	topArtists = await fetchTopArtists(username);
-	topAlbums = await fetchTopAlbums(username);
-	topTracks = await fetchTopTracks(username);
+	// These three are independent, so fetch them concurrently.
+	[topArtists, topAlbums, topTracks] = await Promise.all([
+		fetchTopArtists(username),
+		fetchTopAlbums(username),
+		fetchTopTracks(username)
+	]);
 
     // Reset track counts in artistsData and albumsData
     const artistTrackSets = Object.create(null);
@@ -1167,11 +1257,11 @@ document.getElementById("username-form").addEventListener("submit", async (event
     const loadAllDetailsBtn = document.getElementById("load-all-details");
     if (loadDetailedBtn) {
         loadDetailedBtn.disabled = false;
-        loadDetailedBtn.title = "Click to load detailed data!";
+        loadDetailedBtn.title = LOAD_DETAILS_TOOLTIP;
     }
     if (loadAllDetailsBtn) {
         loadAllDetailsBtn.disabled = false;
-        loadAllDetailsBtn.title = "Downloads metadata for every single song you've ever listened to. This can take a very long time.";
+        loadAllDetailsBtn.title = LOAD_ALL_DETAILS_TOOLTIP;
     }
 
 	console.log("Final allTracks:", allTracks);
@@ -1271,6 +1361,10 @@ async function loadDetailedMetadata(loadAll = false) {
 	console.log("Merged artistsData:", artistsData);
 	console.log("Merged albumsData:", albumsData);
 	console.log("Merged tracksData:", tracksData);
+
+	// Detailed metadata is now available: unlock the gated filters/sorts.
+	extendedDataLoaded = true;
+	updateExtendedDataUI();
 
 	// Update display, filters, etc.
 	loadingDiv.innerHTML = ""; // Clear loading message
@@ -1381,53 +1475,157 @@ if (confirmGridExportButton) {
     });
 }
   
-async function fetchListeningHistory(username) {
-    const baseUrl = `https://ws.audioscrobbler.com/2.0/?method=user.getrecenttracks&user=${username}&api_key=${API_KEY}&format=json&extended=1&limit=200&autocorrect=0`;
+// Map a raw Last.fm recenttracks entry to our internal shape.
+function mapRecentTrack(track) {
+    return {
+        Artist: track.artist?.name || track.artist?.["#text"] || "Unknown",
+        Album: track.album?.["#text"] || "Unknown",
+        Track: track.name || "Unknown",
+        Date: track.date?.uts ? parseInt(track.date.uts) * 1000 : null
+    };
+}
 
-    const firstData = await fetchJsonWithRetry(baseUrl);
+// Lightweight live preview shown while history is still downloading, so the
+// user sees lists forming instead of a frozen "loading" message. This is a raw
+// scrobble-count tally only; the full filter/sort pipeline runs once loading
+// finishes and replaces this.
+function renderLoadingPreview({ artistTally, trackTally, scrobbles, pagesLoaded, totalPages }) {
+    const results = document.getElementById("results");
+    if (!results) return;
+
+    const entityTypeEl = document.getElementById("entity-type");
+    const entityType = entityTypeEl ? entityTypeEl.value : "track";
+    const listLength = parseInt(document.getElementById("list-length")?.value, 10) || 10;
+
+    const useArtists = entityType === "artist";
+    const heading = document.querySelector("#results-section h2");
+    if (heading) {
+        const label = useArtists ? "artists" : "tracks";
+        heading.textContent = `Building your top ${label}… ${scrobbles.toLocaleString()} scrobbles (page ${pagesLoaded}/${totalPages})`;
+    }
+
+    let entries;
+    if (useArtists) {
+        entries = Array.from(artistTally.entries())
+            .map(([artist, count]) => ({ title: `<strong>${escapeHTML(artist)}</strong>`, count }));
+    } else {
+        entries = Array.from(trackTally.entries())
+            .map(([key, count]) => {
+                const sep = key.indexOf("||||");
+                const track = sep >= 0 ? key.slice(0, sep) : key;
+                const artist = sep >= 0 ? key.slice(sep + 4) : "";
+                return { title: `<strong>${escapeHTML(track)}</strong> by ${escapeHTML(artist)}`, count };
+            });
+    }
+
+    entries.sort((a, b) => b.count - a.count);
+    const top = entries.slice(0, listLength);
+
+    const fragment = document.createDocumentFragment();
+
+    const banner = document.createElement("div");
+    banner.className = "loading-preview-banner";
+    banner.textContent = "Live preview — still loading, ranked by scrobble count. Filters apply once loading finishes.";
+    fragment.appendChild(banner);
+
+    top.forEach((entry, index) => {
+        const row = document.createElement("div");
+        row.classList.add(useArtists ? "artist" : "track");
+        row.innerHTML = `<strong>${index + 1}.</strong> ${entry.title}<br>Scrobbles so far: ${entry.count.toLocaleString()}`;
+        fragment.appendChild(row);
+    });
+
+    results.innerHTML = "";
+    results.appendChild(fragment);
+}
+
+async function fetchListeningHistory(username, onPreview = null) {
+    // Reset adaptive throttling for a fresh load.
+    currentFetchConcurrency = HISTORY_FETCH_CONCURRENCY;
+    rateLimitBackoffUntil = 0;
+
+    const buildUrl = (limit, page) =>
+        `https://ws.audioscrobbler.com/2.0/?method=user.getrecenttracks&user=${username}&api_key=${API_KEY}&format=json&extended=1&limit=${limit}&autocorrect=0&page=${page}`;
+
+    // Try a large page size first; if the API rejects it (empty/invalid page 1),
+    // transparently fall back to the known-good size. Either way the real page
+    // count is derived below from what the server actually returns, so a
+    // silently capped limit can never drop scrobbles. The probe uses a single
+    // quick retry so a rejected large limit falls back fast.
+    let pageSize = HISTORY_PAGE_SIZE_LARGE;
+    let firstData = await fetchJsonWithRetry(buildUrl(pageSize, 1), 1);
+    if (!firstData || !firstData.recenttracks || !Array.isArray(firstData.recenttracks.track) || firstData.recenttracks.track.length === 0) {
+        console.warn(`Large page size (${pageSize}) returned no usable data; falling back to ${HISTORY_PAGE_SIZE_SAFE}.`);
+        pageSize = HISTORY_PAGE_SIZE_SAFE;
+        firstData = await fetchJsonWithRetry(buildUrl(pageSize, 1));
+    }
 
     if (!firstData || !firstData.recenttracks || !Array.isArray(firstData.recenttracks.track)) {
         console.error("Error: Could not connect to Last.fm.");
         return [];
     }
 
-    const totalPages = parseInt(firstData.recenttracks["@attr"].totalPages, 10) || 1;
-    console.log(`Total Pages to fetch: ${totalPages}`); // Log total count
+    const attr = firstData.recenttracks["@attr"] || {};
+    const totalScrobbles = parseInt(attr.total, 10) || 0;
 
-    let lastfmData = firstData.recenttracks.track.map((track) => ({
-        Artist: track.artist?.name || track.artist?.["#text"] || "Unknown",
-        Album: track.album?.["#text"] || "Unknown",
-        Track: track.name || "Unknown",
-        Date: track.date?.uts ? parseInt(track.date.uts) * 1000 : null
-    }));
+    const firstPageTracks = firstData.recenttracks.track.map(mapRecentTrack);
+    // "Now playing" tracks have no date and don't count toward pagination.
+    const datedOnFirstPage = firstPageTracks.filter(t => t.Date !== null).length || firstPageTracks.length;
+    // Derive page count from the server's ACTUAL per-page size, not the requested
+    // limit, so it stays correct whether the limit was honoured or capped.
+    const effectivePageSize = Math.max(1, datedOnFirstPage);
+    const totalPages = totalScrobbles > 0
+        ? Math.max(1, Math.ceil(totalScrobbles / effectivePageSize))
+        : (parseInt(attr.totalPages, 10) || 1);
+
+    console.log(`History fetch: ${totalScrobbles} scrobbles, page size ${effectivePageSize}, ${totalPages} pages, concurrency ${currentFetchConcurrency}.`);
+
+    const lastfmData = [...firstPageTracks];
+
+    // Running tally that powers the live "building your lists" preview.
+    const artistTally = new Map();
+    const trackTally = new Map();
+    const addToTally = (tracks) => {
+        for (const t of tracks) {
+            if (!t.Artist) continue;
+            artistTally.set(t.Artist, (artistTally.get(t.Artist) || 0) + 1);
+            const trackKey = `${t.Track}||||${t.Artist}`;
+            trackTally.set(trackKey, (trackTally.get(trackKey) || 0) + 1);
+        }
+    };
+    addToTally(firstPageTracks);
+
+    let pagesLoaded = 1;
+    let lastPreviewAt = 0;
+    const emitPreview = (force = false) => {
+        if (typeof onPreview !== "function") return;
+        const now = Date.now();
+        if (!force && now - lastPreviewAt < 400) return; // throttle DOM work
+        lastPreviewAt = now;
+        onPreview({ artistTally, trackTally, scrobbles: lastfmData.length, pagesLoaded, totalPages });
+    };
 
     loadingDiv.innerHTML = `<p>Loading data... Page 1 of ${totalPages}</p>`;
+    emitPreview(true);
 
-    for (let page = 2; page <= totalPages; page++) {
-        const data = await fetchJsonWithRetry(`${baseUrl}&page=${page}`);
-
-        if (data && data.recenttracks && Array.isArray(data.recenttracks.track)) {
-            const pageTracks = data.recenttracks.track.map((track) => ({
-                Artist: track.artist?.name || track.artist?.["#text"] || "Unknown",
-                Album: track.album?.["#text"] || "Unknown",
-                Track: track.name || "Unknown",
-                Date: track.date?.uts ? parseInt(track.date.uts) * 1000 : null
-            }));
-
-            lastfmData.push(...pageTracks);
-            
-            // RESTORED LOGS HERE
-            console.log(`Fetched Page ${page}/${totalPages}, Total Tracks now: ${lastfmData.length}`);
-            loadingDiv.innerHTML = `<p>Loading data... Page ${page} of ${totalPages}</p>`;
-
-            if (page % 15 === 0) { 
-                await new Promise(resolve => setTimeout(resolve, 150)); 
+    if (totalPages > 1) {
+        const pageNumbers = Array.from({ length: totalPages - 1 }, (_, idx) => idx + 2);
+        await mapWithConcurrency(pageNumbers, async (page) => {
+            const data = await fetchJsonWithRetry(buildUrl(pageSize, page));
+            if (data && data.recenttracks && Array.isArray(data.recenttracks.track)) {
+                const pageTracks = data.recenttracks.track.map(mapRecentTrack);
+                lastfmData.push(...pageTracks);
+                addToTally(pageTracks);
+            } else {
+                console.warn(`Skipping page ${page} after multiple failed attempts.`);
             }
-        } else {
-            console.warn(`Skipping Page ${page} after multiple failed attempts.`);
-        }
+            pagesLoaded += 1;
+            loadingDiv.innerHTML = `<p>Loading data... Page ${pagesLoaded} of ${totalPages} (${lastfmData.length.toLocaleString()} scrobbles)</p>`;
+            emitPreview();
+        }, currentFetchConcurrency);
     }
 
+    emitPreview(true);
     console.log(`Fetch complete. Total tracks: ${lastfmData.length}`);
     return lastfmData;
 }
@@ -1481,11 +1679,58 @@ async function fetchRecentTracksSince(username, latestTimestamp) {
     return newTracks;
 }
 
+// Pause here if a recent request was rate-limited, so all concurrent workers
+// back off together instead of hammering the API.
+async function waitOutRateLimitBackoff() {
+    const remaining = rateLimitBackoffUntil - Date.now();
+    if (remaining > 0) {
+        await new Promise(resolve => setTimeout(resolve, remaining));
+    }
+}
+
+// Global leaky-bucket limiter: hand out one request "slot" every
+// MIN_REQUEST_INTERVAL_MS so that request starts never exceed the target rate,
+// regardless of how many callers are running concurrently. The synchronous
+// slot bookkeeping runs to completion before any await, so concurrent callers
+// reserve distinct, evenly-spaced slots. Any active 429 backoff is honoured too.
+async function acquireRateSlot() {
+    await waitOutRateLimitBackoff();
+    const now = Date.now();
+    const slot = Math.max(now, rateLimiterNextSlot);
+    rateLimiterNextSlot = slot + MIN_REQUEST_INTERVAL_MS;
+    const wait = slot - now;
+    if (wait > 0) {
+        await new Promise(resolve => setTimeout(resolve, wait));
+    }
+}
+
+// fetch() wrapper that every Last.fm API call goes through, so all of them
+// share the one global rate budget.
+async function rateLimitedFetch(url, options) {
+    await acquireRateSlot();
+    return fetch(url, options);
+}
+
 async function fetchJsonWithRetry(url, maxRetries = 3, delayMs = 1000) {
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
         try {
-            const response = await fetch(url);
-            
+            const response = await rateLimitedFetch(url);
+
+            // Handle rate limiting explicitly: back every worker off for a bit
+            // and shrink the concurrency ceiling so we settle under the limit.
+            if (response.status === 429) {
+                const retryAfterHeader = parseInt(response.headers.get("retry-after"), 10);
+                const backoff = (!isNaN(retryAfterHeader) && retryAfterHeader > 0)
+                    ? retryAfterHeader * 1000
+                    : delayMs * Math.pow(2, attempt);
+                rateLimitBackoffUntil = Date.now() + backoff;
+                currentFetchConcurrency = Math.max(MIN_FETCH_CONCURRENCY, currentFetchConcurrency - 1);
+                console.warn(`Rate limited (429). Backing off ${backoff}ms, concurrency now ${currentFetchConcurrency}.`);
+                if (attempt === maxRetries) return null;
+                await new Promise(resolve => setTimeout(resolve, backoff));
+                continue;
+            }
+
             // Check for HTTP errors (500, 503, etc.)
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}`);
@@ -1568,7 +1813,7 @@ async function fetchArtistDetails(artistName) {
     const url = `https://ws.audioscrobbler.com/2.0/?method=artist.getinfo&artist=${encodeURIComponent(artistName)}&api_key=${API_KEY}&format=json&autocorrect=0`;
 
     try {
-        const response = await fetch(url);
+        const response = await rateLimitedFetch(url);
         const data = await response.json();
 
         if (!data.artist || !data.artist.stats) {
@@ -1672,7 +1917,7 @@ async function fetchAlbumDetails(album) {
     const url = `https://ws.audioscrobbler.com/2.0/?method=album.getInfo&api_key=${API_KEY}&artist=${encodeURIComponent(album.artist)}&album=${encodeURIComponent(album.name)}&format=json&autocorrect=0`;
 
     try {
-        const response = await fetch(url);
+        const response = await rateLimitedFetch(url);
         const data = await response.json();
 
         if (data.album) {
@@ -1765,7 +2010,7 @@ async function fetchTrackDetails(track) {
 	let attempts = 0;
 	while (attempts < 2) {
 		try {
-			const response = await fetch(url);
+			const response = await rateLimitedFetch(url);
 			const data = await response.json();
 
 			// Rate limit detection (Last.fm sometimes returns errors when limited)
@@ -1930,10 +2175,12 @@ if (csvFileInput) csvFileInput.addEventListener('change', async (event) => {
         buildHistoryContextMaps();
         ensureRaceDateDefaults(true);
 
-        // ✅ Fetch top stats using the extracted username
-        const topArtists = await fetchTopArtists(username);
-        const topAlbums = await fetchTopAlbums(username);
-        const topTracks = await fetchTopTracks(username);
+        // ✅ Fetch top stats using the extracted username (independent → concurrent)
+        const [topArtists, topAlbums, topTracks] = await Promise.all([
+            fetchTopArtists(username),
+            fetchTopAlbums(username),
+            fetchTopTracks(username)
+        ]);
 
         // ✅ Ensure first scrobbles are properly retrieved
         console.log("First Scrobbles Data:", firstScrobbles);
@@ -2008,11 +2255,11 @@ if (csvFileInput) csvFileInput.addEventListener('change', async (event) => {
         const loadAllDetailsBtn = document.getElementById("load-all-details");
         if (loadDetailedBtn) {
             loadDetailedBtn.disabled = false;
-            loadDetailedBtn.title = "Click to load detailed data!";
+            loadDetailedBtn.title = LOAD_DETAILS_TOOLTIP;
         }
         if (loadAllDetailsBtn) {
             loadAllDetailsBtn.disabled = false;
-            loadAllDetailsBtn.title = "Downloads metadata for every single song you've ever listened to. This can take a very long time.";
+            loadAllDetailsBtn.title = LOAD_ALL_DETAILS_TOOLTIP;
         }
 
         setAppLoadedState(username);
@@ -6301,6 +6548,7 @@ document.addEventListener("DOMContentLoaded", () => {
     ensureRaceDateDefaults();
     updateRaceControlsVisibility();
     updateComparisonInteractionState();
+    updateExtendedDataUI(); // Start with metadata-only controls locked.
 
     document.querySelectorAll(".dropdown-button").forEach(button => {
         button.addEventListener("click", (event) => {

@@ -51,8 +51,8 @@
                 </div>
             </div>
             <div class="session-actions">
-                <button type="button" id="load-detailed-data" disabled aria-label="Load details" title="Load your regular data and save it to your browser to unlock loading detailed data!"><i class="fas fa-circle-down" aria-hidden="true"></i><span class="btn-label">Load Details</span></button>
-                <button type="button" id="load-all-details" disabled aria-label="Load all details" title="Downloads metadata for every single song you've ever listened to. This can take a very long time."><i class="fas fa-cloud-arrow-down" aria-hidden="true"></i><span class="btn-label">Load All Details</span></button>
+                <button type="button" id="load-detailed-data" disabled aria-label="Load details" title="Load extended data for your top artists, albums and tracks — Last.fm metadata like track length, genre/country tags, and global listeners/playcount. This unlocks the duration, tags and global-stats filters plus the “Time spent listening” and “Percentage of global scrobbles” sorts. Enough for most stats and much faster than “Load All Details”. (Load and save your data first to enable this.)"><i class="fas fa-circle-down" aria-hidden="true"></i><span class="btn-label">Load Details</span></button>
+                <button type="button" id="load-all-details" disabled aria-label="Load all details" title="Same extended metadata (track length, tags, global listeners/playcount) but for EVERY song you've ever scrobbled, not just your top ones. Unlocks the duration, tags and global-stats filters and the “Time spent listening” / “Percentage of global scrobbles” sorts for your whole library. This makes thousands of requests and can take a very long time. (Load and save your data first to enable this.)"><i class="fas fa-cloud-arrow-down" aria-hidden="true"></i><span class="btn-label">Load All Details</span></button>
                 <button type="button" id="save-data" aria-label="Save data" title="Save your loaded data to this browser"><i class="fas fa-floppy-disk" aria-hidden="true"></i><span class="btn-label">Save Data</span></button>
                 <button type="button" id="open-export-options" aria-label="Export as image" title="Export the current list as a PNG image"><i class="fas fa-image" aria-hidden="true"></i><span class="btn-label">Export Image</span></button>
                 <button type="button" id="open-grid-export" aria-label="Export as grid" title="Export album artwork as a collage grid"><i class="fas fa-table-cells" aria-hidden="true"></i><span class="btn-label">Export Grid</span></button>
@@ -250,8 +250,8 @@
 
                         <hr class="separator">
 
-                        <!-- Category 3: Global (Last.fm detailed) filters -->
-                        <div class="input-group">
+                        <!-- Category 3: Global (Last.fm detailed) filters — require extended data -->
+                        <div class="input-group requires-extended">
                             <label>Artist global listeners (min – max)</label>
                             <div class="input-pair">
                                 <input type="number" id="artist-listeners-min" placeholder="0" min="0">
@@ -259,7 +259,7 @@
                             </div>
                         </div>
 
-                        <div class="input-group">
+                        <div class="input-group requires-extended">
                             <label>Artist global playcount (min – max)</label>
                             <div class="input-pair">
                                 <input type="number" id="artist-global-scrobbles-min" placeholder="0" min="0">
@@ -267,8 +267,10 @@
                             </div>
                         </div>
 
-                        <label for="artist-tags">Artist tags (genre, country, …)</label>
-                        <input type="text" id="artist-tags" placeholder="e.g., pop, rock, american">
+                        <div class="input-group requires-extended">
+                            <label for="artist-tags">Artist tags (genre, country, …)</label>
+                            <input type="text" id="artist-tags" placeholder="e.g., pop, rock, american">
+                        </div>
 
                     </div>
                 </div>
@@ -348,8 +350,8 @@
 
                         <hr class="separator">
 
-                        <!-- Category 3: Global (Last.fm detailed) filters -->
-                        <div class="input-group">
+                        <!-- Category 3: Global (Last.fm detailed) filters — require extended data -->
+                        <div class="input-group requires-extended">
                             <label>Album global listeners (min – max)</label>
                             <div class="input-pair">
                                 <input type="number" id="album-listeners-min" placeholder="0" min="0">
@@ -357,7 +359,7 @@
                             </div>
                         </div>
 
-                        <div class="input-group">
+                        <div class="input-group requires-extended">
                             <label>Album global playcount (min – max)</label>
                             <div class="input-pair">
                                 <input type="number" id="album-global-scrobbles-min" placeholder="0" min="0">
@@ -433,8 +435,8 @@
 
                         <hr class="separator">
 
-                        <!-- Category 3: Global (Last.fm detailed) filters -->
-                        <div class="input-group">
+                        <!-- Category 3: Global (Last.fm detailed) filters — require extended data -->
+                        <div class="input-group requires-extended">
                             <label>Track global listeners (min – max)</label>
                             <div class="input-pair">
                                 <input type="number" id="track-listeners-min" placeholder="0" min="0">
@@ -442,7 +444,7 @@
                             </div>
                         </div>
 
-                        <div class="input-group">
+                        <div class="input-group requires-extended">
                             <label>Track global playcount (min – max)</label>
                             <div class="input-pair">
                                 <input type="number" id="track-global-scrobbles-min" placeholder="0" min="0">
@@ -450,7 +452,7 @@
                             </div>
                         </div>
 
-                        <div class="input-group">
+                        <div class="input-group requires-extended">
                             <label>Track duration in seconds (min – max)</label>
                             <div class="input-pair">
                                 <input type="number" id="track-duration-min" placeholder="0" min="0">

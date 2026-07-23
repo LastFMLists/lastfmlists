@@ -730,6 +730,36 @@ body.app-loaded #session-panel {
     gap: 0.5rem;
 }
 
+/* Controls that only work once extended Last.fm metadata is loaded. */
+.requires-extended.locked {
+    opacity: 0.5;
+    cursor: help;
+    position: relative;
+}
+
+.requires-extended.locked input,
+.requires-extended.locked select,
+.requires-extended.locked textarea {
+    cursor: help;
+    pointer-events: none;
+}
+
+.requires-extended.locked label::after {
+    content: " 🔒";
+    font-size: 0.85em;
+}
+
+/* Live preview banner shown while listening history is still downloading. */
+.loading-preview-banner {
+    font-size: 0.85rem;
+    color: var(--secondary-text-color);
+    background: var(--secondary-accent-color);
+    border: 1px dashed var(--border-color);
+    border-radius: 8px;
+    padding: 0.5rem 0.75rem;
+    margin-bottom: 0.75rem;
+}
+
 .input-pair input {
     margin: 0;
 }
