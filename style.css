@@ -1644,22 +1644,22 @@ footer a:hover {
 .view-tabs {
     width: 100%;
     max-width: 1180px;
-    margin: 0 auto 0.4rem;
+    margin: 0 auto 0.35rem;
     display: flex;
-    gap: 0.4rem;
-    justify-content: center;
+    gap: 0.3rem;
+    justify-content: flex-start;
 }
 
 .view-tab {
     display: inline-flex;
     align-items: center;
-    gap: 0.5rem;
-    padding: 0.55rem 1.4rem;
+    gap: 0.4rem;
+    padding: 0.3rem 0.95rem;
     border: 1px solid var(--border-color);
     border-radius: 999px;
     background: var(--sidebar-color);
     color: var(--secondary-text-color);
-    font-size: 1rem;
+    font-size: 0.9rem;
     font-weight: 600;
     cursor: pointer;
     transition: background 0.18s, color 0.18s, border-color 0.18s, transform 0.18s;
@@ -1979,6 +1979,178 @@ button.game-card:hover {
     }
     .hl-option {
         min-height: 130px;
+    }
+}
+
+/* --- Fill the List --- */
+
+.ftl-group {
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 0.8rem 1rem 1rem;
+    margin: 0 0 1rem;
+}
+
+.ftl-group legend {
+    padding: 0 0.4rem;
+    font-weight: 700;
+    color: var(--secondary-text-color);
+}
+
+.ftl-check {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.25rem 0;
+    cursor: pointer;
+}
+
+.ftl-check input {
+    width: auto;
+}
+
+.ftl-inline {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-top: 0.5rem;
+}
+
+.ftl-inline select {
+    width: auto;
+    padding: 0.35rem 0.6rem;
+}
+
+.ftl-topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.9rem;
+}
+
+.ftl-prompt {
+    font-size: 1.3rem;
+    font-weight: 700;
+}
+
+.ftl-meta {
+    display: flex;
+    gap: 1rem;
+    align-items: baseline;
+    font-weight: 600;
+    color: var(--secondary-text-color);
+    white-space: nowrap;
+}
+
+.ftl-timeleft {
+    color: var(--primary-accent-color);
+}
+
+.ftl-timeleft.low {
+    color: #d9534f;
+}
+
+.ftl-guess-form {
+    margin-bottom: 1rem;
+}
+
+#ftl-guess {
+    width: 100%;
+    padding: 0.7rem 0.9rem;
+    font-size: 1.05rem;
+    border: 2px solid var(--border-color);
+    border-radius: 10px;
+    background: var(--background-color);
+    color: var(--primary-text-color);
+}
+
+#ftl-guess:focus {
+    outline: none;
+    border-color: var(--primary-accent-color);
+}
+
+.ftl-slots {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+}
+
+.ftl-slot {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    padding: 0.55rem 0.8rem;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    background: var(--sidebar-color);
+    min-height: 1.5em;
+}
+
+.ftl-slot-rank {
+    color: var(--secondary-text-color);
+    font-weight: 700;
+    min-width: 1.6em;
+}
+
+.ftl-slot-text {
+    flex: 1;
+    color: var(--secondary-text-color);
+}
+
+.ftl-slot.found .ftl-slot-text {
+    color: var(--primary-text-color);
+    font-weight: 600;
+}
+
+.ftl-slot.found {
+    border-color: #3fae6b;
+    background: rgba(63, 174, 107, 0.12);
+}
+
+.ftl-slot.missed {
+    border-color: var(--border-color);
+}
+
+.ftl-slot.missed .ftl-slot-text {
+    color: #d9534f;
+}
+
+.ftl-slot-hint {
+    color: var(--secondary-text-color);
+    font-size: 0.9em;
+}
+
+.ftl-slot-count {
+    color: var(--secondary-text-color);
+    font-size: 0.85em;
+    white-space: nowrap;
+}
+
+.ftl-actions {
+    display: flex;
+    gap: 0.7rem;
+    justify-content: center;
+    margin-top: 1.3rem;
+    flex-wrap: wrap;
+}
+
+.ftl-flash {
+    animation: ftlFlash 0.4s ease;
+}
+
+@keyframes ftlFlash {
+    from { background: rgba(63, 174, 107, 0.4); }
+    to { background: rgba(63, 174, 107, 0.12); }
+}
+
+@media (max-width: 560px) {
+    .ftl-slots {
+        grid-template-columns: 1fr;
     }
 }
 

@@ -609,11 +609,11 @@
                         <span class="game-card-title">Higher or Lower</span>
                         <span class="game-card-desc">Two picks from your library. Guess which one you've scrobbled more, and keep the streak going.</span>
                     </button>
-                    <div class="game-card game-card-soon" aria-disabled="true">
+                    <button type="button" class="game-card" id="open-filllist">
                         <span class="game-card-icon"><i class="fas fa-list-ol" aria-hidden="true"></i></span>
                         <span class="game-card-title">Fill the List</span>
-                        <span class="game-card-desc">Coming soon.</span>
-                    </div>
+                        <span class="game-card-desc">We roll a random list from your library — a year, a letter, a mood. Name as many of the top 10 as you can.</span>
+                    </button>
                 </div>
             </div>
 
@@ -655,10 +655,65 @@
 
                 <div id="hl-over" class="hl-over" hidden>
                     <h2>Streak over</h2>
-                    <p class="hl-over-score">You reached <strong id="hl-final">0</strong>. Best this session: <strong id="hl-best-2">0</strong>.</p>
+                    <p class="hl-over-score">You reached <strong id="hl-final">0</strong>. Your best: <strong id="hl-best-2">0</strong>.</p>
                     <div class="hl-over-actions">
                         <button type="button" id="hl-again" class="hl-primary">Play again</button>
                         <button type="button" id="hl-change-type" class="hl-secondary">Change type</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="ftl-game" class="ftl-game" hidden>
+                <button type="button" class="hl-back" id="ftl-back"><i class="fas fa-arrow-left" aria-hidden="true"></i> All games</button>
+
+                <div id="ftl-setup" class="ftl-setup">
+                    <h2>Fill the List</h2>
+                    <p>We pick a random slice of your library and you name its top 10.</p>
+
+                    <fieldset class="ftl-group">
+                        <legend>Play with</legend>
+                        <label class="ftl-check"><input type="checkbox" class="ftl-type" value="track" checked> Tracks</label>
+                        <label class="ftl-check"><input type="checkbox" class="ftl-type" value="album" checked> Albums</label>
+                        <label class="ftl-check"><input type="checkbox" class="ftl-type" value="artist" checked> Artists</label>
+                    </fieldset>
+
+                    <fieldset class="ftl-group">
+                        <legend>Puzzle types</legend>
+                        <label class="ftl-check"><input type="checkbox" class="ftl-cat" value="time" checked> Time (years, months, recent…)</label>
+                        <label class="ftl-check"><input type="checkbox" class="ftl-cat" value="names" checked> Names &amp; words</label>
+                        <label class="ftl-check"><input type="checkbox" class="ftl-cat" value="deep" checked> Deep cuts</label>
+                        <label class="ftl-check"><input type="checkbox" class="ftl-cat" value="byartist" checked> By artist</label>
+                    </fieldset>
+
+                    <fieldset class="ftl-group">
+                        <legend>Options</legend>
+                        <label class="ftl-check"><input type="checkbox" id="ftl-hard"> Hard mode (hide the artist on track &amp; album lists)</label>
+                        <label class="ftl-inline">Time limit
+                            <select id="ftl-timer">
+                                <option value="0">None</option>
+                                <option value="60">1 minute</option>
+                                <option value="120">2 minutes</option>
+                                <option value="300">5 minutes</option>
+                            </select>
+                        </label>
+                    </fieldset>
+
+                    <p id="ftl-setup-note" class="hl-setup-note" hidden></p>
+                    <button type="button" id="ftl-start" class="hl-primary">Start</button>
+                </div>
+
+                <div id="ftl-play" class="ftl-play" hidden>
+                    <div class="ftl-topbar">
+                        <span class="ftl-prompt" id="ftl-prompt"></span>
+                        <span class="ftl-meta"><span id="ftl-score">0 / 10</span><span id="ftl-timeleft" class="ftl-timeleft" hidden></span></span>
+                    </div>
+                    <form id="ftl-guess-form" class="ftl-guess-form" autocomplete="off">
+                        <input type="text" id="ftl-guess" placeholder="Type a guess and press Enter" autocomplete="off" autocapitalize="none" spellcheck="false">
+                    </form>
+                    <ol id="ftl-slots" class="ftl-slots"></ol>
+                    <div class="ftl-actions">
+                        <button type="button" id="ftl-reveal" class="hl-secondary">Give up &amp; reveal</button>
+                        <button type="button" id="ftl-next" class="hl-primary">New list</button>
                     </div>
                 </div>
             </div>

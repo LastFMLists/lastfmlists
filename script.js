@@ -6621,7 +6621,41 @@ const HL_RECENT_MEMORY = 12; // items excluded from reuse across recent rounds
 const HL_REVEAL_MS = 1500;   // pause on the reveal before advancing
 
 let hlState = null;
-let hlBestStreak = 0; // persists across a session
+
+// ---- Persistent game records (localStorage) ----
+const GAMES_STORAGE_KEY = "lastfmlists_games_v1";
+let gamesRecords = {
+    hlBest: { artist: 0, album: 0, track: 0 },
+    ftlBest: 0,
+    ftlPlayed: 0
+};
+
+function loadGamesRecords() {
+    try {
+        const raw = JSON.parse(localStorage.getItem(GAMES_STORAGE_KEY));
+        if (raw && typeof raw === "object") {
+            gamesRecords = {
+                ...gamesRecords,
+                ...raw,
+                hlBest: { ...gamesRecords.hlBest, ...(raw.hlBest || {}) }
+            };
+        }
+    } catch (e) {
+        // ignore malformed/blocked storage
+    }
+}
+
+function saveGamesRecords() {
+    try {
+        localStorage.setItem(GAMES_STORAGE_KEY, JSON.stringify(gamesRecords));
+    } catch (e) {
+        // storage may be unavailable (private mode); records just won't persist
+    }
+}
+
+function hlBest(type) {
+    return (gamesRecords.hlBest && gamesRecords.hlBest[type]) || 0;
+}
 
 function hlSourceData(type) {
     if (type === "artist") return artistsData;
@@ -6652,38 +6686,72 @@ function hlTierForRound(round) {
     return HL_TIERS.find(t => round <= t.maxRound) || HL_TIERS[HL_TIERS.length - 1];
 }
 
-function hlPickPair() {
+// One attempt at a pair for the given tier. Returns { anchor, partner, ratio }
+// or null. Direction (partner higher/lower) is steered by where the anchor
+// sits in the tier pool so the target count actually exists in range.
+function hlAttemptPair(tier, tierPool) {
     const { pool, recent } = hlState;
-    if (pool.length < 2) return null;
 
-    const tier = hlTierForRound(hlState.round);
-    const depth = Math.min(tier.depth, pool.length);
-    const tierPool = pool.slice(0, depth);
-
-    // Anchor: prefer one not shown recently.
     let anchorPool = tierPool.filter(e => !recent.has(e.key));
     if (anchorPool.length < 1) anchorPool = tierPool;
     const anchor = anchorPool[Math.floor(Math.random() * anchorPool.length)];
 
-    const ratio = tier.ratioMin + Math.random() * (tier.ratioMax - tier.ratioMin);
-    // Partner may be the higher or the lower of the two, chosen at random.
-    const target = Math.random() < 0.5 ? anchor.count * ratio : anchor.count / ratio;
+    const ratioTarget = tier.ratioMin + Math.random() * (tier.ratioMax - tier.ratioMin);
 
-    // Look for the partner in the tier pool first (keeps both familiar); widen
-    // to the full pool only if the tier is too thin to find a good match.
+    // tierPool is sorted by count desc; anchor near the top should look down,
+    // near the bottom should look up, so the target stays inside the pool.
+    const hi = tierPool[0].count;
+    const lo = tierPool[tierPool.length - 1].count;
+    const frac = hi > lo ? (anchor.count - lo) / (hi - lo) : 0.5;
+    let goUp;
+    if (frac < 0.25) goUp = true;
+    else if (frac > 0.75) goUp = false;
+    else goUp = Math.random() < 0.5;
+    const target = goUp ? anchor.count * ratioTarget : anchor.count / ratioTarget;
+
     let candidates = tierPool.filter(e => e.key !== anchor.key && !recent.has(e.key));
     if (candidates.length < 3) candidates = pool.filter(e => e.key !== anchor.key && !recent.has(e.key));
     if (candidates.length < 1) candidates = pool.filter(e => e.key !== anchor.key);
     if (candidates.length < 1) return null;
 
-    // Closeness by ratio, not absolute difference.
     candidates.sort((a, b) =>
         Math.abs(Math.log(a.count / target)) - Math.abs(Math.log(b.count / target)));
     const nearest = candidates.slice(0, Math.min(5, candidates.length));
     const partner = nearest[Math.floor(Math.random() * nearest.length)];
     if (!partner) return null;
 
-    return Math.random() < 0.5 ? { left: anchor, right: partner } : { left: partner, right: anchor };
+    const ratio = Math.max(anchor.count, partner.count) / Math.min(anchor.count, partner.count);
+    return { anchor, partner, ratio };
+}
+
+function hlPickPair() {
+    const { pool } = hlState;
+    if (pool.length < 2) return null;
+
+    const tier = hlTierForRound(hlState.round);
+    const depth = Math.min(tier.depth, pool.length);
+    const tierPool = pool.slice(0, depth);
+
+    // Retry until the ACTUAL ratio lands near the tier band, so a bottom-of-pool
+    // anchor can't hand us a 76-vs-77 coin flip. Keep the closest fallback for
+    // small or tightly clustered libraries where the band can't be hit.
+    const loOK = tier.ratioMin * 0.85;
+    const hiOK = tier.ratioMax * 1.35;
+    const mid = Math.sqrt(tier.ratioMin * tier.ratioMax);
+    let best = null;
+    let bestScore = Infinity;
+    for (let attempt = 0; attempt < 16; attempt++) {
+        const candidate = hlAttemptPair(tier, tierPool);
+        if (!candidate) continue;
+        if (candidate.ratio >= loOK && candidate.ratio <= hiOK) { best = candidate; break; }
+        const score = Math.abs(Math.log(candidate.ratio / mid));
+        if (score < bestScore) { bestScore = score; best = candidate; }
+    }
+    if (!best) return null;
+
+    return Math.random() < 0.5
+        ? { left: best.anchor, right: best.partner }
+        : { left: best.partner, right: best.anchor };
 }
 
 function hlOptionEls() {
@@ -6754,9 +6822,12 @@ function hlGuess(side) {
     const fb = document.getElementById("hl-feedback");
     if (correct) {
         hlState.streak += 1;
-        hlBestStreak = Math.max(hlBestStreak, hlState.streak);
+        if (hlState.streak > hlBest(hlState.type)) {
+            gamesRecords.hlBest[hlState.type] = hlState.streak;
+            saveGamesRecords();
+        }
         document.getElementById("hl-streak").textContent = hlState.streak;
-        document.getElementById("hl-best").textContent = hlBestStreak;
+        document.getElementById("hl-best").textContent = hlBest(hlState.type);
         fb.textContent = tie ? "Dead heat — that counts!" : "Correct!";
         fb.className = "hl-feedback good";
         hlState.round += 1;
@@ -6786,14 +6857,18 @@ function hlClearTimer() {
 }
 
 // ---- Higher or Lower: screens ----
+// Shared "back to the games menu" used by both games.
 function hlShowHome() {
     hlClearTimer();
+    ftlStopTimer();
     document.getElementById("games-home").hidden = false;
     document.getElementById("hl-game").hidden = true;
+    document.getElementById("ftl-game").hidden = true;
 }
 
 function hlOpenGame() {
     hlClearTimer();
+    document.getElementById("ftl-game").hidden = true;
     document.getElementById("games-home").hidden = true;
     document.getElementById("hl-game").hidden = false;
     hlShowSetup();
@@ -6831,7 +6906,7 @@ function hlStart(type) {
     document.getElementById("hl-over").hidden = true;
     document.getElementById("hl-play").hidden = false;
     document.getElementById("hl-streak").textContent = "0";
-    document.getElementById("hl-best").textContent = hlBestStreak;
+    document.getElementById("hl-best").textContent = hlBest(type);
     hlRenderRound();
 }
 
@@ -6841,10 +6916,442 @@ function hlEndGame() {
     document.getElementById("hl-setup").hidden = true;
     document.getElementById("hl-over").hidden = false;
     document.getElementById("hl-final").textContent = hlState ? hlState.streak : 0;
-    document.getElementById("hl-best-2").textContent = hlBestStreak;
+    document.getElementById("hl-best-2").textContent = hlState ? hlBest(hlState.type) : 0;
+}
+
+// ============================================================
+// Fill the List
+// ============================================================
+
+const FTL_MIN_SCROBBLES = 5;   // entries below this are dropped
+const FTL_MIN_ANSWERS = 10;    // a puzzle needs at least this many valid entries
+const FTL_LIST_SIZE = 10;      // you name the top 10
+const FTL_ENTITY_NOUN = { artist: "artists", album: "albums", track: "tracks" };
+const FTL_MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+const FTL_WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+// Common title words. The meta-filter drops any that don't yield a full list.
+const FTL_WORDS = ["love", "night", "time", "heart", "home", "dead", "blue", "black", "light", "world", "fire", "dream", "day", "girl", "baby", "rain", "sun", "gold", "life", "god", "dance", "sky", "moon", "star", "lost", "city", "blood", "cold", "wild", "young", "free", "alone", "good", "bad", "high", "red", "white", "king", "run", "eyes"];
+
+let ftlState = null;
+let ftlIndexCache = null;
+
+function ftlToDate(v) { return typeof v === "string" ? parseInt(v, 10) : v; }
+
+// One pass over allTracks builds per-entity aggregates (count, first/last date,
+// and per-artist distinct-track count) used by every non-time facet.
+function ftlBuildIndex() {
+    const artist = new Map(), album = new Map(), track = new Map();
+    const artistTracks = new Map();
+    let minY = Infinity, maxY = -Infinity;
+
+    const upd = (map, key, base, date) => {
+        let e = map.get(key);
+        if (!e) { e = { ...base, count: 0, first: date, last: date }; map.set(key, e); }
+        e.count++;
+        if (date < e.first) e.first = date;
+        if (date > e.last) e.last = date;
+    };
+
+    for (const s of allTracks) {
+        const d = ftlToDate(s.Date);
+        if (!d) continue;
+        const y = new Date(d).getFullYear();
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+        const A = s.Artist, Al = s.Album, T = s.Track;
+        if (A && A !== "Unknown") upd(artist, A.toLowerCase(), { name: A, artist: null }, d);
+        if (A && A !== "Unknown" && Al && Al !== "Unknown") upd(album, `${Al.toLowerCase()}|||${A.toLowerCase()}`, { name: Al, artist: A }, d);
+        if (A && A !== "Unknown" && T && T !== "Unknown") {
+            upd(track, `${T.toLowerCase()}|||${A.toLowerCase()}`, { name: T, artist: A }, d);
+            const ak = A.toLowerCase();
+            let set = artistTracks.get(ak);
+            if (!set) { set = new Set(); artistTracks.set(ak, set); }
+            set.add(T.toLowerCase());
+        }
+    }
+    for (const [k, e] of artist) e.trackCount = artistTracks.get(k)?.size || 0;
+
+    const years = [];
+    if (isFinite(minY)) for (let y = minY; y <= maxY; y++) years.push(y);
+
+    return { artist: [...artist.values()], album: [...album.values()], track: [...track.values()], years };
+}
+
+function ftlEntities(type) { return ftlIndexCache[type] || []; }
+
+// Meta-filter: drop entries under FTL_MIN_SCROBBLES, reject if fewer than
+// FTL_MIN_ANSWERS remain, otherwise return the top FTL_LIST_SIZE.
+function ftlFinalize(entities) {
+    const valid = entities.filter(e => e.count >= FTL_MIN_SCROBBLES);
+    if (valid.length < FTL_MIN_ANSWERS) return null;
+    valid.sort((a, b) => b.count - a.count);
+    return valid.slice(0, FTL_LIST_SIZE).map(e => ({ name: e.name, artist: e.artist || null, count: e.count }));
+}
+
+// Time facets need scrobble-level filtering, so they scan allTracks.
+function ftlRankScrobbles(pred, type) {
+    const counts = new Map();
+    for (const s of allTracks) {
+        const d = ftlToDate(s.Date);
+        if (!d || !pred(d)) continue;
+        let name, artist = null, key;
+        if (type === "artist") {
+            name = s.Artist;
+            if (!name || name === "Unknown") continue;
+            key = name.toLowerCase();
+        } else if (type === "album") {
+            name = s.Album; artist = s.Artist;
+            if (!name || name === "Unknown" || !artist || artist === "Unknown") continue;
+            key = `${name.toLowerCase()}|||${artist.toLowerCase()}`;
+        } else {
+            name = s.Track; artist = s.Artist;
+            if (!name || name === "Unknown" || !artist || artist === "Unknown") continue;
+            key = `${name.toLowerCase()}|||${artist.toLowerCase()}`;
+        }
+        let e = counts.get(key);
+        if (!e) { e = { name, artist, count: 0 }; counts.set(key, e); }
+        e.count++;
+    }
+    return ftlFinalize([...counts.values()]);
+}
+
+function ftlRandom(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+// ---- Facet generators: each returns { prompt, answers } or null ----
+function ftlGenYear(type) {
+    if (!ftlIndexCache.years.length) return null;
+    const y = ftlRandom(ftlIndexCache.years);
+    const answers = ftlRankScrobbles(d => new Date(d).getFullYear() === y, type);
+    return answers && { prompt: `Top ${FTL_ENTITY_NOUN[type]} of ${y}`, answers };
+}
+function ftlGenMonth(type) {
+    const m = Math.floor(Math.random() * 12);
+    const answers = ftlRankScrobbles(d => new Date(d).getMonth() === m, type);
+    return answers && { prompt: `Top ${FTL_ENTITY_NOUN[type]} across every ${FTL_MONTHS[m]}`, answers };
+}
+function ftlGenYearMonth(type) {
+    if (!ftlIndexCache.years.length) return null;
+    const y = ftlRandom(ftlIndexCache.years);
+    const m = Math.floor(Math.random() * 12);
+    const answers = ftlRankScrobbles(d => { const dt = new Date(d); return dt.getFullYear() === y && dt.getMonth() === m; }, type);
+    return answers && { prompt: `Top ${FTL_ENTITY_NOUN[type]} of ${FTL_MONTHS[m]} ${y}`, answers };
+}
+function ftlGenWeekday(type) {
+    const w = Math.floor(Math.random() * 7);
+    const answers = ftlRankScrobbles(d => new Date(d).getDay() === w, type);
+    return answers && { prompt: `Top ${FTL_ENTITY_NOUN[type]} you play on ${FTL_WEEKDAYS[w]}s`, answers };
+}
+function ftlGenLastDays(type) {
+    const n = ftlRandom([7, 30, 90, 180, 365]);
+    const cutoff = Date.now() - n * 86400000;
+    const answers = ftlRankScrobbles(d => d >= cutoff, type);
+    return answers && { prompt: `Top ${FTL_ENTITY_NOUN[type]} of the last ${n} days`, answers };
+}
+function ftlGenInitial(type) {
+    const letters = new Set();
+    for (const e of ftlEntities(type)) {
+        const c = (e.name || "").trim()[0];
+        if (c && /[a-z0-9]/i.test(c)) letters.add(c.toUpperCase());
+    }
+    if (!letters.size) return null;
+    const L = ftlRandom([...letters]);
+    const answers = ftlFinalize(ftlEntities(type).filter(e => (e.name || "").trim().toUpperCase().startsWith(L)));
+    return answers && { prompt: `Top ${FTL_ENTITY_NOUN[type]} starting with “${L}”`, answers };
+}
+function ftlGenWord(type) {
+    const w = ftlRandom(FTL_WORDS);
+    const re = new RegExp(`\\b${w}`, "i");
+    const answers = ftlFinalize(ftlEntities(type).filter(e => re.test(e.name || "")));
+    return answers && { prompt: `Top ${FTL_ENTITY_NOUN[type]} with “${w}” in the name`, answers };
+}
+function ftlGenNameLength() {
+    const len = 3 + Math.floor(Math.random() * 4); // 3–6
+    const answers = ftlFinalize(ftlEntities("artist").filter(e => (e.name || "").replace(/\s/g, "").length === len));
+    return answers && { prompt: `Top artists whose name is exactly ${len} letters`, answers };
+}
+function ftlGenDiscovery(type) {
+    if (!ftlIndexCache.years.length) return null;
+    const y = ftlRandom(ftlIndexCache.years);
+    const answers = ftlFinalize(ftlEntities(type).filter(e => new Date(e.first).getFullYear() === y));
+    return answers && { prompt: `Top ${FTL_ENTITY_NOUN[type]} you first scrobbled in ${y}`, answers };
+}
+function ftlGenDormant(type) {
+    const n = Math.random() < 0.5 ? 30 : 365;
+    const cutoff = Date.now() - n * 86400000;
+    const label = n === 30 ? "a month" : "a year";
+    const answers = ftlFinalize(ftlEntities(type).filter(e => e.last < cutoff));
+    return answers && { prompt: `Top ${FTL_ENTITY_NOUN[type]} you haven't played in over ${label}`, answers };
+}
+function ftlGenOneHit() {
+    const answers = ftlFinalize(ftlEntities("artist").filter(e => e.trackCount === 1));
+    return answers && { prompt: `Top artists you've only scrobbled one track from`, answers };
+}
+function ftlGenByArtist(type) {
+    const top = [...ftlEntities("artist")].sort((a, b) => b.count - a.count).slice(0, 25);
+    for (let i = 0; i < 8 && top.length; i++) {
+        const a = ftlRandom(top);
+        const ak = a.name.toLowerCase();
+        const answers = ftlFinalize(ftlEntities(type).filter(e => (e.artist || "").toLowerCase() === ak));
+        if (answers) return { prompt: `Top ${FTL_ENTITY_NOUN[type]} by ${a.name}`, answers, fixedArtist: a.name };
+    }
+    return null;
+}
+
+const FTL_FACETS = [
+    { id: "year", cat: "time", types: ["track", "album", "artist"], gen: ftlGenYear },
+    { id: "month", cat: "time", types: ["track", "album", "artist"], gen: ftlGenMonth },
+    { id: "yearmonth", cat: "time", types: ["track", "album", "artist"], gen: ftlGenYearMonth },
+    { id: "weekday", cat: "time", types: ["track", "album", "artist"], gen: ftlGenWeekday },
+    { id: "lastdays", cat: "time", types: ["track", "album", "artist"], gen: ftlGenLastDays },
+    { id: "initial", cat: "names", types: ["track", "album", "artist"], gen: ftlGenInitial },
+    { id: "word", cat: "names", types: ["track", "album", "artist"], gen: ftlGenWord },
+    { id: "namelength", cat: "names", types: ["artist"], gen: ftlGenNameLength },
+    { id: "discovery", cat: "deep", types: ["track", "album", "artist"], gen: ftlGenDiscovery },
+    { id: "dormant", cat: "deep", types: ["track", "album", "artist"], gen: ftlGenDormant },
+    { id: "onehit", cat: "deep", types: ["artist"], gen: ftlGenOneHit },
+    { id: "byartist", cat: "byartist", types: ["track", "album"], gen: ftlGenByArtist }
+];
+
+function ftlShuffle(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+}
+
+function ftlEligibleFacets() {
+    const { types, cats } = ftlState.options;
+    return FTL_FACETS.filter(f => cats.has(f.cat) && f.types.some(t => types.has(t)));
+}
+
+function ftlEligibleCategories() {
+    const set = new Set(ftlEligibleFacets().map(f => f.cat));
+    return [...ftlState.options.cats].filter(c => set.has(c));
+}
+
+// Category deck: cycle through all enabled categories before repeating any.
+function ftlDrawCategory() {
+    const eligible = ftlEligibleCategories();
+    if (!eligible.length) return null;
+    if (!ftlState.categoryDeck || !ftlState.categoryDeck.length) {
+        ftlState.categoryDeck = ftlShuffle(eligible.slice());
+    }
+    return ftlState.categoryDeck.pop();
+}
+
+// Facet pick with a short cooldown so the same facet doesn't repeat back to back.
+function ftlPickFacet(category) {
+    const facets = ftlEligibleFacets().filter(f => f.cat === category);
+    if (!facets.length) return null;
+    const weighted = facets.map(f => {
+        const last = ftlState.facetLastUsed.get(f.id);
+        const recent = last !== undefined && (ftlState.puzzleNum - last) < 3;
+        return { f, w: recent ? 0.08 : 1 };
+    });
+    const total = weighted.reduce((s, x) => s + x.w, 0);
+    let r = Math.random() * total;
+    for (const x of weighted) { r -= x.w; if (r <= 0) return x.f; }
+    return weighted[weighted.length - 1].f;
+}
+
+function ftlGeneratePuzzle() {
+    ftlState.puzzleNum += 1;
+    const catCount = ftlEligibleCategories().length;
+    for (let c = 0; c < catCount + 1; c++) {
+        const category = ftlDrawCategory();
+        if (!category) break;
+        for (let t = 0; t < 8; t++) {
+            const facet = ftlPickFacet(category);
+            if (!facet) break;
+            const okTypes = facet.types.filter(ty => ftlState.options.types.has(ty));
+            if (!okTypes.length) break;
+            const entityType = ftlRandom(okTypes);
+            const result = facet.gen(entityType);
+            if (result) {
+                ftlState.facetLastUsed.set(facet.id, ftlState.puzzleNum);
+                return { ...result, entityType, facetId: facet.id };
+            }
+        }
+    }
+    // Fallback so the game never stalls: overall top list of an enabled type.
+    const type = [...ftlState.options.types][0] || "track";
+    const answers = ftlFinalize(ftlEntities(type));
+    return answers ? { prompt: `Your top ${FTL_ENTITY_NOUN[type]}`, answers, entityType: type, facetId: "overall" } : null;
+}
+
+// Sporcle-style normalization: case-insensitive, punctuation/diacritics ignored,
+// remaster/feat./version tails stripped. Falls back to the raw text if a title
+// is entirely symbols.
+function ftlNormalize(s) {
+    if (!s) return "";
+    let t = String(s).toLowerCase();
+    t = t.replace(/\s*[\(\[][^\)\]]*[\)\]]/g, " ");
+    t = t.replace(/\s*[-–—]\s*[^-–—]*(remaster|remastered|version|edit|mix|mono|stereo|deluxe|anniversary|live|acoustic|demo|radio)[^-–—]*$/i, " ");
+    t = t.replace(/\s*(feat|ft|featuring)\.?\s.*$/i, " ");
+    t = t.normalize("NFD").replace(/[̀-ͯ]/g, "");
+    const stripped = t.replace(/[^\p{L}\p{N}]+/gu, "");
+    return stripped.length ? stripped : String(s).toLowerCase().replace(/\s+/g, "");
+}
+
+function ftlRenderSlots() {
+    const ol = document.getElementById("ftl-slots");
+    ol.innerHTML = "";
+    const { puzzle, options } = ftlState;
+    const showHint = !options.hard && puzzle.entityType !== "artist" && !puzzle.fixedArtist;
+    puzzle.answers.forEach((a, i) => {
+        const li = document.createElement("li");
+        li.className = "ftl-slot";
+        li.dataset.idx = i;
+        const hint = showHint && a.artist ? `<span class="ftl-slot-hint">by ${escapeHTML(a.artist)}</span>` : "———";
+        li.innerHTML = `<span class="ftl-slot-rank">${i + 1}.</span><span class="ftl-slot-text">${hint}</span>`;
+        ol.appendChild(li);
+    });
+}
+
+function ftlMarkSlot(i, missed) {
+    const li = document.querySelector(`.ftl-slot[data-idx="${i}"]`);
+    if (!li) return;
+    const a = ftlState.puzzle.answers[i];
+    li.classList.remove("ftl-flash");
+    li.classList.add(missed ? "missed" : "found");
+    if (!missed) { void li.offsetWidth; li.classList.add("ftl-flash"); }
+    const showArtist = ftlState.puzzle.entityType !== "artist" && !ftlState.puzzle.fixedArtist && a.artist;
+    const sub = showArtist ? ` <span class="ftl-slot-hint">— ${escapeHTML(a.artist)}</span>` : "";
+    li.querySelector(".ftl-slot-text").innerHTML =
+        `${escapeHTML(a.name)}${sub} <span class="ftl-slot-count">${a.count.toLocaleString()}</span>`;
+}
+
+function ftlUpdateScore() {
+    document.getElementById("ftl-score").textContent = `${ftlState.found.size} / ${ftlState.puzzle.answers.length}`;
+}
+
+function ftlSubmitGuess() {
+    if (!ftlState || ftlState.done) return;
+    const input = document.getElementById("ftl-guess");
+    const norm = ftlNormalize(input.value);
+    input.value = "";
+    if (!norm) return;
+    const answers = ftlState.puzzle.answers;
+    let hit = answers.findIndex((a, i) => !ftlState.found.has(i) && a.norm === norm);
+    if (hit < 0 && norm.length >= 4) {
+        const matches = [];
+        answers.forEach((a, i) => { if (!ftlState.found.has(i) && a.norm.startsWith(norm)) matches.push(i); });
+        if (matches.length === 1) hit = matches[0];
+    }
+    if (hit >= 0) {
+        ftlState.found.add(hit);
+        ftlMarkSlot(hit, false);
+        ftlUpdateScore();
+        if (ftlState.found.size === answers.length) ftlFinish(false);
+    }
+}
+
+function ftlFinish(timedOut) {
+    if (!ftlState || ftlState.done) return;
+    ftlState.done = true;
+    ftlStopTimer();
+    ftlState.puzzle.answers.forEach((a, i) => { if (!ftlState.found.has(i)) ftlMarkSlot(i, true); });
+    document.getElementById("ftl-guess").disabled = true;
+    gamesRecords.ftlPlayed = (gamesRecords.ftlPlayed || 0) + 1;
+    if (ftlState.found.size > (gamesRecords.ftlBest || 0)) gamesRecords.ftlBest = ftlState.found.size;
+    saveGamesRecords();
+}
+
+function ftlStopTimer() {
+    if (ftlState && ftlState.timerId) { clearInterval(ftlState.timerId); ftlState.timerId = null; }
+}
+
+function ftlRenderTime() {
+    const el = document.getElementById("ftl-timeleft");
+    const m = Math.floor(ftlState.timeLeft / 60);
+    const s = ftlState.timeLeft % 60;
+    el.textContent = `${m}:${String(s).padStart(2, "0")}`;
+    el.classList.toggle("low", ftlState.timeLeft <= 10);
+}
+
+function ftlStartTimer() {
+    ftlStopTimer();
+    const el = document.getElementById("ftl-timeleft");
+    if (!ftlState.options.timer) { el.hidden = true; return; }
+    ftlState.timeLeft = ftlState.options.timer;
+    el.hidden = false;
+    ftlRenderTime();
+    ftlState.timerId = setInterval(() => {
+        ftlState.timeLeft -= 1;
+        ftlRenderTime();
+        if (ftlState.timeLeft <= 0) ftlFinish(true);
+    }, 1000);
+}
+
+function ftlNextPuzzle() {
+    ftlStopTimer();
+    const puzzle = ftlGeneratePuzzle();
+    if (!puzzle) { ftlShowSetup(true); return; }
+    puzzle.answers.forEach(a => { a.norm = ftlNormalize(a.name); });
+    ftlState.puzzle = puzzle;
+    ftlState.found = new Set();
+    ftlState.done = false;
+    document.getElementById("ftl-prompt").textContent = puzzle.prompt;
+    const guess = document.getElementById("ftl-guess");
+    guess.disabled = false;
+    guess.value = "";
+    ftlRenderSlots();
+    ftlUpdateScore();
+    ftlStartTimer();
+    guess.focus();
+}
+
+// ---- Fill the List: screens ----
+function ftlOpenGame() {
+    ftlStopTimer();
+    document.getElementById("hl-game").hidden = true;
+    document.getElementById("games-home").hidden = true;
+    document.getElementById("ftl-game").hidden = false;
+    ftlShowSetup(false);
+}
+
+function ftlShowSetup(showNote) {
+    ftlStopTimer();
+    document.getElementById("ftl-setup").hidden = false;
+    document.getElementById("ftl-play").hidden = true;
+    const note = document.getElementById("ftl-setup-note");
+    if (showNote) {
+        note.hidden = false;
+        note.textContent = "No lists match those options — turn on more types or puzzle categories.";
+    } else {
+        note.hidden = true;
+    }
+}
+
+function ftlStartGame() {
+    const types = new Set([...document.querySelectorAll(".ftl-type:checked")].map(c => c.value));
+    const cats = new Set([...document.querySelectorAll(".ftl-cat:checked")].map(c => c.value));
+    if (!types.size || !cats.size) { ftlShowSetup(true); return; }
+    ftlIndexCache = ftlBuildIndex();
+    ftlState = {
+        options: {
+            types,
+            cats,
+            hard: document.getElementById("ftl-hard").checked,
+            timer: parseInt(document.getElementById("ftl-timer").value, 10) || 0
+        },
+        categoryDeck: [],
+        facetLastUsed: new Map(),
+        puzzleNum: 0,
+        puzzle: null,
+        found: new Set(),
+        done: false,
+        timerId: null
+    };
+    document.getElementById("ftl-setup").hidden = true;
+    document.getElementById("ftl-play").hidden = false;
+    ftlNextPuzzle();
 }
 
 function initGames() {
+    loadGamesRecords();
+
     const tabLists = document.getElementById("tab-lists");
     const tabGames = document.getElementById("tab-games");
     if (tabLists) tabLists.addEventListener("click", () => {
@@ -6854,6 +7361,7 @@ function initGames() {
         if (!tabGames.disabled && !document.body.classList.contains("view-games")) setActiveView("games");
     });
 
+    // Higher or Lower
     const openHL = document.getElementById("open-higherlower");
     if (openHL) openHL.addEventListener("click", hlOpenGame);
 
@@ -6871,6 +7379,25 @@ function initGames() {
 
     const changeType = document.getElementById("hl-change-type");
     if (changeType) changeType.addEventListener("click", hlShowSetup);
+
+    // Fill the List
+    const openFTL = document.getElementById("open-filllist");
+    if (openFTL) openFTL.addEventListener("click", ftlOpenGame);
+
+    const ftlBack = document.getElementById("ftl-back");
+    if (ftlBack) ftlBack.addEventListener("click", hlShowHome);
+
+    const ftlStartBtn = document.getElementById("ftl-start");
+    if (ftlStartBtn) ftlStartBtn.addEventListener("click", ftlStartGame);
+
+    const ftlForm = document.getElementById("ftl-guess-form");
+    if (ftlForm) ftlForm.addEventListener("submit", (e) => { e.preventDefault(); ftlSubmitGuess(); });
+
+    const ftlReveal = document.getElementById("ftl-reveal");
+    if (ftlReveal) ftlReveal.addEventListener("click", () => ftlFinish(false));
+
+    const ftlNext = document.getElementById("ftl-next");
+    if (ftlNext) ftlNext.addEventListener("click", ftlNextPuzzle);
 }
 
 document.addEventListener("DOMContentLoaded", () => {
