@@ -7464,7 +7464,7 @@ function ftlOnInput() {
             if (n.startsWith(typed)) bestRatio = Math.max(bestRatio, typed.length / n.length);
         }
     }
-    ftlSetInputProgress(typed.length >= 2 ? bestRatio : 0);
+    ftlSetInputProgress(typed.length >= 5 ? bestRatio : 0);
 }
 
 // Enter is an optional shortcut. It accepts a full/near-full match like typing
