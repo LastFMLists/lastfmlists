@@ -7052,10 +7052,30 @@ function ftlFinalize(entities) {
 }
 
 // Like ftlFinalize but ranks by an arbitrary metric (for streak/first/fastest).
-function ftlFinalizeBy(rows, ascending) {
+// detailFn(row) produces the text shown on reveal instead of the scrobble total.
+function ftlFinalizeBy(rows, ascending, detailFn) {
     if (rows.length < FTL_MIN_ANSWERS) return null;
     rows.sort((a, b) => ascending ? a.metric - b.metric : b.metric - a.metric);
-    return rows.slice(0, FTL_LIST_SIZE).map(r => ({ name: r.name, artist: r.artist || null, count: r.count }));
+    return rows.slice(0, FTL_LIST_SIZE).map(r => ({
+        name: r.name,
+        artist: r.artist || null,
+        count: r.count,
+        detail: detailFn ? detailFn(r) : null
+    }));
+}
+
+function ftlFormatDay(ts) {
+    const d = new Date(ts);
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+}
+function ftlFormatDuration(ms) {
+    const days = ms / 86400000;
+    if (days < 1) { const h = Math.max(1, Math.round(ms / 3600000)); return `${h} hour${h === 1 ? "" : "s"}`; }
+    if (days < 45) { const n = Math.max(1, Math.round(days)); return `${n} day${n === 1 ? "" : "s"}`; }
+    if (days < 365) { const n = Math.round(days / 30); return `${n} month${n === 1 ? "" : "s"}`; }
+    const y = days / 365;
+    return `${y.toFixed(y < 10 ? 1 : 0)} years`;
 }
 
 // Scrobble-level ranking; pred receives (date, scrobble).
@@ -7200,7 +7220,7 @@ function ftlGenFirstToX(type) {
     const seq = ftlEntitySequences(type);
     const rows = [];
     for (const e of seq.values()) if (e.dates.length >= X) rows.push({ name: e.name, artist: e.artist, count: e.dates.length, metric: e.dates[X - 1] });
-    const answers = ftlFinalizeBy(rows, true);
+    const answers = ftlFinalizeBy(rows, true, r => `hit ${X} on ${ftlFormatDay(r.metric)}`);
     return answers && { prompt: `First ${FTL_ENTITY_NOUN[type]} to reach ${X} scrobbles`, answers, key };
 }
 function ftlGenFastestToX(type) {
@@ -7210,7 +7230,7 @@ function ftlGenFastestToX(type) {
     const seq = ftlEntitySequences(type);
     const rows = [];
     for (const e of seq.values()) if (e.dates.length >= X) rows.push({ name: e.name, artist: e.artist, count: e.dates.length, metric: e.dates[X - 1] - e.dates[0] });
-    const answers = ftlFinalizeBy(rows, true);
+    const answers = ftlFinalizeBy(rows, true, r => `${X} in ${ftlFormatDuration(r.metric)}`);
     return answers && { prompt: `Fastest ${FTL_ENTITY_NOUN[type]} to reach ${X} scrobbles`, answers, key };
 }
 function ftlGenSingleDay(type) {
@@ -7221,16 +7241,16 @@ function ftlGenSingleDay(type) {
     for (const e of seq.values()) {
         if (e.dates.length < FTL_MIN_SCROBBLES) continue;
         const dayCounts = new Map();
-        let max = 0;
+        let max = 0, peak = e.dates[0];
         for (const d of e.dates) {
             const k = getLocalDayKeyFromTimestamp(d);
             const c = (dayCounts.get(k) || 0) + 1;
             dayCounts.set(k, c);
-            if (c > max) max = c;
+            if (c > max) { max = c; peak = d; }
         }
-        rows.push({ name: e.name, artist: e.artist, count: e.dates.length, metric: max });
+        rows.push({ name: e.name, artist: e.artist, count: e.dates.length, metric: max, peak });
     }
-    const answers = ftlFinalizeBy(rows, false);
+    const answers = ftlFinalizeBy(rows, false, r => `${r.metric} on ${ftlFormatDay(r.peak)}`);
     return answers && { prompt: `Top ${FTL_ENTITY_NOUN[type]} by scrobbles in a single day`, answers, key };
 }
 function ftlGenSeparateDays(type) {
@@ -7244,7 +7264,7 @@ function ftlGenSeparateDays(type) {
         for (const d of e.dates) days.add(getLocalDayKeyFromTimestamp(d));
         rows.push({ name: e.name, artist: e.artist, count: e.dates.length, metric: days.size });
     }
-    const answers = ftlFinalizeBy(rows, false);
+    const answers = ftlFinalizeBy(rows, false, r => `${r.metric} separate days`);
     return answers && { prompt: `Top ${FTL_ENTITY_NOUN[type]} you've played across the most separate days`, answers, key };
 }
 function ftlGenSequence(type) {
@@ -7527,8 +7547,9 @@ function ftlMarkSlot(i, missed) {
     if (!missed) { void li.offsetWidth; li.classList.add("ftl-flash"); }
     const showArtist = ftlState.puzzle.entityType !== "artist" && !ftlState.puzzle.fixedArtist && a.artist;
     const sub = showArtist ? ` <span class="ftl-slot-hint">by ${escapeHTML(a.artist)}</span>` : "";
+    const metric = a.detail ? escapeHTML(a.detail) : `${a.count.toLocaleString()} scrobbles`;
     li.querySelector(".ftl-slot-text").innerHTML =
-        `${escapeHTML(a.name)}${sub} <span class="ftl-slot-count">${a.count.toLocaleString()}</span>`;
+        `${escapeHTML(a.name)}${sub} <span class="ftl-slot-count">${metric}</span>`;
 }
 
 function ftlUpdateScore() {
