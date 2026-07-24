@@ -7370,9 +7370,22 @@ function ftlNormalize(s) {
     return stripped.length ? stripped : String(s).toLowerCase().replace(/\s+/g, "");
 }
 
+// Words that mark a parenthetical as a release qualifier rather than a title.
+const FTL_QUALIFIER_WORDS = new Set([
+    "remaster", "remastered", "remasters", "remastering", "version", "edition",
+    "deluxe", "expanded", "anniversary", "live", "acoustic", "demo", "mono",
+    "stereo", "bonus", "special", "edit", "mix", "remix", "radio", "single",
+    "instrumental", "explicit", "clean", "extended", "reissue", "disc", "original",
+    "soundtrack", "ost", "ep", "feat", "ft", "featuring", "cover", "karaoke",
+    "session", "sessions", "unplugged", "volume", "vol", "part", "pt", "take",
+    "alternate", "reprise", "interlude", "skit"
+]);
+
 // Acceptable typed forms for a title. Normally just the normalized title, but
-// when the main title is non-Latin (e.g. 복합성 (Complexity)) the parenthetical
+// when the main title is non-Latin (e.g. 복합성 (Complexity)) a parenthetical
 // Latin gloss is also accepted, so you can type "complexity" instead of hangul.
+// A parenthetical that is a release qualifier (Special Edition, Remastered, …)
+// is NOT accepted, since it isn't the title and would match several albums.
 function ftlNormsFor(name) {
     const norms = new Set();
     const full = ftlNormalize(name);
@@ -7380,7 +7393,10 @@ function ftlNormsFor(name) {
     if (!/[a-z]/.test(full)) {
         const parens = String(name).match(/[\(\[]([^\)\]]+)[\)\]]/g) || [];
         for (const p of parens) {
-            const inner = ftlNormalize(p.slice(1, -1));
+            const raw = p.slice(1, -1);
+            const words = raw.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+            if (words.some(w => FTL_QUALIFIER_WORDS.has(w))) continue;
+            const inner = ftlNormalize(raw);
             if (inner && /[a-z]/.test(inner)) norms.add(inner);
         }
     }
