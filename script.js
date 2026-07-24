@@ -7169,14 +7169,14 @@ function ftlGenArtistLength() {
     const key = `alen:${len}`;
     if (ftlSeen(key)) return null;
     const answers = ftlFinalize(ftlEntities("artist").filter(e => (e.name || "").replace(/\s/g, "").length === len));
-    return answers && { prompt: `Top artists whose name is exactly ${len} letters`, answers, key };
+    return answers && { prompt: `Top artists whose name is ${len} characters long, not counting spaces`, answers, key };
 }
 function ftlGenTrackLength() {
     const len = 3 + Math.floor(Math.random() * 7); // 3–9
     const key = `tlen:${len}`;
     if (ftlSeen(key)) return null;
     const answers = ftlFinalize(ftlEntities("track").filter(e => (e.name || "").replace(/\s/g, "").length === len));
-    return answers && { prompt: `Top tracks whose title is exactly ${len} letters`, answers, key };
+    return answers && { prompt: `Top tracks whose title is ${len} characters long, not counting spaces`, answers, key };
 }
 function ftlGenDiscovery(type) {
     if (!ftlIndexCache.years.length) return null;
