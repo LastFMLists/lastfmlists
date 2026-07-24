@@ -7455,8 +7455,12 @@ function ftlMatchIndex(typed) {
         if (ftlState.found.has(i)) return;
         for (const n of a.norms) {
             if (n.length < 4) continue;
-            const tol = Math.max(1, Math.round(n.length * 0.15));
-            if (Math.abs(typed.length - n.length) <= tol && ftlEditDistance(typed, n) <= tol) { near.push(i); break; }
+            // Never complete a prefix: the typed text must be at least the full
+            // length of the answer. That leaves room only for same-length typos
+            // (or a stray extra character), so partial titles never auto-fill.
+            if (typed.length < n.length) continue;
+            const tol = Math.max(1, Math.round(n.length * 0.12));
+            if (typed.length - n.length <= tol && ftlEditDistance(typed, n) <= tol) { near.push(i); break; }
         }
     });
     return near.length === 1 ? near[0] : -1;
