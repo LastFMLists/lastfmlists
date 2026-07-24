@@ -6828,7 +6828,7 @@ function hlGuess(side) {
         }
         document.getElementById("hl-streak").textContent = hlState.streak;
         document.getElementById("hl-best").textContent = hlBest(hlState.type);
-        fb.textContent = tie ? "Dead heat — that counts!" : "Correct!";
+        fb.textContent = tie ? "Dead heat, that counts!" : "Correct!";
         fb.className = "hl-feedback good";
         hlState.round += 1;
         hlState.pending = "next";
@@ -6887,7 +6887,7 @@ function hlStart(type) {
     if (pool.length < 2) {
         const note = document.getElementById("hl-setup-note");
         note.hidden = false;
-        note.textContent = `Not enough ${type} data to play this one yet — try another type or load more of your history.`;
+        note.textContent = `Not enough ${type} data to play this one yet. Try another type, or load more of your history.`;
         return;
     }
     hlState = {
@@ -6926,11 +6926,22 @@ function hlEndGame() {
 const FTL_MIN_SCROBBLES = 5;   // entries below this are dropped
 const FTL_MIN_ANSWERS = 10;    // a puzzle needs at least this many valid entries
 const FTL_LIST_SIZE = 10;      // you name the top 10
+const FTL_BY_ARTIST_MIN = 10;  // an artist needs this many qualifying entries to be a "by artist" puzzle
+const FTL_SEQUENCE_BUCKET = 10000; // scrobble-sequence window size
 const FTL_ENTITY_NOUN = { artist: "artists", album: "albums", track: "tracks" };
 const FTL_MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-const FTL_WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 // Common title words. The meta-filter drops any that don't yield a full list.
-const FTL_WORDS = ["love", "night", "time", "heart", "home", "dead", "blue", "black", "light", "world", "fire", "dream", "day", "girl", "baby", "rain", "sun", "gold", "life", "god", "dance", "sky", "moon", "star", "lost", "city", "blood", "cold", "wild", "young", "free", "alone", "good", "bad", "high", "red", "white", "king", "run", "eyes"];
+const FTL_WORDS = [
+    "love", "night", "time", "heart", "home", "dead", "blue", "black", "light", "world",
+    "fire", "dream", "day", "girl", "baby", "rain", "sun", "gold", "life", "god",
+    "dance", "sky", "moon", "star", "lost", "city", "blood", "cold", "wild", "young",
+    "free", "alone", "good", "bad", "high", "red", "white", "king", "run", "eyes",
+    "heaven", "hell", "angel", "devil", "boy", "man", "woman", "friend", "money", "party",
+    "summer", "winter", "beautiful", "crazy", "sweet", "little", "hard", "soft", "slow", "fast",
+    "dark", "shadow", "ghost", "dream", "sleep", "wake", "gone", "stay", "leave", "fall",
+    "rise", "burn", "break", "hold", "feel", "know", "want", "need", "song", "music",
+    "one", "two", "everything", "nothing", "forever", "tonight", "yesterday", "tomorrow", "again", "away"
+];
 
 let ftlState = null;
 let ftlIndexCache = null;
@@ -6938,7 +6949,7 @@ let ftlIndexCache = null;
 function ftlToDate(v) { return typeof v === "string" ? parseInt(v, 10) : v; }
 
 // One pass over allTracks builds per-entity aggregates (count, first/last date,
-// and per-artist distinct-track count) used by every non-time facet.
+// per-artist distinct-track count) plus the "by artist" eligibility lists.
 function ftlBuildIndex() {
     const artist = new Map(), album = new Map(), track = new Map();
     const artistTracks = new Map();
@@ -6971,16 +6982,68 @@ function ftlBuildIndex() {
     }
     for (const [k, e] of artist) e.trackCount = artistTracks.get(k)?.size || 0;
 
+    // "By artist" eligibility: artists with at least FTL_BY_ARTIST_MIN entries of
+    // the given type that each clear the scrobble floor.
+    const eligible = (entityMap) => {
+        const perArtist = new Map();
+        for (const e of entityMap.values()) {
+            if (e.count < FTL_MIN_SCROBBLES || !e.artist) continue;
+            const ak = e.artist.toLowerCase();
+            let q = perArtist.get(ak);
+            if (!q) { q = { name: e.artist, count: 0 }; perArtist.set(ak, q); }
+            q.count++;
+        }
+        return [...perArtist.values()].filter(q => q.count >= FTL_BY_ARTIST_MIN).map(q => ({ name: q.name, key: q.name.toLowerCase() }));
+    };
+
     const years = [];
     if (isFinite(minY)) for (let y = minY; y <= maxY; y++) years.push(y);
 
-    return { artist: [...artist.values()], album: [...album.values()], track: [...track.values()], years };
+    return {
+        artist: [...artist.values()],
+        album: [...album.values()],
+        track: [...track.values()],
+        years,
+        byArtistEligible: { track: eligible(track), album: eligible(album) },
+        seq: {}
+    };
 }
 
 function ftlEntities(type) { return ftlIndexCache[type] || []; }
 
+// Lazily build & cache per-entity sorted scrobble-date lists (for streak/first/
+// fastest facets). Only built for the entity type a sorting facet actually needs.
+function ftlEntitySequences(type) {
+    if (ftlIndexCache.seq[type]) return ftlIndexCache.seq[type];
+    const map = new Map();
+    for (const s of allTracks) {
+        const d = ftlToDate(s.Date);
+        if (!d) continue;
+        let name, artist = null, key;
+        if (type === "artist") {
+            name = s.Artist;
+            if (!name || name === "Unknown") continue;
+            key = name.toLowerCase();
+        } else if (type === "album") {
+            name = s.Album; artist = s.Artist;
+            if (!name || name === "Unknown" || !artist || artist === "Unknown") continue;
+            key = `${name.toLowerCase()}|||${artist.toLowerCase()}`;
+        } else {
+            name = s.Track; artist = s.Artist;
+            if (!name || name === "Unknown" || !artist || artist === "Unknown") continue;
+            key = `${name.toLowerCase()}|||${artist.toLowerCase()}`;
+        }
+        let e = map.get(key);
+        if (!e) { e = { name, artist, dates: [] }; map.set(key, e); }
+        e.dates.push(d);
+    }
+    for (const e of map.values()) e.dates.sort((a, b) => a - b);
+    ftlIndexCache.seq[type] = map;
+    return map;
+}
+
 // Meta-filter: drop entries under FTL_MIN_SCROBBLES, reject if fewer than
-// FTL_MIN_ANSWERS remain, otherwise return the top FTL_LIST_SIZE.
+// FTL_MIN_ANSWERS remain, otherwise return the top FTL_LIST_SIZE by count.
 function ftlFinalize(entities) {
     const valid = entities.filter(e => e.count >= FTL_MIN_SCROBBLES);
     if (valid.length < FTL_MIN_ANSWERS) return null;
@@ -6988,12 +7051,19 @@ function ftlFinalize(entities) {
     return valid.slice(0, FTL_LIST_SIZE).map(e => ({ name: e.name, artist: e.artist || null, count: e.count }));
 }
 
-// Time facets need scrobble-level filtering, so they scan allTracks.
+// Like ftlFinalize but ranks by an arbitrary metric (for streak/first/fastest).
+function ftlFinalizeBy(rows, ascending) {
+    if (rows.length < FTL_MIN_ANSWERS) return null;
+    rows.sort((a, b) => ascending ? a.metric - b.metric : b.metric - a.metric);
+    return rows.slice(0, FTL_LIST_SIZE).map(r => ({ name: r.name, artist: r.artist || null, count: r.count }));
+}
+
+// Scrobble-level ranking; pred receives (date, scrobble).
 function ftlRankScrobbles(pred, type) {
     const counts = new Map();
     for (const s of allTracks) {
         const d = ftlToDate(s.Date);
-        if (!d || !pred(d)) continue;
+        if (!d || !pred(d, s)) continue;
         let name, artist = null, key;
         if (type === "artist") {
             name = s.Artist;
@@ -7016,36 +7086,42 @@ function ftlRankScrobbles(pred, type) {
 }
 
 function ftlRandom(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+function ftlSeen(key) { return !!(ftlState && ftlState.seen && ftlState.seen.has(key)); }
 
-// ---- Facet generators: each returns { prompt, answers } or null ----
+// ---- Facet generators: each returns { prompt, answers, key } or null.
+// The `key` is the per-session signature; a generator returns null if that exact
+// puzzle was already served this session (so nothing repeats until reload).
 function ftlGenYear(type) {
     if (!ftlIndexCache.years.length) return null;
     const y = ftlRandom(ftlIndexCache.years);
+    const key = `year:${type}:${y}`;
+    if (ftlSeen(key)) return null;
     const answers = ftlRankScrobbles(d => new Date(d).getFullYear() === y, type);
-    return answers && { prompt: `Top ${FTL_ENTITY_NOUN[type]} of ${y}`, answers };
+    return answers && { prompt: `Top ${FTL_ENTITY_NOUN[type]} of ${y}`, answers, key };
 }
 function ftlGenMonth(type) {
     const m = Math.floor(Math.random() * 12);
+    const key = `month:${type}:${m}`;
+    if (ftlSeen(key)) return null;
     const answers = ftlRankScrobbles(d => new Date(d).getMonth() === m, type);
-    return answers && { prompt: `Top ${FTL_ENTITY_NOUN[type]} across every ${FTL_MONTHS[m]}`, answers };
+    return answers && { prompt: `Top ${FTL_ENTITY_NOUN[type]} across every ${FTL_MONTHS[m]}`, answers, key };
 }
 function ftlGenYearMonth(type) {
     if (!ftlIndexCache.years.length) return null;
     const y = ftlRandom(ftlIndexCache.years);
     const m = Math.floor(Math.random() * 12);
+    const key = `yearmonth:${type}:${y}-${m}`;
+    if (ftlSeen(key)) return null;
     const answers = ftlRankScrobbles(d => { const dt = new Date(d); return dt.getFullYear() === y && dt.getMonth() === m; }, type);
-    return answers && { prompt: `Top ${FTL_ENTITY_NOUN[type]} of ${FTL_MONTHS[m]} ${y}`, answers };
-}
-function ftlGenWeekday(type) {
-    const w = Math.floor(Math.random() * 7);
-    const answers = ftlRankScrobbles(d => new Date(d).getDay() === w, type);
-    return answers && { prompt: `Top ${FTL_ENTITY_NOUN[type]} you play on ${FTL_WEEKDAYS[w]}s`, answers };
+    return answers && { prompt: `Top ${FTL_ENTITY_NOUN[type]} of ${FTL_MONTHS[m]} ${y}`, answers, key };
 }
 function ftlGenLastDays(type) {
     const n = ftlRandom([7, 30, 90, 180, 365]);
+    const key = `lastdays:${type}:${n}`;
+    if (ftlSeen(key)) return null;
     const cutoff = Date.now() - n * 86400000;
     const answers = ftlRankScrobbles(d => d >= cutoff, type);
-    return answers && { prompt: `Top ${FTL_ENTITY_NOUN[type]} of the last ${n} days`, answers };
+    return answers && { prompt: `Top ${FTL_ENTITY_NOUN[type]} of the last ${n} days`, answers, key };
 }
 function ftlGenInitial(type) {
     const letters = new Set();
@@ -7055,60 +7131,151 @@ function ftlGenInitial(type) {
     }
     if (!letters.size) return null;
     const L = ftlRandom([...letters]);
+    const key = `initial:${type}:${L}`;
+    if (ftlSeen(key)) return null;
     const answers = ftlFinalize(ftlEntities(type).filter(e => (e.name || "").trim().toUpperCase().startsWith(L)));
-    return answers && { prompt: `Top ${FTL_ENTITY_NOUN[type]} starting with “${L}”`, answers };
+    return answers && { prompt: `Top ${FTL_ENTITY_NOUN[type]} starting with “${L}”`, answers, key };
 }
 function ftlGenWord(type) {
     const w = ftlRandom(FTL_WORDS);
+    const key = `word:${type}:${w}`;
+    if (ftlSeen(key)) return null;
     const re = new RegExp(`\\b${w}`, "i");
     const answers = ftlFinalize(ftlEntities(type).filter(e => re.test(e.name || "")));
-    return answers && { prompt: `Top ${FTL_ENTITY_NOUN[type]} with “${w}” in the name`, answers };
+    return answers && { prompt: `Top ${FTL_ENTITY_NOUN[type]} with “${w}” in the name`, answers, key };
 }
-function ftlGenNameLength() {
+function ftlGenArtistLength() {
     const len = 3 + Math.floor(Math.random() * 4); // 3–6
+    const key = `alen:${len}`;
+    if (ftlSeen(key)) return null;
     const answers = ftlFinalize(ftlEntities("artist").filter(e => (e.name || "").replace(/\s/g, "").length === len));
-    return answers && { prompt: `Top artists whose name is exactly ${len} letters`, answers };
+    return answers && { prompt: `Top artists whose name is exactly ${len} letters`, answers, key };
+}
+function ftlGenTrackLength() {
+    const len = 3 + Math.floor(Math.random() * 7); // 3–9
+    const key = `tlen:${len}`;
+    if (ftlSeen(key)) return null;
+    const answers = ftlFinalize(ftlEntities("track").filter(e => (e.name || "").replace(/\s/g, "").length === len));
+    return answers && { prompt: `Top tracks whose title is exactly ${len} letters`, answers, key };
 }
 function ftlGenDiscovery(type) {
     if (!ftlIndexCache.years.length) return null;
     const y = ftlRandom(ftlIndexCache.years);
+    const key = `disc:${type}:${y}`;
+    if (ftlSeen(key)) return null;
     const answers = ftlFinalize(ftlEntities(type).filter(e => new Date(e.first).getFullYear() === y));
-    return answers && { prompt: `Top ${FTL_ENTITY_NOUN[type]} you first scrobbled in ${y}`, answers };
+    return answers && { prompt: `Top ${FTL_ENTITY_NOUN[type]} you first scrobbled in ${y}`, answers, key };
 }
 function ftlGenDormant(type) {
     const n = Math.random() < 0.5 ? 30 : 365;
+    const key = `dormant:${type}:${n}`;
+    if (ftlSeen(key)) return null;
     const cutoff = Date.now() - n * 86400000;
     const label = n === 30 ? "a month" : "a year";
     const answers = ftlFinalize(ftlEntities(type).filter(e => e.last < cutoff));
-    return answers && { prompt: `Top ${FTL_ENTITY_NOUN[type]} you haven't played in over ${label}`, answers };
+    return answers && { prompt: `Top ${FTL_ENTITY_NOUN[type]} you haven't played in over ${label}`, answers, key };
 }
 function ftlGenOneHit() {
+    const key = "onehit";
+    if (ftlSeen(key)) return null;
     const answers = ftlFinalize(ftlEntities("artist").filter(e => e.trackCount === 1));
-    return answers && { prompt: `Top artists you've only scrobbled one track from`, answers };
+    return answers && { prompt: `Top artists you've only scrobbled one track from`, answers, key };
 }
 function ftlGenByArtist(type) {
-    const top = [...ftlEntities("artist")].sort((a, b) => b.count - a.count).slice(0, 25);
-    for (let i = 0; i < 8 && top.length; i++) {
-        const a = ftlRandom(top);
-        const ak = a.name.toLowerCase();
-        const answers = ftlFinalize(ftlEntities(type).filter(e => (e.artist || "").toLowerCase() === ak));
-        if (answers) return { prompt: `Top ${FTL_ENTITY_NOUN[type]} by ${a.name}`, answers, fixedArtist: a.name };
+    const pool = ftlIndexCache.byArtistEligible[type] || [];
+    if (!pool.length) return null;
+    for (let i = 0; i < 8; i++) {
+        const a = ftlRandom(pool);
+        const key = `byartist:${type}:${a.key}`;
+        if (ftlSeen(key)) continue;
+        const answers = ftlFinalize(ftlEntities(type).filter(e => (e.artist || "").toLowerCase() === a.key));
+        if (answers) return { prompt: `Top ${FTL_ENTITY_NOUN[type]} by ${a.name}`, answers, key, fixedArtist: a.name };
     }
     return null;
+}
+function ftlGenFirstToX(type) {
+    const X = ftlRandom([50, 100, 200]);
+    const key = `first:${type}:${X}`;
+    if (ftlSeen(key)) return null;
+    const seq = ftlEntitySequences(type);
+    const rows = [];
+    for (const e of seq.values()) if (e.dates.length >= X) rows.push({ name: e.name, artist: e.artist, count: e.dates.length, metric: e.dates[X - 1] });
+    const answers = ftlFinalizeBy(rows, true);
+    return answers && { prompt: `First ${FTL_ENTITY_NOUN[type]} to reach ${X} scrobbles`, answers, key };
+}
+function ftlGenFastestToX(type) {
+    const X = ftlRandom([50, 100, 200]);
+    const key = `fastest:${type}:${X}`;
+    if (ftlSeen(key)) return null;
+    const seq = ftlEntitySequences(type);
+    const rows = [];
+    for (const e of seq.values()) if (e.dates.length >= X) rows.push({ name: e.name, artist: e.artist, count: e.dates.length, metric: e.dates[X - 1] - e.dates[0] });
+    const answers = ftlFinalizeBy(rows, true);
+    return answers && { prompt: `Fastest ${FTL_ENTITY_NOUN[type]} to reach ${X} scrobbles`, answers, key };
+}
+function ftlGenSingleDay(type) {
+    const key = `singleday:${type}`;
+    if (ftlSeen(key)) return null;
+    const seq = ftlEntitySequences(type);
+    const rows = [];
+    for (const e of seq.values()) {
+        if (e.dates.length < FTL_MIN_SCROBBLES) continue;
+        const dayCounts = new Map();
+        let max = 0;
+        for (const d of e.dates) {
+            const k = getLocalDayKeyFromTimestamp(d);
+            const c = (dayCounts.get(k) || 0) + 1;
+            dayCounts.set(k, c);
+            if (c > max) max = c;
+        }
+        rows.push({ name: e.name, artist: e.artist, count: e.dates.length, metric: max });
+    }
+    const answers = ftlFinalizeBy(rows, false);
+    return answers && { prompt: `Top ${FTL_ENTITY_NOUN[type]} by scrobbles in a single day`, answers, key };
+}
+function ftlGenSeparateDays(type) {
+    const key = `sepdays:${type}`;
+    if (ftlSeen(key)) return null;
+    const seq = ftlEntitySequences(type);
+    const rows = [];
+    for (const e of seq.values()) {
+        if (e.dates.length < FTL_MIN_SCROBBLES) continue;
+        const days = new Set();
+        for (const d of e.dates) days.add(getLocalDayKeyFromTimestamp(d));
+        rows.push({ name: e.name, artist: e.artist, count: e.dates.length, metric: days.size });
+    }
+    const answers = ftlFinalizeBy(rows, false);
+    return answers && { prompt: `Top ${FTL_ENTITY_NOUN[type]} you've played across the most separate days`, answers, key };
+}
+function ftlGenSequence(type) {
+    const buckets = Math.floor(allTracks.length / FTL_SEQUENCE_BUCKET);
+    if (buckets < 1) return null;
+    const b = Math.floor(Math.random() * buckets);
+    const key = `seq:${type}:${b}`;
+    if (ftlSeen(key)) return null;
+    const lo = b * FTL_SEQUENCE_BUCKET + 1;
+    const hi = (b + 1) * FTL_SEQUENCE_BUCKET;
+    const answers = ftlRankScrobbles((d, s) => s.order >= lo && s.order <= hi, type);
+    return answers && { prompt: `Top ${FTL_ENTITY_NOUN[type]} from scrobbles ${lo.toLocaleString()} to ${hi.toLocaleString()}`, answers, key };
 }
 
 const FTL_FACETS = [
     { id: "year", cat: "time", types: ["track", "album", "artist"], gen: ftlGenYear },
     { id: "month", cat: "time", types: ["track", "album", "artist"], gen: ftlGenMonth },
     { id: "yearmonth", cat: "time", types: ["track", "album", "artist"], gen: ftlGenYearMonth },
-    { id: "weekday", cat: "time", types: ["track", "album", "artist"], gen: ftlGenWeekday },
     { id: "lastdays", cat: "time", types: ["track", "album", "artist"], gen: ftlGenLastDays },
     { id: "initial", cat: "names", types: ["track", "album", "artist"], gen: ftlGenInitial },
     { id: "word", cat: "names", types: ["track", "album", "artist"], gen: ftlGenWord },
-    { id: "namelength", cat: "names", types: ["artist"], gen: ftlGenNameLength },
+    { id: "artistlength", cat: "names", types: ["artist"], gen: ftlGenArtistLength },
+    { id: "tracklength", cat: "names", types: ["track"], gen: ftlGenTrackLength },
     { id: "discovery", cat: "deep", types: ["track", "album", "artist"], gen: ftlGenDiscovery },
     { id: "dormant", cat: "deep", types: ["track", "album", "artist"], gen: ftlGenDormant },
     { id: "onehit", cat: "deep", types: ["artist"], gen: ftlGenOneHit },
+    { id: "firsttox", cat: "sorting", types: ["track", "album", "artist"], gen: ftlGenFirstToX },
+    { id: "fastesttox", cat: "sorting", types: ["track", "album", "artist"], gen: ftlGenFastestToX },
+    { id: "singleday", cat: "sorting", types: ["track", "album", "artist"], gen: ftlGenSingleDay },
+    { id: "separatedays", cat: "sorting", types: ["track", "album", "artist"], gen: ftlGenSeparateDays },
+    { id: "sequence", cat: "sorting", types: ["track", "album", "artist"], gen: ftlGenSequence },
     { id: "byartist", cat: "byartist", types: ["track", "album"], gen: ftlGenByArtist }
 ];
 
@@ -7170,14 +7337,23 @@ function ftlGeneratePuzzle() {
             const result = facet.gen(entityType);
             if (result) {
                 ftlState.facetLastUsed.set(facet.id, ftlState.puzzleNum);
+                ftlState.seen.add(result.key);
                 return { ...result, entityType, facetId: facet.id };
             }
         }
     }
-    // Fallback so the game never stalls: overall top list of an enabled type.
-    const type = [...ftlState.options.types][0] || "track";
-    const answers = ftlFinalize(ftlEntities(type));
-    return answers ? { prompt: `Your top ${FTL_ENTITY_NOUN[type]}`, answers, entityType: type, facetId: "overall" } : null;
+    // Fallback so the game rarely stalls: overall top list of an enabled type,
+    // itself only served once per session.
+    for (const type of ftlState.options.types) {
+        const key = `overall:${type}`;
+        if (ftlSeen(key)) continue;
+        const answers = ftlFinalize(ftlEntities(type));
+        if (answers) {
+            ftlState.seen.add(key);
+            return { prompt: `Your top ${FTL_ENTITY_NOUN[type]}`, answers, entityType: type, facetId: "overall", key };
+        }
+    }
+    return null; // everything reachable has been played this session
 }
 
 // Sporcle-style normalization: case-insensitive, punctuation/diacritics ignored,
@@ -7192,6 +7368,86 @@ function ftlNormalize(s) {
     t = t.normalize("NFD").replace(/[̀-ͯ]/g, "");
     const stripped = t.replace(/[^\p{L}\p{N}]+/gu, "");
     return stripped.length ? stripped : String(s).toLowerCase().replace(/\s+/g, "");
+}
+
+// Acceptable typed forms for a title. Normally just the normalized title, but
+// when the main title is non-Latin (e.g. 복합성 (Complexity)) the parenthetical
+// Latin gloss is also accepted, so you can type "complexity" instead of hangul.
+function ftlNormsFor(name) {
+    const norms = new Set();
+    const full = ftlNormalize(name);
+    if (full) norms.add(full);
+    if (!/[a-z]/.test(full)) {
+        const parens = String(name).match(/[\(\[]([^\)\]]+)[\)\]]/g) || [];
+        for (const p of parens) {
+            const inner = ftlNormalize(p.slice(1, -1));
+            if (inner && /[a-z]/.test(inner)) norms.add(inner);
+        }
+    }
+    return [...norms];
+}
+
+// Accept an answer: fill its slot, clear the box, and finish if all are found.
+function ftlAcceptAnswer(idx) {
+    ftlState.found.add(idx);
+    const input = document.getElementById("ftl-guess");
+    input.value = "";
+    ftlSetInputProgress(0);
+    ftlMarkSlot(idx, false);
+    ftlUpdateScore();
+    if (ftlState.found.size === ftlState.puzzle.answers.length) ftlFinish(false);
+}
+
+// Tint the input greener as the typed text gets closer to an unfound answer.
+function ftlSetInputProgress(p) {
+    const input = document.getElementById("ftl-guess");
+    if (!input) return;
+    input.style.backgroundColor = p > 0 ? `rgba(63, 174, 107, ${(0.5 * p).toFixed(2)})` : "";
+}
+
+// Runs on every keystroke: auto-completes on a match and shows how close you are.
+function ftlOnInput() {
+    if (!ftlState || ftlState.done) return;
+    const input = document.getElementById("ftl-guess");
+    const typed = ftlNormalize(input.value);
+    if (!typed) { ftlSetInputProgress(0); return; }
+    const answers = ftlState.puzzle.answers;
+
+    // exact match on any accepted form -> auto-complete
+    let hit = answers.findIndex((a, i) => !ftlState.found.has(i) && a.norms.includes(typed));
+    // long, unambiguous prefix -> auto-complete too (so you needn't type it all)
+    if (hit < 0 && typed.length >= 8) {
+        const m = [];
+        answers.forEach((a, i) => { if (!ftlState.found.has(i) && a.norms.some(n => n.startsWith(typed))) m.push(i); });
+        if (m.length === 1) hit = m[0];
+    }
+    if (hit >= 0) { ftlAcceptAnswer(hit); return; }
+
+    // otherwise colour by how far into the closest matching answer we are
+    let bestLen = Infinity;
+    answers.forEach((a, i) => {
+        if (ftlState.found.has(i)) return;
+        for (const n of a.norms) if (n.startsWith(typed) && n.length < bestLen) bestLen = n.length;
+    });
+    const progress = isFinite(bestLen) ? Math.min(1, typed.length / bestLen) : 0;
+    ftlSetInputProgress(typed.length >= 2 ? progress : 0);
+}
+
+// Enter is an optional shortcut: force an unambiguous prefix guess without
+// wiping the box on a miss, so a typo can just be edited.
+function ftlForceGuess() {
+    if (!ftlState || ftlState.done) return;
+    const input = document.getElementById("ftl-guess");
+    const typed = ftlNormalize(input.value);
+    if (typed.length < 4) return;
+    const answers = ftlState.puzzle.answers;
+    let hit = answers.findIndex((a, i) => !ftlState.found.has(i) && a.norms.includes(typed));
+    if (hit < 0) {
+        const m = [];
+        answers.forEach((a, i) => { if (!ftlState.found.has(i) && a.norms.some(n => n.startsWith(typed))) m.push(i); });
+        if (m.length === 1) hit = m[0];
+    }
+    if (hit >= 0) ftlAcceptAnswer(hit);
 }
 
 function ftlRenderSlots() {
@@ -7217,34 +7473,13 @@ function ftlMarkSlot(i, missed) {
     li.classList.add(missed ? "missed" : "found");
     if (!missed) { void li.offsetWidth; li.classList.add("ftl-flash"); }
     const showArtist = ftlState.puzzle.entityType !== "artist" && !ftlState.puzzle.fixedArtist && a.artist;
-    const sub = showArtist ? ` <span class="ftl-slot-hint">— ${escapeHTML(a.artist)}</span>` : "";
+    const sub = showArtist ? ` <span class="ftl-slot-hint">by ${escapeHTML(a.artist)}</span>` : "";
     li.querySelector(".ftl-slot-text").innerHTML =
         `${escapeHTML(a.name)}${sub} <span class="ftl-slot-count">${a.count.toLocaleString()}</span>`;
 }
 
 function ftlUpdateScore() {
     document.getElementById("ftl-score").textContent = `${ftlState.found.size} / ${ftlState.puzzle.answers.length}`;
-}
-
-function ftlSubmitGuess() {
-    if (!ftlState || ftlState.done) return;
-    const input = document.getElementById("ftl-guess");
-    const norm = ftlNormalize(input.value);
-    input.value = "";
-    if (!norm) return;
-    const answers = ftlState.puzzle.answers;
-    let hit = answers.findIndex((a, i) => !ftlState.found.has(i) && a.norm === norm);
-    if (hit < 0 && norm.length >= 4) {
-        const matches = [];
-        answers.forEach((a, i) => { if (!ftlState.found.has(i) && a.norm.startsWith(norm)) matches.push(i); });
-        if (matches.length === 1) hit = matches[0];
-    }
-    if (hit >= 0) {
-        ftlState.found.add(hit);
-        ftlMarkSlot(hit, false);
-        ftlUpdateScore();
-        if (ftlState.found.size === answers.length) ftlFinish(false);
-    }
 }
 
 function ftlFinish(timedOut) {
@@ -7288,7 +7523,7 @@ function ftlNextPuzzle() {
     ftlStopTimer();
     const puzzle = ftlGeneratePuzzle();
     if (!puzzle) { ftlShowSetup(true); return; }
-    puzzle.answers.forEach(a => { a.norm = ftlNormalize(a.name); });
+    puzzle.answers.forEach(a => { a.norms = ftlNormsFor(a.name); });
     ftlState.puzzle = puzzle;
     ftlState.found = new Set();
     ftlState.done = false;
@@ -7296,6 +7531,7 @@ function ftlNextPuzzle() {
     const guess = document.getElementById("ftl-guess");
     guess.disabled = false;
     guess.value = "";
+    ftlSetInputProgress(0);
     ftlRenderSlots();
     ftlUpdateScore();
     ftlStartTimer();
@@ -7318,7 +7554,7 @@ function ftlShowSetup(showNote) {
     const note = document.getElementById("ftl-setup-note");
     if (showNote) {
         note.hidden = false;
-        note.textContent = "No lists match those options — turn on more types or puzzle categories.";
+        note.textContent = "No lists match those options. Turn on more types or puzzle categories.";
     } else {
         note.hidden = true;
     }
@@ -7338,6 +7574,7 @@ function ftlStartGame() {
         },
         categoryDeck: [],
         facetLastUsed: new Map(),
+        seen: new Set(),
         puzzleNum: 0,
         puzzle: null,
         found: new Set(),
@@ -7390,8 +7627,11 @@ function initGames() {
     const ftlStartBtn = document.getElementById("ftl-start");
     if (ftlStartBtn) ftlStartBtn.addEventListener("click", ftlStartGame);
 
+    const ftlInput = document.getElementById("ftl-guess");
+    if (ftlInput) ftlInput.addEventListener("input", ftlOnInput);
+
     const ftlForm = document.getElementById("ftl-guess-form");
-    if (ftlForm) ftlForm.addEventListener("submit", (e) => { e.preventDefault(); ftlSubmitGuess(); });
+    if (ftlForm) ftlForm.addEventListener("submit", (e) => { e.preventDefault(); ftlForceGuess(); });
 
     const ftlReveal = document.getElementById("ftl-reveal");
     if (ftlReveal) ftlReveal.addEventListener("click", () => ftlFinish(false));
