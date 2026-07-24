@@ -7387,6 +7387,45 @@ function ftlNormsFor(name) {
     return [...norms];
 }
 
+// Levenshtein distance, used to allow a small typo on an otherwise complete guess.
+function ftlEditDistance(a, b) {
+    const m = a.length, n = b.length;
+    if (!m) return n;
+    if (!n) return m;
+    let prev = new Array(n + 1);
+    for (let j = 0; j <= n; j++) prev[j] = j;
+    for (let i = 1; i <= m; i++) {
+        const cur = [i];
+        const ai = a.charCodeAt(i - 1);
+        for (let j = 1; j <= n; j++) {
+            const cost = ai === b.charCodeAt(j - 1) ? 0 : 1;
+            cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost);
+        }
+        prev = cur;
+    }
+    return prev[n];
+}
+
+// Index of the unfound answer the typed text completes: an exact normalized
+// match, or a near-complete one (roughly full length, within ~15% typos). Never
+// a prefix, so nothing auto-completes mid-title. Returns -1 if none or ambiguous.
+function ftlMatchIndex(typed) {
+    const answers = ftlState.puzzle.answers;
+    const exact = answers.findIndex((a, i) => !ftlState.found.has(i) && a.norms.includes(typed));
+    if (exact >= 0) return exact;
+    if (typed.length < 4) return -1;
+    const near = [];
+    answers.forEach((a, i) => {
+        if (ftlState.found.has(i)) return;
+        for (const n of a.norms) {
+            if (n.length < 4) continue;
+            const tol = Math.max(1, Math.round(n.length * 0.15));
+            if (Math.abs(typed.length - n.length) <= tol && ftlEditDistance(typed, n) <= tol) { near.push(i); break; }
+        }
+    });
+    return near.length === 1 ? near[0] : -1;
+}
+
 // Accept an answer: fill its slot, clear the box, and finish if all are found.
 function ftlAcceptAnswer(idx) {
     ftlState.found.add(idx);
@@ -7405,46 +7444,44 @@ function ftlSetInputProgress(p) {
     input.style.backgroundColor = p > 0 ? `rgba(63, 174, 107, ${(0.5 * p).toFixed(2)})` : "";
 }
 
-// Runs on every keystroke: auto-completes on a match and shows how close you are.
+// Runs on every keystroke: auto-completes only once the typed text is a full
+// (or near-full, small-typo) match, and colours the box by how close you are.
 function ftlOnInput() {
     if (!ftlState || ftlState.done) return;
     const input = document.getElementById("ftl-guess");
     const typed = ftlNormalize(input.value);
     if (!typed) { ftlSetInputProgress(0); return; }
-    const answers = ftlState.puzzle.answers;
 
-    // exact match on any accepted form -> auto-complete
-    let hit = answers.findIndex((a, i) => !ftlState.found.has(i) && a.norms.includes(typed));
-    // long, unambiguous prefix -> auto-complete too (so you needn't type it all)
-    if (hit < 0 && typed.length >= 8) {
-        const m = [];
-        answers.forEach((a, i) => { if (!ftlState.found.has(i) && a.norms.some(n => n.startsWith(typed))) m.push(i); });
-        if (m.length === 1) hit = m[0];
-    }
+    const hit = ftlMatchIndex(typed);
     if (hit >= 0) { ftlAcceptAnswer(hit); return; }
 
-    // otherwise colour by how far into the closest matching answer we are
-    let bestLen = Infinity;
-    answers.forEach((a, i) => {
-        if (ftlState.found.has(i)) return;
-        for (const n of a.norms) if (n.startsWith(typed) && n.length < bestLen) bestLen = n.length;
-    });
-    const progress = isFinite(bestLen) ? Math.min(1, typed.length / bestLen) : 0;
-    ftlSetInputProgress(typed.length >= 2 ? progress : 0);
+    // Colour by how far into the closest matching answer we are, so a title you
+    // are typing correctly deepens toward green as it nears completion.
+    let bestRatio = 0;
+    for (let i = 0; i < ftlState.puzzle.answers.length; i++) {
+        if (ftlState.found.has(i)) continue;
+        for (const n of ftlState.puzzle.answers[i].norms) {
+            if (n.startsWith(typed)) bestRatio = Math.max(bestRatio, typed.length / n.length);
+        }
+    }
+    ftlSetInputProgress(typed.length >= 2 ? bestRatio : 0);
 }
 
-// Enter is an optional shortcut: force an unambiguous prefix guess without
-// wiping the box on a miss, so a typo can just be edited.
+// Enter is an optional shortcut. It accepts a full/near-full match like typing
+// does, plus an unambiguous prefix once you're at least halfway through the
+// title (so you can skip the tail of a long one). A miss never wipes the box.
 function ftlForceGuess() {
     if (!ftlState || ftlState.done) return;
     const input = document.getElementById("ftl-guess");
     const typed = ftlNormalize(input.value);
     if (typed.length < 4) return;
-    const answers = ftlState.puzzle.answers;
-    let hit = answers.findIndex((a, i) => !ftlState.found.has(i) && a.norms.includes(typed));
+    let hit = ftlMatchIndex(typed);
     if (hit < 0) {
         const m = [];
-        answers.forEach((a, i) => { if (!ftlState.found.has(i) && a.norms.some(n => n.startsWith(typed))) m.push(i); });
+        ftlState.puzzle.answers.forEach((a, i) => {
+            if (ftlState.found.has(i)) return;
+            if (a.norms.some(n => n.startsWith(typed) && typed.length >= n.length * 0.5)) m.push(i);
+        });
         if (m.length === 1) hit = m[0];
     }
     if (hit >= 0) ftlAcceptAnswer(hit);
