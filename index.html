@@ -614,6 +614,11 @@
                         <span class="game-card-title">Fill the List</span>
                         <span class="game-card-desc">We pick a random slice of your library, like a year, a letter, or one artist. You name as many of its top 10 as you can.</span>
                     </button>
+                    <button type="button" class="game-card" id="open-ordering">
+                        <span class="game-card-icon"><i class="fas fa-arrow-down-1-9" aria-hidden="true"></i></span>
+                        <span class="game-card-title">Put Them In Order</span>
+                        <span class="game-card-desc">Five picks from your library and one thing to rank them by. Drag them into the right order.</span>
+                    </button>
                 </div>
             </div>
 
@@ -709,12 +714,44 @@
                         <span class="ftl-meta"><span id="ftl-score">0 / 10</span><span id="ftl-timeleft" class="ftl-timeleft" hidden></span></span>
                     </div>
                     <form id="ftl-guess-form" class="ftl-guess-form" autocomplete="off">
-                        <input type="text" id="ftl-guess" placeholder="Type a guess and press Enter" autocomplete="off" autocapitalize="none" spellcheck="false">
+                        <input type="text" id="ftl-guess" placeholder="Start typing an answer" autocomplete="off" autocapitalize="none" spellcheck="false">
                     </form>
                     <ol id="ftl-slots" class="ftl-slots"></ol>
                     <div class="ftl-actions">
                         <button type="button" id="ftl-reveal" class="hl-secondary">Give up &amp; reveal</button>
                         <button type="button" id="ftl-next" class="hl-primary">New list</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="ord-game" class="ord-game" hidden>
+                <button type="button" class="hl-back" id="ord-back"><i class="fas fa-arrow-left" aria-hidden="true"></i> All games</button>
+
+                <div id="ord-setup" class="hl-setup">
+                    <h2>Put Them In Order</h2>
+                    <p>Five picks from your library and one thing to rank them by. Pick what you want to play with:</p>
+                    <div class="hl-type-choice">
+                        <button type="button" class="ord-type" data-type="artist"><i class="fas fa-microphone" aria-hidden="true"></i>Artists</button>
+                        <button type="button" class="ord-type" data-type="album"><i class="fas fa-compact-disc" aria-hidden="true"></i>Albums</button>
+                        <button type="button" class="ord-type" data-type="track"><i class="fas fa-music" aria-hidden="true"></i>Tracks</button>
+                    </div>
+                    <p id="ord-setup-note" class="hl-setup-note" hidden></p>
+                </div>
+
+                <div id="ord-play" class="ord-play" hidden>
+                    <div class="ord-topbar">
+                        <div>
+                            <div class="ord-title" id="ord-title"></div>
+                            <div class="ord-instruction" id="ord-instruction"></div>
+                        </div>
+                        <span class="ftl-meta"><span id="ord-score"></span></span>
+                    </div>
+                    <ol id="ord-list" class="ord-list"></ol>
+                    <p class="ord-hint">Drag the rows, or use the arrows, then check your order.</p>
+                    <div class="ftl-actions">
+                        <button type="button" id="ord-check" class="hl-primary">Check order</button>
+                        <button type="button" id="ord-next" class="hl-secondary" hidden>Next round</button>
+                        <button type="button" id="ord-change-type" class="hl-secondary">Change type</button>
                     </div>
                 </div>
             </div>

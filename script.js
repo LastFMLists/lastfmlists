@@ -6627,7 +6627,9 @@ const GAMES_STORAGE_KEY = "lastfmlists_games_v1";
 let gamesRecords = {
     hlBest: { artist: 0, album: 0, track: 0 },
     ftlBest: 0,
-    ftlPlayed: 0
+    ftlPlayed: 0,
+    ordBest: 0,
+    ordPlayed: 0
 };
 
 function loadGamesRecords() {
@@ -6864,11 +6866,13 @@ function hlShowHome() {
     document.getElementById("games-home").hidden = false;
     document.getElementById("hl-game").hidden = true;
     document.getElementById("ftl-game").hidden = true;
+    document.getElementById("ord-game").hidden = true;
 }
 
 function hlOpenGame() {
     hlClearTimer();
     document.getElementById("ftl-game").hidden = true;
+    document.getElementById("ord-game").hidden = true;
     document.getElementById("games-home").hidden = true;
     document.getElementById("hl-game").hidden = false;
     hlShowSetup();
@@ -7620,6 +7624,7 @@ function ftlNextPuzzle() {
 function ftlOpenGame() {
     ftlStopTimer();
     document.getElementById("hl-game").hidden = true;
+    document.getElementById("ord-game").hidden = true;
     document.getElementById("games-home").hidden = true;
     document.getElementById("ftl-game").hidden = false;
     ftlShowSetup(false);
@@ -7662,6 +7667,458 @@ function ftlStartGame() {
     document.getElementById("ftl-setup").hidden = true;
     document.getElementById("ftl-play").hidden = false;
     ftlNextPuzzle();
+}
+
+// ============================================================
+// Put Them In Order
+// ============================================================
+
+const ORD_ITEM_COUNT = 5;
+const ORD_POOL_LIMIT = { artist: 200, album: 300, track: 600 };
+const ORD_MIN_SCROBBLES = 5;
+
+let ordState = null;
+let ordConsecutiveCache = {};
+let ordTrackStatsCache = {};
+let ordDayStatsCache = {};
+let ordDragEl = null;
+
+// Key for a raw scrobble, matching the entity keys used by the index.
+function ordScrobbleKey(type, s) {
+    const A = s.Artist;
+    if (!A || A === "Unknown") return null;
+    if (type === "artist") return A.toLowerCase();
+    const n = type === "album" ? s.Album : s.Track;
+    if (!n || n === "Unknown") return null;
+    return `${n.toLowerCase()}|||${A.toLowerCase()}`;
+}
+
+function ordEntityKey(type, e) {
+    return type === "artist"
+        ? (e.name || "").toLowerCase()
+        : `${(e.name || "").toLowerCase()}|||${(e.artist || "").toLowerCase()}`;
+}
+
+// Recognisable candidates only: the most-played slice of the library.
+function ordBasePool(type) {
+    const ents = ftlEntities(type).filter(e => e.count >= ORD_MIN_SCROBBLES);
+    ents.sort((a, b) => b.count - a.count);
+    return ents.slice(0, ORD_POOL_LIMIT[type] || 300).map(e => ({
+        name: e.name,
+        artist: e.artist || null,
+        count: e.count,
+        first: e.first,
+        last: e.last,
+        trackCount: e.trackCount,
+        key: ordEntityKey(type, e)
+    }));
+}
+
+// Longest run of back-to-back scrobbles, from one pass over the play history.
+function ordConsecutiveMap(type) {
+    if (ordConsecutiveCache[type]) return ordConsecutiveCache[type];
+    const map = new Map();
+    let prevKey = null, run = 0;
+    for (const s of allTracks) {
+        const k = ordScrobbleKey(type, s);
+        if (!k) { prevKey = null; run = 0; continue; }
+        run = k === prevKey ? run + 1 : 1;
+        prevKey = k;
+        if (run > (map.get(k) || 0)) map.set(k, run);
+    }
+    ordConsecutiveCache[type] = map;
+    return map;
+}
+
+// Per artist/album: biggest single track and how many distinct tracks.
+function ordTrackStats(type) {
+    if (ordTrackStatsCache[type]) return ordTrackStatsCache[type];
+    const perEntity = new Map();
+    for (const s of allTracks) {
+        const ek = ordScrobbleKey(type, s);
+        if (!ek || !s.Track || s.Track === "Unknown") continue;
+        const tk = s.Track.toLowerCase();
+        let m = perEntity.get(ek);
+        if (!m) { m = new Map(); perEntity.set(ek, m); }
+        m.set(tk, (m.get(tk) || 0) + 1);
+    }
+    const out = new Map();
+    for (const [ek, m] of perEntity) {
+        let max = 0;
+        for (const c of m.values()) if (c > max) max = c;
+        out.set(ek, { maxTrack: max, distinct: m.size });
+    }
+    ordTrackStatsCache[type] = out;
+    return out;
+}
+
+// Per entity: biggest single day and how many separate days.
+function ordDayStats(type) {
+    if (ordDayStatsCache[type]) return ordDayStatsCache[type];
+    const seq = ftlEntitySequences(type);
+    const out = new Map();
+    for (const [key, e] of seq) {
+        const days = new Map();
+        let max = 0;
+        for (const d of e.dates) {
+            const k = getLocalDayKeyFromTimestamp(d);
+            const c = (days.get(k) || 0) + 1;
+            days.set(k, c);
+            if (c > max) max = c;
+        }
+        out.set(key, { maxDay: max, days: days.size });
+    }
+    ordDayStatsCache[type] = out;
+    return out;
+}
+
+// Each criterion builds a spec: the items with their values, which way to sort,
+// and how to render the value on reveal.
+const ORD_CRITERIA = [
+    {
+        id: "plays", types: ["artist", "album", "track"],
+        build: (type, pool) => ({
+            title: "Total scrobbles", instruction: "Most played at the top", desc: true, isDate: false,
+            items: pool.map(e => ({ ...e, value: e.count })),
+            format: v => `${v.toLocaleString()} scrobbles`
+        })
+    },
+    {
+        id: "first", types: ["artist", "album", "track"],
+        build: (type, pool) => ({
+            title: "First ever scrobble", instruction: "Whatever you discovered first at the top", desc: false, isDate: true,
+            items: pool.filter(e => e.first).map(e => ({ ...e, value: e.first })),
+            format: v => `first played ${ftlFormatDay(v)}`
+        })
+    },
+    {
+        id: "last", types: ["artist", "album", "track"],
+        build: (type, pool) => ({
+            title: "Most recent scrobble", instruction: "Most recently played at the top", desc: true, isDate: true,
+            items: pool.filter(e => e.last).map(e => ({ ...e, value: e.last })),
+            format: v => `last played ${ftlFormatDay(v)}`
+        })
+    },
+    {
+        id: "period", types: ["artist", "album", "track"],
+        build: (type, pool) => {
+            const years = ftlIndexCache.years;
+            const modes = years.length ? ["year", "yearmonth", "lastdays"] : ["lastdays"];
+            const mode = ftlRandom(modes);
+            let pred, label;
+            if (mode === "year") {
+                const y = ftlRandom(years);
+                pred = d => new Date(d).getFullYear() === y;
+                label = `in ${y}`;
+            } else if (mode === "yearmonth") {
+                const y = ftlRandom(years);
+                const m = Math.floor(Math.random() * 12);
+                pred = d => { const dt = new Date(d); return dt.getFullYear() === y && dt.getMonth() === m; };
+                label = `in ${FTL_MONTHS[m]} ${y}`;
+            } else {
+                const n = ftlRandom([30, 90, 180, 365]);
+                const cutoff = Date.now() - n * 86400000;
+                pred = d => d >= cutoff;
+                label = `in the last ${n} days`;
+            }
+            const map = new Map();
+            for (const s of allTracks) {
+                const d = ftlToDate(s.Date);
+                if (!d || !pred(d)) continue;
+                const k = ordScrobbleKey(type, s);
+                if (k) map.set(k, (map.get(k) || 0) + 1);
+            }
+            return {
+                title: `Scrobbles ${label}`, instruction: `Most played ${label} at the top`, desc: true, isDate: false,
+                items: pool.map(e => ({ ...e, value: map.get(e.key) || 0 })).filter(e => e.value > 0),
+                format: v => `${v.toLocaleString()} ${label}`
+            };
+        }
+    },
+    {
+        id: "toptrack", types: ["artist", "album"],
+        build: (type, pool) => {
+            const stats = ordTrackStats(type);
+            return {
+                title: "Biggest single track", instruction: "Whoever has the most-played single track at the top", desc: true, isDate: false,
+                items: pool.map(e => ({ ...e, value: stats.get(e.key)?.maxTrack || 0 })).filter(e => e.value > 0),
+                format: v => `top track played ${v.toLocaleString()} times`
+            };
+        }
+    },
+    {
+        id: "distincttracks", types: ["artist", "album"],
+        build: (type, pool) => {
+            const stats = ordTrackStats(type);
+            return {
+                title: "Different tracks played", instruction: "Most different tracks at the top", desc: true, isDate: false,
+                items: pool.map(e => ({ ...e, value: stats.get(e.key)?.distinct || 0 })).filter(e => e.value > 0),
+                format: v => `${v.toLocaleString()} different tracks`
+            };
+        }
+    },
+    {
+        id: "consecutive", types: ["artist", "album", "track"],
+        build: (type, pool) => {
+            const map = ordConsecutiveMap(type);
+            return {
+                title: "Longest run back to back", instruction: "Longest unbroken run at the top", desc: true, isDate: false,
+                items: pool.map(e => ({ ...e, value: map.get(e.key) || 0 })).filter(e => e.value > 1),
+                format: v => `${v} in a row`
+            };
+        }
+    },
+    {
+        id: "singleday", types: ["artist", "album", "track"],
+        build: (type, pool) => {
+            const stats = ordDayStats(type);
+            return {
+                title: "Most scrobbles in one day", instruction: "Biggest single day at the top", desc: true, isDate: false,
+                items: pool.map(e => ({ ...e, value: stats.get(e.key)?.maxDay || 0 })).filter(e => e.value > 1),
+                format: v => `${v} in one day`
+            };
+        }
+    },
+    {
+        id: "separatedays", types: ["artist", "album", "track"],
+        build: (type, pool) => {
+            const stats = ordDayStats(type);
+            return {
+                title: "Days played on", instruction: "Played across the most separate days at the top", desc: true, isDate: false,
+                items: pool.map(e => ({ ...e, value: stats.get(e.key)?.days || 0 })).filter(e => e.value > 0),
+                format: v => `${v.toLocaleString()} separate days`
+            };
+        }
+    }
+];
+
+// Pick items whose values are clearly apart, so the ordering is knowable rather
+// than a coin flip between near-identical numbers.
+function ordPickSpread(items, n, isDate) {
+    const valid = items.filter(i => typeof i.value === "number" && isFinite(i.value));
+    if (valid.length < n) return null;
+    valid.sort((a, b) => b.value - a.value);
+    const separated = (a, b) => isDate
+        ? Math.abs(a - b) >= 14 * 86400000
+        : Math.abs(a - b) >= Math.max(1, Math.round(Math.max(Math.abs(a), Math.abs(b)) * 0.08));
+
+    for (let attempt = 0; attempt < 30; attempt++) {
+        const start = Math.floor(Math.random() * Math.max(1, valid.length - n));
+        const picked = [valid[start]];
+        for (let i = start + 1; i < valid.length && picked.length < n; i++) {
+            if (separated(valid[i].value, picked[picked.length - 1].value)) picked.push(valid[i]);
+        }
+        if (picked.length === n) return picked;
+    }
+    // Fallback: spread evenly across the whole list and require distinct values.
+    const step = Math.max(1, Math.floor(valid.length / n));
+    const out = [];
+    for (let i = 0; i < n; i++) out.push(valid[Math.min(valid.length - 1, i * step)]);
+    const distinct = new Set(out.map(o => o.value));
+    return distinct.size === n ? out : null;
+}
+
+function ordBuildRound(type) {
+    const pool = ordBasePool(type);
+    if (pool.length < ORD_ITEM_COUNT) return null;
+    let choices = ORD_CRITERIA.filter(c => c.types.includes(type) && c.id !== ordState.lastCriterion);
+    if (!choices.length) choices = ORD_CRITERIA.filter(c => c.types.includes(type));
+
+    for (let attempt = 0; attempt < 14; attempt++) {
+        const crit = ftlRandom(choices);
+        const spec = crit.build(type, pool);
+        if (!spec || !spec.items || spec.items.length < ORD_ITEM_COUNT) continue;
+        const picked = ordPickSpread(spec.items, ORD_ITEM_COUNT, spec.isDate);
+        if (!picked) continue;
+        const correct = [...picked].sort((a, b) => spec.desc ? b.value - a.value : a.value - b.value);
+        let display = ftlShuffle([...correct]);
+        // Don't hand them an already-solved board.
+        if (display.every((d, i) => d.key === correct[i].key)) display = ftlShuffle([...correct].reverse());
+        ordState.lastCriterion = crit.id;
+        return { title: spec.title, instruction: spec.instruction, format: spec.format, correct, display };
+    }
+    return null;
+}
+
+function ordRenumber() {
+    document.querySelectorAll("#ord-list .ord-item").forEach((li, i) => {
+        const rank = li.querySelector(".ord-rank");
+        if (rank) rank.textContent = `${i + 1}.`;
+    });
+}
+
+function ordRenderRound() {
+    const list = document.getElementById("ord-list");
+    list.innerHTML = "";
+    const showArtist = ordState.type !== "artist";
+    ordState.round.display.forEach((item, i) => {
+        const li = document.createElement("li");
+        li.className = "ord-item";
+        li.draggable = true;
+        li.dataset.key = item.key;
+        const sub = showArtist && item.artist ? `<span class="ord-sub">by ${escapeHTML(item.artist)}</span>` : "";
+        li.innerHTML =
+            `<span class="ord-rank">${i + 1}.</span>` +
+            `<span class="ord-name">${escapeHTML(item.name)}${sub}</span>` +
+            `<span class="ord-value"></span>` +
+            `<span class="ord-moves"><button type="button" class="ord-up" aria-label="Move up">&#9650;</button>` +
+            `<button type="button" class="ord-down" aria-label="Move down">&#9660;</button></span>`;
+        list.appendChild(li);
+    });
+    document.getElementById("ord-title").textContent = ordState.round.title;
+    document.getElementById("ord-instruction").textContent = ordState.round.instruction;
+    document.getElementById("ord-check").hidden = false;
+    document.getElementById("ord-next").hidden = true;
+    ordUpdateScore();
+}
+
+function ordUpdateScore() {
+    const el = document.getElementById("ord-score");
+    const best = gamesRecords.ordBest || 0;
+    el.textContent = ordState.rounds
+        ? `Round ${ordState.rounds + 1} · perfect streak ${ordState.streak} · best ${best}`
+        : `Best perfect streak: ${best}`;
+}
+
+function ordCheck() {
+    if (!ordState || !ordState.round || ordState.checked) return;
+    ordState.checked = true;
+    const rows = [...document.querySelectorAll("#ord-list .ord-item")];
+    const correct = ordState.round.correct;
+    const correctKeys = correct.map(c => c.key);
+    const byKey = new Map(correct.map((c, i) => [c.key, { item: c, pos: i }]));
+
+    let right = 0;
+    rows.forEach((li, idx) => {
+        const info = byKey.get(li.dataset.key);
+        li.classList.add("checked");
+        li.draggable = false;
+        const moves = li.querySelector(".ord-moves");
+        if (moves) moves.remove();
+        if (!info) return;
+        const isRight = correctKeys[idx] === li.dataset.key;
+        if (isRight) right++;
+        li.classList.add(isRight ? "ok" : "bad");
+        const valueEl = li.querySelector(".ord-value");
+        valueEl.textContent = ordState.round.format(info.item.value);
+        if (!isRight) {
+            const badge = document.createElement("span");
+            badge.className = "ord-correct-pos";
+            badge.textContent = `belongs at #${info.pos + 1}`;
+            li.appendChild(badge);
+        }
+    });
+
+    ordState.rounds += 1;
+    if (right === correct.length) {
+        ordState.streak += 1;
+        if (ordState.streak > (gamesRecords.ordBest || 0)) {
+            gamesRecords.ordBest = ordState.streak;
+        }
+    } else {
+        ordState.streak = 0;
+    }
+    gamesRecords.ordPlayed = (gamesRecords.ordPlayed || 0) + 1;
+    saveGamesRecords();
+
+    document.getElementById("ord-score").textContent =
+        `${right} of ${correct.length} in the right place · perfect streak ${ordState.streak} · best ${gamesRecords.ordBest || 0}`;
+    document.getElementById("ord-check").hidden = true;
+    document.getElementById("ord-next").hidden = false;
+}
+
+function ordNextRound() {
+    const round = ordBuildRound(ordState.type);
+    if (!round) {
+        ordShowSetup(true);
+        return;
+    }
+    ordState.round = round;
+    ordState.checked = false;
+    ordRenderRound();
+}
+
+function ordStart(type) {
+    ftlIndexCache = ftlBuildIndex();
+    ordConsecutiveCache = {};
+    ordTrackStatsCache = {};
+    ordDayStatsCache = {};
+    ordState = { type, round: null, checked: false, rounds: 0, streak: 0, lastCriterion: null };
+    const pool = ordBasePool(type);
+    if (pool.length < ORD_ITEM_COUNT) {
+        ordShowSetup(true);
+        return;
+    }
+    document.getElementById("ord-setup").hidden = true;
+    document.getElementById("ord-play").hidden = false;
+    ordNextRound();
+}
+
+function ordOpenGame() {
+    document.getElementById("hl-game").hidden = true;
+    document.getElementById("ftl-game").hidden = true;
+    document.getElementById("games-home").hidden = true;
+    document.getElementById("ord-game").hidden = false;
+    ordShowSetup(false);
+}
+
+function ordShowSetup(showNote) {
+    document.getElementById("ord-setup").hidden = false;
+    document.getElementById("ord-play").hidden = true;
+    const note = document.getElementById("ord-setup-note");
+    if (showNote) {
+        note.hidden = false;
+        note.textContent = "Not enough data of that kind to build a round yet. Try another type.";
+    } else {
+        note.hidden = true;
+    }
+}
+
+function initOrderingControls() {
+    const list = document.getElementById("ord-list");
+    if (!list) return;
+
+    list.addEventListener("click", (e) => {
+        if (!ordState || ordState.checked) return;
+        const li = e.target.closest(".ord-item");
+        if (!li) return;
+        if (e.target.closest(".ord-up") && li.previousElementSibling) {
+            list.insertBefore(li, li.previousElementSibling);
+            ordRenumber();
+        } else if (e.target.closest(".ord-down") && li.nextElementSibling) {
+            list.insertBefore(li.nextElementSibling, li);
+            ordRenumber();
+        }
+    });
+
+    list.addEventListener("dragstart", (e) => {
+        const li = e.target.closest(".ord-item");
+        if (!li || !ordState || ordState.checked) { e.preventDefault(); return; }
+        ordDragEl = li;
+        li.classList.add("dragging");
+        if (e.dataTransfer) {
+            e.dataTransfer.effectAllowed = "move";
+            try { e.dataTransfer.setData("text/plain", ""); } catch (err) { /* some browsers need this */ }
+        }
+    });
+
+    list.addEventListener("dragover", (e) => {
+        if (!ordDragEl) return;
+        e.preventDefault();
+        const target = e.target.closest(".ord-item");
+        if (!target || target === ordDragEl) return;
+        const rect = target.getBoundingClientRect();
+        const after = (e.clientY - rect.top) > rect.height / 2;
+        list.insertBefore(ordDragEl, after ? target.nextSibling : target);
+    });
+
+    list.addEventListener("drop", (e) => e.preventDefault());
+
+    list.addEventListener("dragend", () => {
+        if (ordDragEl) ordDragEl.classList.remove("dragging");
+        ordDragEl = null;
+        ordRenumber();
+    });
 }
 
 function initGames() {
@@ -7716,6 +8173,27 @@ function initGames() {
 
     const ftlNext = document.getElementById("ftl-next");
     if (ftlNext) ftlNext.addEventListener("click", ftlNextPuzzle);
+
+    // Put Them In Order
+    const openOrd = document.getElementById("open-ordering");
+    if (openOrd) openOrd.addEventListener("click", ordOpenGame);
+
+    const ordBack = document.getElementById("ord-back");
+    if (ordBack) ordBack.addEventListener("click", hlShowHome);
+
+    document.querySelectorAll(".ord-type").forEach(btn =>
+        btn.addEventListener("click", () => ordStart(btn.dataset.type)));
+
+    const ordCheckBtn = document.getElementById("ord-check");
+    if (ordCheckBtn) ordCheckBtn.addEventListener("click", ordCheck);
+
+    const ordNextBtn = document.getElementById("ord-next");
+    if (ordNextBtn) ordNextBtn.addEventListener("click", ordNextRound);
+
+    const ordChangeType = document.getElementById("ord-change-type");
+    if (ordChangeType) ordChangeType.addEventListener("click", () => ordShowSetup(false));
+
+    initOrderingControls();
 }
 
 document.addEventListener("DOMContentLoaded", () => {

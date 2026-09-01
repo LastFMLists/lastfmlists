@@ -2155,6 +2155,139 @@ button.game-card:hover {
     }
 }
 
+/* --- Put Them In Order --- */
+
+.ord-topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+}
+
+.ord-title {
+    font-size: 1.3rem;
+    font-weight: 700;
+}
+
+.ord-instruction {
+    color: var(--secondary-text-color);
+    font-size: 0.95rem;
+    margin-top: 0.15rem;
+}
+
+.ord-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.ord-item {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    padding: 0.7rem 0.9rem;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    background: var(--sidebar-color);
+    cursor: grab;
+}
+
+.ord-item.dragging {
+    opacity: 0.5;
+    cursor: grabbing;
+}
+
+.ord-item.checked {
+    cursor: default;
+}
+
+.ord-rank {
+    font-weight: 700;
+    color: var(--secondary-text-color);
+    min-width: 1.5em;
+}
+
+.ord-name {
+    flex: 1;
+    font-weight: 600;
+    line-height: 1.25;
+}
+
+.ord-sub {
+    display: block;
+    font-weight: 400;
+    font-size: 0.88rem;
+    color: var(--secondary-text-color);
+}
+
+.ord-value {
+    color: var(--secondary-text-color);
+    font-size: 0.9rem;
+    white-space: nowrap;
+}
+
+.ord-moves {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.ord-moves button {
+    border: 1px solid var(--border-color);
+    background: var(--background-color);
+    color: var(--secondary-text-color);
+    border-radius: 6px;
+    width: 1.9rem;
+    height: 1.25rem;
+    line-height: 1;
+    font-size: 0.7rem;
+    cursor: pointer;
+    padding: 0;
+}
+
+.ord-moves button:hover {
+    border-color: var(--primary-accent-color);
+    color: var(--primary-accent-color);
+}
+
+.ord-item.ok {
+    border-color: #3fae6b;
+    background: rgba(63, 174, 107, 0.12);
+}
+
+.ord-item.bad {
+    border-color: #d9534f;
+    background: rgba(217, 83, 79, 0.1);
+}
+
+.ord-correct-pos {
+    font-size: 0.85rem;
+    color: #d9534f;
+    white-space: nowrap;
+}
+
+.ord-hint {
+    text-align: center;
+    color: var(--secondary-text-color);
+    font-size: 0.9rem;
+    margin: 0.9rem 0 0;
+}
+
+@media (max-width: 560px) {
+    .ord-item {
+        flex-wrap: wrap;
+    }
+    .ord-value {
+        width: 100%;
+        padding-left: 2.2em;
+    }
+}
+
 /* ==========================================================================
    Reduced motion
    ========================================================================== */
