@@ -7676,6 +7676,8 @@ function ftlStartGame() {
 const ORD_ITEM_COUNT = 5;
 const ORD_POOL_LIMIT = { artist: 200, album: 300, track: 600 };
 const ORD_MIN_SCROBBLES = 5;
+// Adjacent values in a round must differ by at least this factor.
+const ORD_MIN_RATIO = 1.35;
 
 let ordState = null;
 let ordConsecutiveCache = {};
@@ -7830,7 +7832,7 @@ const ORD_CRITERIA = [
             }
             return {
                 title: `Scrobbles ${label}`, instruction: `Most played ${label} at the top`, desc: true, isDate: false,
-                items: pool.map(e => ({ ...e, value: map.get(e.key) || 0 })).filter(e => e.value > 0),
+                items: pool.map(e => ({ ...e, value: map.get(e.key) || 0 })).filter(e => e.value >= 8),
                 format: v => `${v.toLocaleString()} ${label}`
             };
         }
@@ -7841,7 +7843,7 @@ const ORD_CRITERIA = [
             const stats = ordTrackStats(type);
             return {
                 title: "Biggest single track", instruction: "Whoever has the most-played single track at the top", desc: true, isDate: false,
-                items: pool.map(e => ({ ...e, value: stats.get(e.key)?.maxTrack || 0 })).filter(e => e.value > 0),
+                items: pool.map(e => ({ ...e, value: stats.get(e.key)?.maxTrack || 0 })).filter(e => e.value >= 5),
                 format: v => `top track played ${v.toLocaleString()} times`
             };
         }
@@ -7852,7 +7854,7 @@ const ORD_CRITERIA = [
             const stats = ordTrackStats(type);
             return {
                 title: "Different tracks played", instruction: "Most different tracks at the top", desc: true, isDate: false,
-                items: pool.map(e => ({ ...e, value: stats.get(e.key)?.distinct || 0 })).filter(e => e.value > 0),
+                items: pool.map(e => ({ ...e, value: stats.get(e.key)?.distinct || 0 })).filter(e => e.value >= 3),
                 format: v => `${v.toLocaleString()} different tracks`
             };
         }
@@ -7863,7 +7865,7 @@ const ORD_CRITERIA = [
             const map = ordConsecutiveMap(type);
             return {
                 title: "Longest run back to back", instruction: "Longest unbroken run at the top", desc: true, isDate: false,
-                items: pool.map(e => ({ ...e, value: map.get(e.key) || 0 })).filter(e => e.value > 1),
+                items: pool.map(e => ({ ...e, value: map.get(e.key) || 0 })).filter(e => e.value >= 3),
                 format: v => `${v} in a row`
             };
         }
@@ -7874,7 +7876,7 @@ const ORD_CRITERIA = [
             const stats = ordDayStats(type);
             return {
                 title: "Most scrobbles in one day", instruction: "Biggest single day at the top", desc: true, isDate: false,
-                items: pool.map(e => ({ ...e, value: stats.get(e.key)?.maxDay || 0 })).filter(e => e.value > 1),
+                items: pool.map(e => ({ ...e, value: stats.get(e.key)?.maxDay || 0 })).filter(e => e.value >= 3),
                 format: v => `${v} in one day`
             };
         }
@@ -7885,7 +7887,7 @@ const ORD_CRITERIA = [
             const stats = ordDayStats(type);
             return {
                 title: "Days played on", instruction: "Played across the most separate days at the top", desc: true, isDate: false,
-                items: pool.map(e => ({ ...e, value: stats.get(e.key)?.days || 0 })).filter(e => e.value > 0),
+                items: pool.map(e => ({ ...e, value: stats.get(e.key)?.days || 0 })).filter(e => e.value >= 4),
                 format: v => `${v.toLocaleString()} separate days`
             };
         }
@@ -7894,28 +7896,34 @@ const ORD_CRITERIA = [
 
 // Pick items whose values are clearly apart, so the ordering is knowable rather
 // than a coin flip between near-identical numbers.
+// Two values count as tellable apart only if they differ by a clear FACTOR, not
+// a flat amount. A flat gap is meaningless down in the tail: 5 vs 6 scrobbles is
+// a coin flip even though the difference is "1", which is what an 8% rule with a
+// floor of 1 wrongly allowed.
+function ordSeparated(a, b, isDate) {
+    if (isDate) return Math.abs(a - b) >= 21 * 86400000;
+    const hi = Math.max(a, b), lo = Math.min(a, b);
+    if (lo <= 0) return hi >= 3;
+    return (hi / lo) >= ORD_MIN_RATIO && (hi - lo) >= 2;
+}
+
 function ordPickSpread(items, n, isDate) {
     const valid = items.filter(i => typeof i.value === "number" && isFinite(i.value));
     if (valid.length < n) return null;
     valid.sort((a, b) => b.value - a.value);
-    const separated = (a, b) => isDate
-        ? Math.abs(a - b) >= 14 * 86400000
-        : Math.abs(a - b) >= Math.max(1, Math.round(Math.max(Math.abs(a), Math.abs(b)) * 0.08));
 
-    for (let attempt = 0; attempt < 30; attempt++) {
-        const start = Math.floor(Math.random() * Math.max(1, valid.length - n));
+    // Start near the top of the list rather than anywhere in it, so rounds use
+    // items the player actually recognises and values big enough to rank.
+    const maxStart = Math.max(0, Math.min(valid.length - n, Math.ceil(valid.length * 0.55)));
+    for (let attempt = 0; attempt < 40; attempt++) {
+        const start = Math.floor(Math.pow(Math.random(), 1.7) * (maxStart + 1));
         const picked = [valid[start]];
         for (let i = start + 1; i < valid.length && picked.length < n; i++) {
-            if (separated(valid[i].value, picked[picked.length - 1].value)) picked.push(valid[i]);
+            if (ordSeparated(valid[i].value, picked[picked.length - 1].value, isDate)) picked.push(valid[i]);
         }
         if (picked.length === n) return picked;
     }
-    // Fallback: spread evenly across the whole list and require distinct values.
-    const step = Math.max(1, Math.floor(valid.length / n));
-    const out = [];
-    for (let i = 0; i < n; i++) out.push(valid[Math.min(valid.length - 1, i * step)]);
-    const distinct = new Set(out.map(o => o.value));
-    return distinct.size === n ? out : null;
+    return null; // let the round builder try a different criterion
 }
 
 function ordBuildRound(type) {

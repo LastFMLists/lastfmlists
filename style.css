@@ -1773,7 +1773,8 @@ button.game-card:hover {
     margin-top: 1rem;
 }
 
-.hl-type {
+.hl-type,
+.ord-type {
     display: inline-flex;
     align-items: center;
     gap: 0.55rem;
@@ -1788,12 +1789,14 @@ button.game-card:hover {
     transition: transform 0.15s, border-color 0.15s;
 }
 
-.hl-type:hover {
+.hl-type:hover,
+.ord-type:hover {
     transform: translateY(-2px);
     border-color: var(--primary-accent-color);
 }
 
-.hl-type i {
+.hl-type i,
+.ord-type i {
     color: var(--primary-accent-color);
 }
 
