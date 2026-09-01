@@ -173,7 +173,25 @@ Five picks from your library and one thing to rank them by. Arrange them, then c
 
 ### Setup
 
-The player picks **one entity type** (artists, albums, or tracks) before playing. Each round then rolls a ranking criterion, never the same one twice in a row.
+The player picks **one entity type** (artists, albums, or tracks) before playing. Each round then rolls a ranking criterion.
+
+### Difficulty ramp
+
+Like Higher-Lower, the game opens gently and tightens. Three things move together: how many items you have to order, how deep into the library they come from, and how close together their values are allowed to be.
+
+| Rounds | Items | Pool depth | Min ratio between neighbours | Min date gap |
+|--------|-------|------------|------------------------------|--------------|
+| 1-2    | 3     | top 30     | 2.5x                         | 120 days     |
+| 3-4    | 4     | top 60     | 2.0x                         | 90 days      |
+| 5-7    | 4     | top 120    | 1.7x                         | 60 days      |
+| 8-11   | 5     | top 250    | 1.5x                         | 35 days      |
+| 12+    | 5     | full pool  | 1.35x                        | 21 days      |
+
+So a first round is three of your most-played items with values miles apart, and a late round is five deeper cuts separated by a third.
+
+### Keeping the questions varied
+
+Criteria are queued with a cooldown rather than merely avoiding an immediate repeat. Anything used in the last 5 rounds is pushed to the back, and the builder walks the queue in order, taking the first criterion that can actually produce a fair board. Without this, two criteria that happen to build easily (dates always separate cleanly) will just alternate forever.
 
 ### Interaction
 
@@ -197,16 +215,17 @@ The period criterion picks a year, a specific month, or a recent window (30 / 90
 
 ### Candidate pools
 
-Only recognisable items: entities with at least 5 scrobbles, capped to the top 200 artists / 300 albums / 600 tracks by play count.
+Only recognisable items: entities with at least 5 scrobbles, capped to the top 200 artists / 300 albums / 600 tracks by play count, then narrowed further by the round's tier depth.
 
 ### Keeping rounds fair
 
-The same discipline as Higher-Lower. A round where five values are nearly identical is a coin flip, not a puzzle, so candidates are picked to be **clearly separated**:
+The same discipline as Higher-Lower. A round where the values are nearly identical is a coin flip, not a puzzle, so candidates must be **clearly separated**:
 
-- Numeric values must differ by at least 8% from their neighbour in the ordering.
-- Dates must be at least 14 days apart.
-- The picker walks a randomly chosen region of the sorted list, taking only items that clear the separation bar. It retries up to 30 times, then falls back to evenly spaced items, and returns nothing if even that leaves ties.
-- If a criterion can't produce a separated set, the round builder tries a different criterion rather than serving a bad board.
+- Separation is a **ratio**, not a flat gap. Neighbouring values must differ by at least the tier's factor, and by at least 2. A flat rule is worthless in the tail: an early version used "8% with a floor of 1", which let 5 vs 6 scrobbles count as separated and produced a genuinely unguessable board.
+- Dates must be at least the tier's day gap apart.
+- Each criterion also has a minimum value, so trivially small numbers never get ranked.
+- Candidate selection is **biased toward the top** of the sorted list rather than starting anywhere in it, so rounds use items the player knows and numbers big enough to reason about.
+- If a criterion cannot produce a separated set, the builder moves to the next criterion in the queue rather than serving a bad board. There is deliberately no evenly-spaced fallback, since that reintroduces the near-tie problem.
 
 The shuffled starting order is also checked so the player is never handed an already-solved board.
 

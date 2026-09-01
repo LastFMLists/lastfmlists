@@ -7673,11 +7673,27 @@ function ftlStartGame() {
 // Put Them In Order
 // ============================================================
 
-const ORD_ITEM_COUNT = 5;
 const ORD_POOL_LIMIT = { artist: 200, album: 300, track: 600 };
 const ORD_MIN_SCROBBLES = 5;
-// Adjacent values in a round must differ by at least this factor.
-const ORD_MIN_RATIO = 1.35;
+
+// Difficulty ramp. Early rounds are short lists of very familiar items whose
+// values are far apart; later rounds get longer, dig deeper into the library,
+// and allow values that sit much closer together.
+const ORD_TIERS = [
+    { maxRound: 2, items: 3, depth: 30, minRatio: 2.5, minDays: 120 },
+    { maxRound: 4, items: 4, depth: 60, minRatio: 2.0, minDays: 90 },
+    { maxRound: 7, items: 4, depth: 120, minRatio: 1.7, minDays: 60 },
+    { maxRound: 11, items: 5, depth: 250, minRatio: 1.5, minDays: 35 },
+    { maxRound: Infinity, items: 5, depth: Infinity, minRatio: 1.35, minDays: 21 }
+];
+
+// How many rounds a criterion is pushed to the back of the queue after use, so
+// you don't get the same question every other round.
+const ORD_CRITERION_COOLDOWN = 5;
+
+function ordTierForRound(round) {
+    return ORD_TIERS.find(t => round <= t.maxRound) || ORD_TIERS[ORD_TIERS.length - 1];
+}
 
 let ordState = null;
 let ordConsecutiveCache = {};
@@ -7701,11 +7717,13 @@ function ordEntityKey(type, e) {
         : `${(e.name || "").toLowerCase()}|||${(e.artist || "").toLowerCase()}`;
 }
 
-// Recognisable candidates only: the most-played slice of the library.
-function ordBasePool(type) {
+// Recognisable candidates only: the most-played slice of the library, narrowed
+// further on early rounds so beginners get names they definitely know.
+function ordBasePool(type, depth) {
     const ents = ftlEntities(type).filter(e => e.count >= ORD_MIN_SCROBBLES);
     ents.sort((a, b) => b.count - a.count);
-    return ents.slice(0, ORD_POOL_LIMIT[type] || 300).map(e => ({
+    const limit = Math.min(depth || Infinity, ORD_POOL_LIMIT[type] || 300);
+    return ents.slice(0, limit).map(e => ({
         name: e.name,
         artist: e.artist || null,
         count: e.count,
@@ -7900,14 +7918,14 @@ const ORD_CRITERIA = [
 // a flat amount. A flat gap is meaningless down in the tail: 5 vs 6 scrobbles is
 // a coin flip even though the difference is "1", which is what an 8% rule with a
 // floor of 1 wrongly allowed.
-function ordSeparated(a, b, isDate) {
-    if (isDate) return Math.abs(a - b) >= 21 * 86400000;
+function ordSeparated(a, b, isDate, minRatio, minDays) {
+    if (isDate) return Math.abs(a - b) >= minDays * 86400000;
     const hi = Math.max(a, b), lo = Math.min(a, b);
     if (lo <= 0) return hi >= 3;
-    return (hi / lo) >= ORD_MIN_RATIO && (hi - lo) >= 2;
+    return (hi / lo) >= minRatio && (hi - lo) >= 2;
 }
 
-function ordPickSpread(items, n, isDate) {
+function ordPickSpread(items, n, isDate, minRatio, minDays) {
     const valid = items.filter(i => typeof i.value === "number" && isFinite(i.value));
     if (valid.length < n) return null;
     valid.sort((a, b) => b.value - a.value);
@@ -7919,31 +7937,49 @@ function ordPickSpread(items, n, isDate) {
         const start = Math.floor(Math.pow(Math.random(), 1.7) * (maxStart + 1));
         const picked = [valid[start]];
         for (let i = start + 1; i < valid.length && picked.length < n; i++) {
-            if (ordSeparated(valid[i].value, picked[picked.length - 1].value, isDate)) picked.push(valid[i]);
+            if (ordSeparated(valid[i].value, picked[picked.length - 1].value, isDate, minRatio, minDays)) picked.push(valid[i]);
         }
         if (picked.length === n) return picked;
     }
     return null; // let the round builder try a different criterion
 }
 
-function ordBuildRound(type) {
-    const pool = ordBasePool(type);
-    if (pool.length < ORD_ITEM_COUNT) return null;
-    let choices = ORD_CRITERIA.filter(c => c.types.includes(type) && c.id !== ordState.lastCriterion);
-    if (!choices.length) choices = ORD_CRITERIA.filter(c => c.types.includes(type));
+// Criteria queued so anything used recently sinks to the back. A criterion is
+// only revisited once the others have had a turn or failed to build a board,
+// which stops the same question alternating round after round.
+function ordQueuedCriteria(type, round) {
+    return ORD_CRITERIA
+        .filter(c => c.types.includes(type))
+        .map(c => {
+            const last = ordState.criterionLastUsed.get(c.id);
+            const age = last === undefined ? Infinity : round - last;
+            const penalty = age < ORD_CRITERION_COOLDOWN ? (ORD_CRITERION_COOLDOWN - age) * 10 : 0;
+            return { c, score: penalty + Math.random() * 5 };
+        })
+        .sort((a, b) => a.score - b.score)
+        .map(x => x.c);
+}
 
-    for (let attempt = 0; attempt < 14; attempt++) {
-        const crit = ftlRandom(choices);
-        const spec = crit.build(type, pool);
-        if (!spec || !spec.items || spec.items.length < ORD_ITEM_COUNT) continue;
-        const picked = ordPickSpread(spec.items, ORD_ITEM_COUNT, spec.isDate);
-        if (!picked) continue;
-        const correct = [...picked].sort((a, b) => spec.desc ? b.value - a.value : a.value - b.value);
-        let display = ftlShuffle([...correct]);
-        // Don't hand them an already-solved board.
-        if (display.every((d, i) => d.key === correct[i].key)) display = ftlShuffle([...correct].reverse());
-        ordState.lastCriterion = crit.id;
-        return { title: spec.title, instruction: spec.instruction, format: spec.format, correct, display };
+function ordBuildRound(type) {
+    const round = ordState.rounds + 1;
+    const tier = ordTierForRound(round);
+    const pool = ordBasePool(type, tier.depth);
+    if (pool.length < tier.items) return null;
+
+    for (const crit of ordQueuedCriteria(type, round)) {
+        // A couple of goes per criterion, since some roll a random value.
+        for (let attempt = 0; attempt < 3; attempt++) {
+            const spec = crit.build(type, pool);
+            if (!spec || !spec.items || spec.items.length < tier.items) continue;
+            const picked = ordPickSpread(spec.items, tier.items, spec.isDate, tier.minRatio, tier.minDays);
+            if (!picked) continue;
+            const correct = [...picked].sort((a, b) => spec.desc ? b.value - a.value : a.value - b.value);
+            let display = ftlShuffle([...correct]);
+            // Don't hand them an already-solved board.
+            if (display.every((d, i) => d.key === correct[i].key)) display = ftlShuffle([...correct].reverse());
+            ordState.criterionLastUsed.set(crit.id, round);
+            return { title: spec.title, instruction: spec.instruction, format: spec.format, correct, display };
+        }
     }
     return null;
 }
@@ -8051,9 +8087,8 @@ function ordStart(type) {
     ordConsecutiveCache = {};
     ordTrackStatsCache = {};
     ordDayStatsCache = {};
-    ordState = { type, round: null, checked: false, rounds: 0, streak: 0, lastCriterion: null };
-    const pool = ordBasePool(type);
-    if (pool.length < ORD_ITEM_COUNT) {
+    ordState = { type, round: null, checked: false, rounds: 0, streak: 0, criterionLastUsed: new Map() };
+    if (ordBasePool(type, Infinity).length < ORD_TIERS[0].items) {
         ordShowSetup(true);
         return;
     }
