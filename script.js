@@ -61,7 +61,7 @@ let currentFetchConcurrency = HISTORY_FETCH_CONCURRENCY;
 
 // Last.fm's documented limit is 5 requests per originating IP per second,
 // AVERAGED over a 5-minute period. Averaged means the compliant budget for any
-// 5-minute window is ~1500 requests, not a hard 5-per-second tick — so a burst
+// 5-minute window is ~1500 requests, not a hard 5-per-second tick, so a burst
 // is fine as long as the average holds. This token bucket models exactly that:
 // it starts full, each request spends a token, and tokens refill at 5/s. Until
 // the bucket runs dry, requests fire with no artificial delay (with 1000-track
@@ -79,7 +79,7 @@ let rateLastRefillAt = Date.now();
 let extendedDataLoaded = false;
 
 // Tooltips for the two metadata-loading buttons, kept in sync with index.html.
-const LOAD_DETAILS_TOOLTIP = "Load extended data for your top artists, albums and tracks — Last.fm metadata like track length, genre/country tags, and global listeners/playcount. This unlocks the duration, tags and global-stats filters plus the “Time spent listening” and “Percentage of global scrobbles” sorts. Enough for most stats and much faster than “Load All Details”.";
+const LOAD_DETAILS_TOOLTIP = "Load extended data for your top artists, albums and tracks. That means Last.fm metadata like track length, genre/country tags, and global listeners/playcount. It unlocks the duration, tags and global-stats filters plus the “Time spent listening” and “Percentage of global scrobbles” sorts. Enough for most stats and much faster than “Load All Details”.";
 const LOAD_ALL_DETAILS_TOOLTIP = "Same extended metadata (track length, tags, global listeners/playcount) but for EVERY song you've ever scrobbled, not just your top ones. Unlocks the duration, tags and global-stats filters and the “Time spent listening” / “Percentage of global scrobbles” sorts for your whole library. This makes thousands of requests and can take a very long time.";
 
 const resultsDiv = document.getElementById("results");
@@ -127,7 +127,7 @@ function setAppLoadedState(username) {
 }
 
 // Message shown when hovering a control that needs extended metadata.
-const EXTENDED_LOCKED_MSG = "🔒 Needs extended data. Click “Load Details” (or “Load All Details”) at the top first — this uses Last.fm metadata (track length, tags, global listeners/playcount) that isn't downloaded with your basic history.";
+const EXTENDED_LOCKED_MSG = "🔒 Needs extended data. Click “Load Details” (or “Load All Details”) at the top first. It uses Last.fm metadata (track length, tags, global listeners/playcount) that isn't downloaded with your basic history.";
 
 // Enable/disable every control that only works once detailed Last.fm metadata
 // has been loaded, and explain via tooltip how to unlock it. Called on init,
@@ -1532,7 +1532,7 @@ function renderLoadingPreview({ artistTally, trackTally, scrobbles, pagesLoaded,
 
     const banner = document.createElement("div");
     banner.className = "loading-preview-banner";
-    banner.textContent = "Live preview — still loading, ranked by scrobble count. Filters apply once loading finishes.";
+    banner.textContent = "Live preview, still loading. Ranked by scrobble count, and your filters apply once loading finishes.";
     fragment.appendChild(banner);
 
     top.forEach((entry, index) => {
@@ -7540,7 +7540,7 @@ function ftlRenderSlots() {
         const li = document.createElement("li");
         li.className = "ftl-slot";
         li.dataset.idx = i;
-        const hint = showHint && a.artist ? `<span class="ftl-slot-hint">by ${escapeHTML(a.artist)}</span>` : "———";
+        const hint = showHint && a.artist ? `<span class="ftl-slot-hint">by ${escapeHTML(a.artist)}</span>` : "· · · · ·";
         li.innerHTML = `<span class="ftl-slot-rank">${i + 1}.</span><span class="ftl-slot-text">${hint}</span>`;
         ol.appendChild(li);
     });
