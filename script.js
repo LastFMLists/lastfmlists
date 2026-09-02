@@ -1,25 +1,52 @@
-// Global variables
-let allTracks = [];
-let filteredData = [];
-let lastfmData = [];
-let artistsData = []; // [{ name, listeners, playcount, debutYear }]
-let albumsData = [];  // [{ title, artist, releaseDate, playcount }]
-let tracksData = [];  // [{ title, album, listeners, playcount }]
-let artistDataMap = {};
-let albumDataMap = {};
-let trackDataMap = {};
-let topArtists = [];
-let topAlbums = [];
-let topTracks = [];
-let activeFilters = [];
-let comparisonFilterStates = { left: {}, right: {} };
-let comparisonStateInitialized = false;
-let lastEquationInsertTargetId = "equations";
-let lastRenderedListState = {
-    isComparison: false,
-    current: { entities: [], entityType: "track" },
-    left: { entities: [], entityType: "track" },
-    right: { entities: [], entityType: "track" }
+// Mutable state shared across modules. Everything here is derived from the
+// history the user loaded; modules read these fields directly and write back
+// through the same object, so an update is visible everywhere at once.
+const state = {
+    // Loaded scrobble history
+    allTracks: [],
+    lastfmData: [],
+    filteredData: [],
+
+    // Last.fm top-list snapshots taken alongside the history, plus lookup maps
+    artistsData: [],  // [{ name, listeners, playcount, debutYear }]
+    albumsData: [],   // [{ title, artist, releaseDate, playcount }]
+    tracksData: [],   // [{ title, album, listeners, playcount }]
+    artistDataMap: {},
+    albumDataMap: {},
+    trackDataMap: {},
+    topArtists: [],
+    topAlbums: [],
+    topTracks: [],
+
+    // Per-scrobble context, keyed by scrobble order (see buildHistoryContextMaps)
+    previousScrobbleTimestampByOrder: {},
+    isFirstScrobbleOfDayByOrder: {},
+
+    // How much Last.fm metadata has been downloaded, and how deep the top lists go
+    extendedDataLoaded: false,
+    artistLimit: 250,
+    albumLimit: 500,
+    trackLimit: 1000,
+
+    // Filter panel and comparison mode
+    activeFilters: [],
+    comparisonFilterStates: { left: {}, right: {} },
+    comparisonStateInitialized: false,
+    lastEquationInsertTargetId: "equations",
+    lastRenderedListState: {
+        isComparison: false,
+        current: { entities: [], entityType: "track" },
+        left: { entities: [], entityType: "track" },
+        right: { entities: [], entityType: "track" }
+    },
+
+    // Charts and the bar race
+    chartInstances: [],
+    activeRaceState: null,
+    racePlaybackTimerId: null,
+    raceRenderArmed: false,
+    racePlaybackSpeedMs: 260,
+    raceSpeedReadoutElement: null,
 };
 const unfilteredStatsCache = {
     track: { source: null, length: 0, mapping: null },
@@ -32,8 +59,6 @@ const trackAverageListeningCache = {
     minScrobbles: null,
     mapping: null
 };
-let previousScrobbleTimestampByOrder = {};
-let isFirstScrobbleOfDayByOrder = {};
 const SCROBBLE_SORT_ASC = "earliest-to-latest";
 const SCROBBLE_SORT_DESC = "latest-to-earliest";
 const DB_NAME = 'lastfmDataDB';
@@ -76,7 +101,6 @@ let rateLastRefillAt = Date.now();
 
 // True once any detailed Last.fm metadata (durations, tags, global stats) has
 // been loaded. Metadata-only filters/sorts stay disabled until this is set.
-let extendedDataLoaded = false;
 
 // Tooltips for the two metadata-loading buttons, kept in sync with index.html.
 const LOAD_DETAILS_TOOLTIP = "Load extended data for your top artists, albums and tracks. That means Last.fm metadata like track length, genre/country tags, and global listeners/playcount. It unlocks the duration, tags and global-stats filters plus the “Time spent listening” and “Percentage of global scrobbles” sorts. Enough for most stats and much faster than “Load All Details”.";
@@ -100,16 +124,7 @@ function debugLogDataset(label, value) {
 const resultsDiv = document.getElementById("results");
 const loadingDiv = document.getElementById("loading-stats");
 const albumCoverCache = new Map();
-let artistLimit = 250;
-let albumLimit = 500;
-let trackLimit = 1000;
-let chartInstances = [];
-let activeRaceState = null;
-let racePlaybackTimerId = null;
 let gifWorkerBlobUrl = null;
-let raceRenderArmed = false;
-let racePlaybackSpeedMs = 260;
-let raceSpeedReadoutElement = null;
 
 const DISPLAY_MODE_LIST = "list";
 const DISPLAY_MODE_BAR_CHART = "bar-chart";
@@ -184,7 +199,7 @@ const EXTENDED_LOCKED_MSG = "🔒 Needs extended data. Click “Load Details” 
 // has been loaded, and explain via tooltip how to unlock it. Called on init,
 // after metadata loads, and after restoring saved data that already has it.
 function updateExtendedDataUI() {
-    const locked = !extendedDataLoaded;
+    const locked = !state.extendedDataLoaded;
 
     document.querySelectorAll(".requires-extended").forEach(group => {
         group.classList.toggle("locked", locked);
@@ -215,9 +230,9 @@ function updateExtendedDataUI() {
 // Detect whether an already-loaded dataset (e.g. restored from the browser)
 // contains detailed metadata, so gated controls unlock without a re-fetch.
 function datasetHasExtendedMetadata() {
-    const hasTags = Array.isArray(artistsData) && artistsData.some(a => Array.isArray(a?.tags) && a.tags.length > 0);
-    const hasDuration = Array.isArray(tracksData) && tracksData.some(t => parseInt(t?.duration, 10) > 0);
-    const hasGlobal = Array.isArray(artistsData) && artistsData.some(a => parseInt(a?.listeners, 10) > 0 || parseInt(a?.playcount, 10) > 0);
+    const hasTags = Array.isArray(state.artistsData) && state.artistsData.some(a => Array.isArray(a?.tags) && a.tags.length > 0);
+    const hasDuration = Array.isArray(state.tracksData) && state.tracksData.some(t => parseInt(t?.duration, 10) > 0);
+    const hasGlobal = Array.isArray(state.artistsData) && state.artistsData.some(a => parseInt(a?.listeners, 10) > 0 || parseInt(a?.playcount, 10) > 0);
     return hasTags || hasDuration || hasGlobal;
 }
 
@@ -418,7 +433,7 @@ async function exportCurrentListAsImage() {
 }
 
 function applyColorsToChartInstances(colors) {
-    chartInstances.forEach(chart => {
+    state.chartInstances.forEach(chart => {
         if (chart.data.datasets && chart.data.datasets[0]) {
             chart.data.datasets[0].backgroundColor = colors.accentFill;
             chart.data.datasets[0].borderColor = colors.accent;
@@ -472,7 +487,7 @@ async function exportCurrentRaceAsGif() {
         return;
     }
 
-    if (!activeRaceState || activeRaceState.totalFrames <= 0 || typeof activeRaceState.updateFrame !== 'function') {
+    if (!state.activeRaceState || state.activeRaceState.totalFrames <= 0 || typeof state.activeRaceState.updateFrame !== 'function') {
         alert('Race frames are not ready yet. Apply filters in Bar Chart Race mode first.');
         return;
     }
@@ -484,11 +499,11 @@ async function exportCurrentRaceAsGif() {
     }
 
     const frameDelayMs = 260;
-    const originalFrameIndex = activeRaceState.frameIndex || 0;
+    const originalFrameIndex = state.activeRaceState.frameIndex || 0;
 
-    if (racePlaybackTimerId !== null) {
-        clearInterval(racePlaybackTimerId);
-        racePlaybackTimerId = null;
+    if (state.racePlaybackTimerId !== null) {
+        clearInterval(state.racePlaybackTimerId);
+        state.racePlaybackTimerId = null;
     }
 
     const bounds = captureTarget.getBoundingClientRect();
@@ -503,8 +518,8 @@ async function exportCurrentRaceAsGif() {
     });
 
     try {
-        for (let frameIndex = 0; frameIndex < activeRaceState.totalFrames; frameIndex++) {
-            activeRaceState.updateFrame(frameIndex);
+        for (let frameIndex = 0; frameIndex < state.activeRaceState.totalFrames; frameIndex++) {
+            state.activeRaceState.updateFrame(frameIndex);
             await waitForNextPaint();
 
             const frameCanvas = await html2canvas(captureTarget, {
@@ -532,8 +547,8 @@ async function exportCurrentRaceAsGif() {
         console.error('GIF export failed:', error);
         alert('GIF export failed. Please try again.');
     } finally {
-        if (activeRaceState && typeof activeRaceState.updateFrame === 'function') {
-            activeRaceState.updateFrame(originalFrameIndex);
+        if (state.activeRaceState && typeof state.activeRaceState.updateFrame === 'function') {
+            state.activeRaceState.updateFrame(originalFrameIndex);
         }
     }
 }
@@ -554,7 +569,7 @@ function getMostCommonAlbumName(entity) {
 function getTopAlbumForArtist(artistName) {
     if (!artistName) return "";
     const counts = {};
-    allTracks.forEach(track => {
+    state.allTracks.forEach(track => {
         if ((track.Artist || "").toLowerCase() !== artistName.toLowerCase()) return;
         const albumName = (track.Album || "").trim();
         if (!albumName) return;
@@ -574,12 +589,12 @@ function getTopAlbumForArtist(artistName) {
 }
 
 function getGridBaseListState() {
-    if (!lastRenderedListState.isComparison) {
-        return lastRenderedListState.current;
+    if (!state.lastRenderedListState.isComparison) {
+        return state.lastRenderedListState.current;
     }
 
     const target = getComparisonEditTarget();
-    return target === "right" ? lastRenderedListState.right : lastRenderedListState.left;
+    return target === "right" ? state.lastRenderedListState.right : state.lastRenderedListState.left;
 }
 
 function getAlbumSeedsFromCurrentList() {
@@ -900,22 +915,22 @@ function isWithinTimeRange(timestamp, startTime, endTime) {
 }
 
 function buildHistoryContextMaps() {
-    previousScrobbleTimestampByOrder = {};
-    isFirstScrobbleOfDayByOrder = {};
+    state.previousScrobbleTimestampByOrder = {};
+    state.isFirstScrobbleOfDayByOrder = {};
 
     let previousTimestamp = null;
     let previousDayKey = null;
 
-    for (let index = 0; index < allTracks.length; index++) {
-        const track = allTracks[index];
+    for (let index = 0; index < state.allTracks.length; index++) {
+        const track = state.allTracks[index];
         const order = track.order ?? index + 1;
         const timestamp = parseInt(track.Date, 10);
         if (isNaN(timestamp)) continue;
 
-        previousScrobbleTimestampByOrder[order] = previousTimestamp;
+        state.previousScrobbleTimestampByOrder[order] = previousTimestamp;
 
         const dayKey = getLocalDayKeyFromTimestamp(timestamp);
-        isFirstScrobbleOfDayByOrder[order] = dayKey !== previousDayKey;
+        state.isFirstScrobbleOfDayByOrder[order] = dayKey !== previousDayKey;
 
         previousTimestamp = timestamp;
         previousDayKey = dayKey;
@@ -1133,14 +1148,14 @@ document.getElementById("username-form").addEventListener("submit", async (event
         let { allTracks: savedAllTracks, artistsData: savedArtistsData, albumsData: savedAlbumsData, tracksData: savedTracksData } = savedData.data;
     
         // Assign saved data to global variables
-        artistsData = savedArtistsData || [];
-        albumsData = savedAlbumsData || [];
-        tracksData = savedTracksData || [];
+        state.artistsData = savedArtistsData || [];
+        state.albumsData = savedAlbumsData || [];
+        state.tracksData = savedTracksData || [];
 
         // If the saved dataset already contains detailed metadata, unlock the
         // gated filters/sorts so the user doesn't have to re-download it.
         if (datasetHasExtendedMetadata()) {
-            extendedDataLoaded = true;
+            state.extendedDataLoaded = true;
             updateExtendedDataUI();
         }
 
@@ -1155,11 +1170,11 @@ document.getElementById("username-form").addEventListener("submit", async (event
         let newTracks = await fetchRecentTracksSince(username, latestTimestamp);
 
         // Merge new tracks with the saved tracks, keeping chronological order.
-        allTracks = newTracks.concat(savedAllTracks);
+        state.allTracks = newTracks.concat(savedAllTracks);
 
     } else {
         // No saved data exists, fetch all history (with a live preview as pages arrive).
-        allTracks = await fetchListeningHistory(username, renderLoadingPreview);
+        state.allTracks = await fetchListeningHistory(username, renderLoadingPreview);
     }
     } catch (loadError) {
         // A bad username or an unreachable API used to leave the user staring at
@@ -1172,7 +1187,7 @@ document.getElementById("username-form").addEventListener("submit", async (event
     }
     if (submitButton) submitButton.disabled = false;
     
-    allTracks = allTracks.filter(track => {
+    state.allTracks = state.allTracks.filter(track => {
         if (!track.Date) {
             console.warn("Skipping track due to missing date:", track);
             return false;
@@ -1181,10 +1196,10 @@ document.getElementById("username-form").addEventListener("submit", async (event
     });
 
     // Sort allTracks by date (assuming track.Date is a timestamp in milliseconds as a string)
-    allTracks.sort((a, b) => parseInt(a.Date, 10) - parseInt(b.Date, 10));
+    state.allTracks.sort((a, b) => parseInt(a.Date, 10) - parseInt(b.Date, 10));
 
     // Assign an order key (index + 1) to each track
-    allTracks = allTracks.map((track, index) => {
+    state.allTracks = state.allTracks.map((track, index) => {
         track.order = index + 1;
         return track;
     });
@@ -1194,7 +1209,7 @@ document.getElementById("username-form").addEventListener("submit", async (event
 
 	// ✅ ALWAYS re-fetch the top stats to update rankings and counts!
 	// These three are independent, so fetch them concurrently.
-	[topArtists, topAlbums, topTracks] = await Promise.all([
+	[state.topArtists, state.topAlbums, state.topTracks] = await Promise.all([
 		fetchTopArtists(username),
 		fetchTopAlbums(username),
 		fetchTopTracks(username)
@@ -1204,7 +1219,7 @@ document.getElementById("username-form").addEventListener("submit", async (event
     const artistTrackSets = Object.create(null);
     const albumTrackSets = Object.create(null);
 
-    allTracks.forEach(item => {
+    state.allTracks.forEach(item => {
         const artistKey = item.Artist.trim().toLowerCase();
         const albumKey = `${item.Album.trim().toLowerCase()}||${item.Artist.trim().toLowerCase()}`;
         const trackKey = item.Track.trim().toLowerCase();
@@ -1222,7 +1237,7 @@ document.getElementById("username-form").addEventListener("submit", async (event
     loadingDiv.innerHTML = "<p>Processing first/last scrobbles...</p>";
 
 	// Iterate over allTracks to determine first scrobbles
-	allTracks.forEach(track => {
+	state.allTracks.forEach(track => {
 		if (!track.Artist || !track.Track || !track.Date) {
 			console.warn("Skipping track due to missing data:", track);
 			return;
@@ -1259,7 +1274,7 @@ document.getElementById("username-form").addEventListener("submit", async (event
 	});
 
 	// ✅ Update data arrays with correct first scrobbles
-    const newArtistsData = topArtists.map((artist, index) => {
+    const newArtistsData = state.topArtists.map((artist, index) => {
         const key = artist.name.trim().toLowerCase();
         return {
             name: artist.name,
@@ -1272,7 +1287,7 @@ document.getElementById("username-form").addEventListener("submit", async (event
     });
     
     // Create newAlbumsData with track counts
-    const newAlbumsData = topAlbums.map((album, index) => {
+    const newAlbumsData = state.topAlbums.map((album, index) => {
         const key = `${album.name.trim().toLowerCase()}||${album.artist.trim().toLowerCase()}`;
         return {
             name: album.name,
@@ -1285,7 +1300,7 @@ document.getElementById("username-form").addEventListener("submit", async (event
         };
     });
     
-    const newTracksData = topTracks.map((track, index) => {
+    const newTracksData = state.topTracks.map((track, index) => {
         const key = `${track.name.trim().toLowerCase()}_${track.artist.trim().toLowerCase()}`;
         return {
             name: track.name,
@@ -1300,33 +1315,33 @@ document.getElementById("username-form").addEventListener("submit", async (event
     loadingDiv.innerHTML = "<p>Merging data...</p>";
 
     // Merge new data into the existing arrays (only updating the keys specified)
-    artistsData = mergeData(artistsData, newArtistsData, item => item.name.trim().toLowerCase());
-    albumsData = mergeData(albumsData, newAlbumsData, 
+    state.artistsData = mergeData(state.artistsData, newArtistsData, item => item.name.trim().toLowerCase());
+    state.albumsData = mergeData(state.albumsData, newAlbumsData, 
         item => `${item.name.trim().toLowerCase()}_${item.artist.trim().toLowerCase()}`);
-    tracksData = mergeData(tracksData, newTracksData, 
+    state.tracksData = mergeData(state.tracksData, newTracksData, 
         item => `${item.name.trim().toLowerCase()}_${item.artist.trim().toLowerCase()}`);
     
-    debugLogDataset("Merged artistsData:", artistsData);
-	debugLogDataset("Merged albumsData:", albumsData);
-	debugLogDataset("Merged tracksData:", tracksData);
+    debugLogDataset("Merged artistsData:", state.artistsData);
+	debugLogDataset("Merged albumsData:", state.albumsData);
+	debugLogDataset("Merged tracksData:", state.tracksData);
 
     loadingDiv.innerHTML = "<p>Mapping artists...</p>";
 
-    artistDataMap = artistsData.reduce((map, artist) => {
+    state.artistDataMap = state.artistsData.reduce((map, artist) => {
         map[artist.name.toLowerCase()] = artist;
         return map;
     }, {});
 
     loadingDiv.innerHTML = "<p>Mapping albums...</p>";
     
-    albumDataMap = albumsData.reduce((map, album) => {
+    state.albumDataMap = state.albumsData.reduce((map, album) => {
         map[`${album.name.toLowerCase()}||${album.artist.toLowerCase()}`] = album;
         return map;
     }, {});
 
     loadingDiv.innerHTML = "<p>Mapping tracks...</p>";
     
-    trackDataMap = tracksData.reduce((map, track) => {
+    state.trackDataMap = state.tracksData.reduce((map, track) => {
         map[`${track.name.toLowerCase()}||${track.artist.toLowerCase()}`] = track;
         return map;
     }, {});
@@ -1343,7 +1358,7 @@ document.getElementById("username-form").addEventListener("submit", async (event
         loadAllDetailsBtn.title = LOAD_ALL_DETAILS_TOOLTIP;
     }
 
-	debugLogDataset("Final allTracks:", allTracks);
+	debugLogDataset("Final allTracks:", state.allTracks);
 	loadingDiv.innerHTML = ""; // Clear loading message
 
     setAppLoadedState(username);
@@ -1359,24 +1374,24 @@ document.getElementById("username-form").addEventListener("submit", async (event
 async function loadDetailedMetadata(loadAll = false) {
     const selectCandidates = (all) => {
         const selectedArtists = all
-            ? topArtists.slice()
+            ? state.topArtists.slice()
             : (() => {
-                const preferred = topArtists.filter(artist => artist.playcount > 100);
-                return preferred.length < artistLimit ? topArtists.slice(0, artistLimit) : preferred;
+                const preferred = state.topArtists.filter(artist => artist.playcount > 100);
+                return preferred.length < state.artistLimit ? state.topArtists.slice(0, state.artistLimit) : preferred;
             })();
 
         const selectedAlbums = all
-            ? topAlbums.slice()
+            ? state.topAlbums.slice()
             : (() => {
-                const preferred = topAlbums.filter(album => album.playcount > 10);
-                return preferred.length < albumLimit ? topAlbums.slice(0, albumLimit) : preferred;
+                const preferred = state.topAlbums.filter(album => album.playcount > 10);
+                return preferred.length < state.albumLimit ? state.topAlbums.slice(0, state.albumLimit) : preferred;
             })();
 
         const selectedTracks = all
-            ? topTracks.slice()
+            ? state.topTracks.slice()
             : (() => {
-                const preferred = topTracks.filter(track => track.playcount > 5);
-                return preferred.length < trackLimit ? topTracks.slice(0, trackLimit) : preferred;
+                const preferred = state.topTracks.filter(track => track.playcount > 5);
+                return preferred.length < state.trackLimit ? state.topTracks.slice(0, state.trackLimit) : preferred;
             })();
 
         return { selectedArtists, selectedAlbums, selectedTracks };
@@ -1392,9 +1407,9 @@ async function loadDetailedMetadata(loadAll = false) {
     const username = document.getElementById("username").value.trim();
     if (!username) return;
 
-    const activeArtistLimit = loadAll ? Infinity : artistLimit;
-    const activeAlbumLimit = loadAll ? Infinity : albumLimit;
-    const activeTrackLimit = loadAll ? Infinity : trackLimit;
+    const activeArtistLimit = loadAll ? Infinity : state.artistLimit;
+    const activeAlbumLimit = loadAll ? Infinity : state.albumLimit;
+    const activeTrackLimit = loadAll ? Infinity : state.trackLimit;
 
     const fetchedArtists = await fetchAllArtistDetails(selectedArtists, activeArtistLimit);
     console.log("Fetched artist details:", fetchedArtists);
@@ -1432,18 +1447,18 @@ async function loadDetailedMetadata(loadAll = false) {
     }));
 
 	// Merge the new data into existing global arrays while keeping firstscrobble, user_scrobbles, and rank
-    artistsData = mergeData(artistsData, newArtistsData, item => item.name.trim().toLowerCase());
-    albumsData = mergeData(albumsData, newAlbumsData, 
+    state.artistsData = mergeData(state.artistsData, newArtistsData, item => item.name.trim().toLowerCase());
+    state.albumsData = mergeData(state.albumsData, newAlbumsData, 
         item => `${item.name.trim().toLowerCase()}_${item.artist.trim().toLowerCase()}`);
-    tracksData = mergeData(tracksData, newTracksData, 
+    state.tracksData = mergeData(state.tracksData, newTracksData, 
         item => `${item.name.trim().toLowerCase()}_${item.artist.trim().toLowerCase()}`);
 
-	debugLogDataset("Merged artistsData:", artistsData);
-	debugLogDataset("Merged albumsData:", albumsData);
-	debugLogDataset("Merged tracksData:", tracksData);
+	debugLogDataset("Merged artistsData:", state.artistsData);
+	debugLogDataset("Merged albumsData:", state.albumsData);
+	debugLogDataset("Merged tracksData:", state.tracksData);
 
 	// Detailed metadata is now available: unlock the gated filters/sorts.
-	extendedDataLoaded = true;
+	state.extendedDataLoaded = true;
 	updateExtendedDataUI();
 
 	// Update display, filters, etc.
@@ -1469,10 +1484,10 @@ if (loadAllDetailsButton) {
 document.getElementById("save-data").addEventListener("click", async () => {
     const username = document.getElementById("username").value.trim();
     const dataToSave = {
-      allTracks,
-      artistsData,
-      albumsData,
-      tracksData
+      allTracks: state.allTracks,
+      artistsData: state.artistsData,
+      albumsData: state.albumsData,
+      tracksData: state.tracksData
     };
     try {
       await saveUserData(username, dataToSave);
@@ -1627,8 +1642,7 @@ function renderLoadingPreview({ artistTally, trackTally, scrobbles, pagesLoaded,
 
 async function fetchListeningHistory(username, onPreview = null) {
     // Reset adaptive throttling for a fresh load.
-    currentFetchConcurrency = HISTORY_FETCH_CONCURRENCY;
-    rateLimitBackoffUntil = 0;
+    resetFetchThrottle();
 
     const buildUrl = (limit, page) =>
         `https://ws.audioscrobbler.com/2.0/?method=user.getrecenttracks&user=${encodeURIComponent(username)}&api_key=${API_KEY}&format=json&extended=1&limit=${limit}&autocorrect=0&page=${page}`;
@@ -1670,7 +1684,7 @@ async function fetchListeningHistory(username, onPreview = null) {
         ? Math.max(1, Math.ceil(totalScrobbles / effectivePageSize))
         : (parseInt(attr.totalPages, 10) || 1);
 
-    console.log(`History fetch: ${totalScrobbles} scrobbles, page size ${effectivePageSize}, ${totalPages} pages, concurrency ${currentFetchConcurrency}.`);
+    console.log(`History fetch: ${totalScrobbles} scrobbles, page size ${effectivePageSize}, ${totalPages} pages, concurrency ${getFetchConcurrency()}.`);
 
     const lastfmData = [...firstPageTracks];
 
@@ -1714,7 +1728,7 @@ async function fetchListeningHistory(username, onPreview = null) {
             pagesLoaded += 1;
             loadingDiv.innerHTML = `<p>Loading data... Page ${pagesLoaded} of ${totalPages} (${lastfmData.length.toLocaleString()} scrobbles)</p>`;
             emitPreview();
-        }, currentFetchConcurrency);
+        }, getFetchConcurrency());
     }
 
     emitPreview(true);
@@ -1784,6 +1798,17 @@ async function waitOutRateLimitBackoff() {
     if (remaining > 0) {
         await new Promise(resolve => setTimeout(resolve, remaining));
     }
+}
+
+// Start a fresh load with the full burst allowance and no backoff pending.
+function resetFetchThrottle() {
+    currentFetchConcurrency = HISTORY_FETCH_CONCURRENCY;
+    rateLimitBackoffUntil = 0;
+}
+
+// How many history pages may be in flight right now (lowered by 429s).
+function getFetchConcurrency() {
+    return currentFetchConcurrency;
 }
 
 // Global token-bucket limiter (see the RATE_* constants for the reasoning).
@@ -2193,18 +2218,18 @@ if (csvFileInput) csvFileInput.addEventListener('change', async (event) => {
         const csvData = e.target.result;
 
         // ✅ Parse the CSV (including extracting username)
-        allTracks = parseCSV(csvData);
+        state.allTracks = parseCSV(csvData);
 
         // ✅ Try extracting the username if missing
-        if (!allTracks.username) {
+        if (!state.allTracks.username) {
             console.warn("Username missing from parsed data, checking CSV manually...");
             const firstLine = csvData.split("\n")[0]; // Get the first line
             console.log("CSV First Line:", firstLine);
 
             const match = firstLine.match(/Date#(.*)/);
             if (match && match[1]) {
-                allTracks.username = match[1].trim();
-                console.log("Extracted username from CSV:", allTracks.username);
+                state.allTracks.username = match[1].trim();
+                console.log("Extracted username from CSV:", state.allTracks.username);
             } else {
                 console.error("Failed to extract Last.fm username from CSV.");
                 return;
@@ -2212,22 +2237,24 @@ if (csvFileInput) csvFileInput.addEventListener('change', async (event) => {
         }
 
         // ✅ Ensure a username exists after parsing
-        if (!allTracks.username) {
+        if (!state.allTracks.username) {
             console.error("Failed to extract Last.fm username from CSV.");
             return;
         }
-        const username = allTracks.username;
+        const username = state.allTracks.username;
         console.log("Detected Last.fm username:", username);
 
         // ✅ Initialize tracking objects
-        raw_data = [];
+        // Was an implicit global; declared properly so it stays local (and so
+        // this file can run in strict mode).
+        const raw_data = [];
         const firstScrobbles = { artists: {}, albums: {}, tracks: {} };
         const lastScrobbles = { artists: {}, albums: {}, tracks: {} };
         const artistTrackSets = Object.create(null);
         const albumTrackSets = Object.create(null);
 
         // ✅ Iterate over allTracks to determine first scrobbles and track counts
-        allTracks.forEach(track => {
+        state.allTracks.forEach(track => {
             if (!track.artist || !track.track || !track.date) {
                 console.warn("Skipping track due to missing data:", track);
                 return;
@@ -2283,7 +2310,7 @@ if (csvFileInput) csvFileInput.addEventListener('change', async (event) => {
             track.order = index + 1;
         });
 
-        allTracks = raw_data; // Update allTracks with sorted data
+        state.allTracks = raw_data; // Update allTracks with sorted data
         buildHistoryContextMaps();
         ensureRaceDateDefaults(true);
 
@@ -2298,7 +2325,7 @@ if (csvFileInput) csvFileInput.addEventListener('change', async (event) => {
         debugLogDataset("First Scrobbles Data:", firstScrobbles);
 
         // ✅ Update data arrays with correct first scrobbles
-        artistsData = topArtists.map((artist, index) => {
+        state.artistsData = topArtists.map((artist, index) => {
             if (!artist.name) return null; // Prevent undefined objects
 
             const artistKey = artist.name.trim().toLowerCase();
@@ -2312,7 +2339,7 @@ if (csvFileInput) csvFileInput.addEventListener('change', async (event) => {
             };
         }).filter(Boolean);
 
-        albumsData = topAlbums.map((album, index) => {
+        state.albumsData = topAlbums.map((album, index) => {
             if (!album.name || !album.artist) return null;
 
             const albumKey = `${album.name.trim().toLowerCase()}_${album.artist.trim().toLowerCase()}`;
@@ -2327,7 +2354,7 @@ if (csvFileInput) csvFileInput.addEventListener('change', async (event) => {
             };
         }).filter(Boolean);
 
-        tracksData = topTracks.map((track, index) => {
+        state.tracksData = topTracks.map((track, index) => {
             if (!track.name || !track.artist) return null;
 
             const trackKey = `${track.name.trim().toLowerCase()}_${track.artist.trim().toLowerCase()}`;
@@ -2343,21 +2370,21 @@ if (csvFileInput) csvFileInput.addEventListener('change', async (event) => {
 
         loadingDiv.innerHTML = "<p>Mapping artists...</p>";
 
-        artistDataMap = artistsData.reduce((map, artist) => {
+        state.artistDataMap = state.artistsData.reduce((map, artist) => {
             map[artist.name.toLowerCase()] = artist;
             return map;
         }, {});
     
         loadingDiv.innerHTML = "<p>Mapping albums...</p>";
         
-        albumDataMap = albumsData.reduce((map, album) => {
+        state.albumDataMap = state.albumsData.reduce((map, album) => {
             map[`${album.name.toLowerCase()}||${album.artist.toLowerCase()}`] = album;
             return map;
         }, {});
     
         loadingDiv.innerHTML = "<p>Mapping tracks...</p>";
         
-        trackDataMap = tracksData.reduce((map, track) => {
+        state.trackDataMap = state.tracksData.reduce((map, track) => {
             map[`${track.name.toLowerCase()}||${track.artist.toLowerCase()}`] = track;
             return map;
         }, {});
@@ -2377,10 +2404,10 @@ if (csvFileInput) csvFileInput.addEventListener('change', async (event) => {
         setAppLoadedState(username);
         enableGamesTab();
 
-        debugLogDataset("Final allTracks:", allTracks);
-        debugLogDataset("Updated artistsData:", artistsData);
-        debugLogDataset("Updated albumsData:", albumsData);
-        debugLogDataset("Updated tracksData:", tracksData);
+        debugLogDataset("Final allTracks:", state.allTracks);
+        debugLogDataset("Updated artistsData:", state.artistsData);
+        debugLogDataset("Updated albumsData:", state.albumsData);
+        debugLogDataset("Updated tracksData:", state.tracksData);
 
         loadingDiv.innerHTML = ""; // Clear loading message
 
@@ -2432,8 +2459,8 @@ function computeUnfilteredStats(entityType) {
     const cacheEntry = unfilteredStatsCache[entityType];
     if (
         cacheEntry &&
-        cacheEntry.source === allTracks &&
-        cacheEntry.length === allTracks.length &&
+        cacheEntry.source === state.allTracks &&
+        cacheEntry.length === state.allTracks.length &&
         cacheEntry.mapping
     ) {
         return cacheEntry.mapping;
@@ -2441,7 +2468,7 @@ function computeUnfilteredStats(entityType) {
 
     const groups = {};
     if (entityType === 'track') {
-        allTracks.forEach(track => {
+        state.allTracks.forEach(track => {
             const key = `${track.Artist.toLowerCase()} - ${track.Track.toLowerCase()}`;
             if (!groups[key]) {
                 groups[key] = { count: 0 };
@@ -2449,7 +2476,7 @@ function computeUnfilteredStats(entityType) {
             groups[key].count++;
         });
     } else if (entityType === 'album') {
-        allTracks.forEach(track => {
+        state.allTracks.forEach(track => {
             const key = `${track.Album.toLowerCase()}||${track.Artist.toLowerCase()}`;
             if (!groups[key]) {
                 groups[key] = { count: 0 };
@@ -2457,7 +2484,7 @@ function computeUnfilteredStats(entityType) {
             groups[key].count++;
         });
     } else if (entityType === 'artist') {
-        allTracks.forEach(track => {
+        state.allTracks.forEach(track => {
             const key = track.Artist.toLowerCase();
             if (!groups[key]) {
                 groups[key] = { count: 0 };
@@ -2475,8 +2502,8 @@ function computeUnfilteredStats(entityType) {
     });
 
     if (cacheEntry) {
-        cacheEntry.source = allTracks;
-        cacheEntry.length = allTracks.length;
+        cacheEntry.source = state.allTracks;
+        cacheEntry.length = state.allTracks.length;
         cacheEntry.mapping = mapping;
     }
 
@@ -2779,14 +2806,14 @@ function calculateListeningPercentage(tracks, entityType = 'track') {
 
         // Assuming trackDataMap, albumDataMap, and artistDataMap are available and contain playcount and user_scrobbles
         if (entityType === 'track') {
-            scrobbles = trackDataMap[`${track.Track.toLowerCase()}||${track.Artist.toLowerCase()}`]?.user_scrobbles || 0;
-            playcount = trackDataMap[`${track.Track.toLowerCase()}||${track.Artist.toLowerCase()}`]?.playcount || 0;
+            scrobbles = state.trackDataMap[`${track.Track.toLowerCase()}||${track.Artist.toLowerCase()}`]?.user_scrobbles || 0;
+            playcount = state.trackDataMap[`${track.Track.toLowerCase()}||${track.Artist.toLowerCase()}`]?.playcount || 0;
         } else if (entityType === 'album') {
-            scrobbles = albumDataMap[`${track.Album.toLowerCase()}||${track.Artist.toLowerCase()}`]?.user_scrobbles || 0;
-            playcount = albumDataMap[`${track.Album.toLowerCase()}||${track.Artist.toLowerCase()}`]?.playcount || 0;
+            scrobbles = state.albumDataMap[`${track.Album.toLowerCase()}||${track.Artist.toLowerCase()}`]?.user_scrobbles || 0;
+            playcount = state.albumDataMap[`${track.Album.toLowerCase()}||${track.Artist.toLowerCase()}`]?.playcount || 0;
         } else if (entityType === 'artist') {
-            scrobbles = artistDataMap[track.Artist.toLowerCase()]?.user_scrobbles || 0;
-            playcount = artistDataMap[track.Artist.toLowerCase()]?.playcount || 0;
+            scrobbles = state.artistDataMap[track.Artist.toLowerCase()]?.user_scrobbles || 0;
+            playcount = state.artistDataMap[track.Artist.toLowerCase()]?.playcount || 0;
         }
 
         // Calculate listening percentage and update the group's data
@@ -2839,7 +2866,7 @@ function calculateListeningDuration(filteredData, entityType = 'track') {
         trackGroups[key].albumCounts[albumName]++;
 
         // Get the duration of the track from trackDataMap
-        trackGroups[key].duration = trackDataMap[`${track.Track.toLowerCase()}||${track.Artist.toLowerCase()}`]?.duration || 0;
+        trackGroups[key].duration = state.trackDataMap[`${track.Track.toLowerCase()}||${track.Artist.toLowerCase()}`]?.duration || 0;
     });
 
     // Convert the grouped data into an array
@@ -3532,28 +3559,28 @@ const equationFieldResolvers = {
     "artist-word-count": (item) => item.Artist?.trim().split(/\s+/).length ?? null,
     "album-word-count": (item) => item.Album?.trim().split(/\s+/).length ?? null,
     "track-word-count": (item) => item.Track?.trim().split(/\s+/).length ?? null,
-    "artist-scrobble-count": (item) => artistDataMap[item.Artist.toLowerCase()]?.user_scrobbles ?? null,
-    "album-scrobble-count": (item) => albumDataMap[`${item.Album.toLowerCase()}||${item.Artist.toLowerCase()}`]?.user_scrobbles ?? null,
-    "track-scrobble-count": (item) => trackDataMap[`${item.Track.toLowerCase()}||${item.Artist.toLowerCase()}`]?.user_scrobbles ?? null,
-    "artist-rank": (item) => artistDataMap[item.Artist.toLowerCase()]?.rank ?? null,
-    "album-rank": (item) => albumDataMap[`${item.Album.toLowerCase()}||${item.Artist.toLowerCase()}`]?.rank ?? null,
-    "track-rank": (item) => trackDataMap[`${item.Track.toLowerCase()}||${item.Artist.toLowerCase()}`]?.rank ?? null,
-    "artist-track-count": (item) => artistDataMap[item.Artist.toLowerCase()]?.track_count ?? null,
-    "album-track-count": (item) => albumDataMap[`${item.Album.toLowerCase()}||${item.Artist.toLowerCase()}`]?.track_count ?? null,
-    "artist-first-scrobble-year": (item) => getFirstScrobbleYear(artistDataMap[item.Artist.toLowerCase()]?.firstscrobble),
-    "album-first-scrobble-year": (item) => getFirstScrobbleYear(albumDataMap[`${item.Album.toLowerCase()}||${item.Artist.toLowerCase()}`]?.firstscrobble),
-    "track-first-scrobble-year": (item) => getFirstScrobbleYear(trackDataMap[`${item.Track.toLowerCase()}||${item.Artist.toLowerCase()}`]?.firstscrobble),
-    "artist-days-since-last": (item) => getDaysSinceTimestamp(artistDataMap[item.Artist.toLowerCase()]?.lastscrobble),
-    "album-days-since-last": (item) => getDaysSinceTimestamp(albumDataMap[`${item.Album.toLowerCase()}||${item.Artist.toLowerCase()}`]?.lastscrobble),
-    "track-days-since-last": (item) => getDaysSinceTimestamp(trackDataMap[`${item.Track.toLowerCase()}||${item.Artist.toLowerCase()}`]?.lastscrobble),
-    "artist-listeners": (item) => artistDataMap[item.Artist.toLowerCase()]?.listeners ?? null,
-    "album-listeners": (item) => albumDataMap[`${item.Album.toLowerCase()}||${item.Artist.toLowerCase()}`]?.listeners ?? null,
-    "track-listeners": (item) => trackDataMap[`${item.Track.toLowerCase()}||${item.Artist.toLowerCase()}`]?.listeners ?? null,
-    "artist-global-scrobbles": (item) => artistDataMap[item.Artist.toLowerCase()]?.playcount ?? null,
-    "album-global-scrobbles": (item) => albumDataMap[`${item.Album.toLowerCase()}||${item.Artist.toLowerCase()}`]?.playcount ?? null,
-    "track-global-scrobbles": (item) => trackDataMap[`${item.Track.toLowerCase()}||${item.Artist.toLowerCase()}`]?.playcount ?? null,
+    "artist-scrobble-count": (item) => state.artistDataMap[item.Artist.toLowerCase()]?.user_scrobbles ?? null,
+    "album-scrobble-count": (item) => state.albumDataMap[`${item.Album.toLowerCase()}||${item.Artist.toLowerCase()}`]?.user_scrobbles ?? null,
+    "track-scrobble-count": (item) => state.trackDataMap[`${item.Track.toLowerCase()}||${item.Artist.toLowerCase()}`]?.user_scrobbles ?? null,
+    "artist-rank": (item) => state.artistDataMap[item.Artist.toLowerCase()]?.rank ?? null,
+    "album-rank": (item) => state.albumDataMap[`${item.Album.toLowerCase()}||${item.Artist.toLowerCase()}`]?.rank ?? null,
+    "track-rank": (item) => state.trackDataMap[`${item.Track.toLowerCase()}||${item.Artist.toLowerCase()}`]?.rank ?? null,
+    "artist-track-count": (item) => state.artistDataMap[item.Artist.toLowerCase()]?.track_count ?? null,
+    "album-track-count": (item) => state.albumDataMap[`${item.Album.toLowerCase()}||${item.Artist.toLowerCase()}`]?.track_count ?? null,
+    "artist-first-scrobble-year": (item) => getFirstScrobbleYear(state.artistDataMap[item.Artist.toLowerCase()]?.firstscrobble),
+    "album-first-scrobble-year": (item) => getFirstScrobbleYear(state.albumDataMap[`${item.Album.toLowerCase()}||${item.Artist.toLowerCase()}`]?.firstscrobble),
+    "track-first-scrobble-year": (item) => getFirstScrobbleYear(state.trackDataMap[`${item.Track.toLowerCase()}||${item.Artist.toLowerCase()}`]?.firstscrobble),
+    "artist-days-since-last": (item) => getDaysSinceTimestamp(state.artistDataMap[item.Artist.toLowerCase()]?.lastscrobble),
+    "album-days-since-last": (item) => getDaysSinceTimestamp(state.albumDataMap[`${item.Album.toLowerCase()}||${item.Artist.toLowerCase()}`]?.lastscrobble),
+    "track-days-since-last": (item) => getDaysSinceTimestamp(state.trackDataMap[`${item.Track.toLowerCase()}||${item.Artist.toLowerCase()}`]?.lastscrobble),
+    "artist-listeners": (item) => state.artistDataMap[item.Artist.toLowerCase()]?.listeners ?? null,
+    "album-listeners": (item) => state.albumDataMap[`${item.Album.toLowerCase()}||${item.Artist.toLowerCase()}`]?.listeners ?? null,
+    "track-listeners": (item) => state.trackDataMap[`${item.Track.toLowerCase()}||${item.Artist.toLowerCase()}`]?.listeners ?? null,
+    "artist-global-scrobbles": (item) => state.artistDataMap[item.Artist.toLowerCase()]?.playcount ?? null,
+    "album-global-scrobbles": (item) => state.albumDataMap[`${item.Album.toLowerCase()}||${item.Artist.toLowerCase()}`]?.playcount ?? null,
+    "track-global-scrobbles": (item) => state.trackDataMap[`${item.Track.toLowerCase()}||${item.Artist.toLowerCase()}`]?.playcount ?? null,
     "track-duration": (item) => {
-        const durationMs = trackDataMap[`${item.Track.toLowerCase()}||${item.Artist.toLowerCase()}`]?.duration;
+        const durationMs = state.trackDataMap[`${item.Track.toLowerCase()}||${item.Artist.toLowerCase()}`]?.duration;
         return durationMs === undefined || durationMs === null ? null : durationMs / 1000;
     },
     "scrobble-order": (item) => item.order ?? null,
@@ -3674,8 +3701,8 @@ function getDaysSinceTimestamp(timestampValue) {
 function getTrackAverageListeningMap(minScrobbles = 1) {
     const threshold = Math.max(1, parseInt(minScrobbles, 10) || 1);
     if (
-        trackAverageListeningCache.source === allTracks &&
-        trackAverageListeningCache.length === allTracks.length &&
+        trackAverageListeningCache.source === state.allTracks &&
+        trackAverageListeningCache.length === state.allTracks.length &&
         trackAverageListeningCache.minScrobbles === threshold &&
         trackAverageListeningCache.mapping
     ) {
@@ -3683,7 +3710,7 @@ function getTrackAverageListeningMap(minScrobbles = 1) {
     }
 
     const grouped = {};
-    allTracks.forEach(track => {
+    state.allTracks.forEach(track => {
         const key = `${track.Track?.toLowerCase() || ""}||${track.Artist?.toLowerCase() || ""}`;
         if (!key || key === "||") return;
 
@@ -3704,8 +3731,8 @@ function getTrackAverageListeningMap(minScrobbles = 1) {
         }
     });
 
-    trackAverageListeningCache.source = allTracks;
-    trackAverageListeningCache.length = allTracks.length;
+    trackAverageListeningCache.source = state.allTracks;
+    trackAverageListeningCache.length = state.allTracks.length;
     trackAverageListeningCache.minScrobbles = threshold;
     trackAverageListeningCache.mapping = mapping;
 
@@ -4196,11 +4223,11 @@ function getEquationInsertTargetInput() {
             const leftFallback = document.getElementById("equations");
             if (leftFallback) return leftFallback;
         }
-        lastEquationInsertTargetId = activeElement.id;
+        state.lastEquationInsertTargetId = activeElement.id;
         return activeElement;
     }
 
-    const rememberedTarget = document.getElementById(lastEquationInsertTargetId);
+    const rememberedTarget = document.getElementById(state.lastEquationInsertTargetId);
     if (rememberedTarget) {
         if (rememberedTarget.id === "equations-right" && !isComparisonEnabled()) {
             const leftFallback = document.getElementById("equations");
@@ -4316,7 +4343,7 @@ function initializeEquationControls() {
         .forEach(input => {
             ["focus", "click", "keyup", "input", "select"].forEach(eventName => {
                 input.addEventListener(eventName, () => {
-                    lastEquationInsertTargetId = input.id;
+                    state.lastEquationInsertTargetId = input.id;
                 });
             });
         });
@@ -4327,18 +4354,18 @@ function addFilter(id, value) {
         removeFilter(id);
         return;
     }
-    const existingFilter = activeFilters.find(filter => filter.id === id);
+    const existingFilter = state.activeFilters.find(filter => filter.id === id);
     if (existingFilter) {
         existingFilter.value = value;
     } else {
-        activeFilters.push({ id, value });
+        state.activeFilters.push({ id, value });
     }
 }
 
 function removeFilter(id) {
-    const index = activeFilters.findIndex(filter => filter.id === id);
+    const index = state.activeFilters.findIndex(filter => filter.id === id);
     if (index !== -1) {
-        activeFilters.splice(index, 1);
+        state.activeFilters.splice(index, 1);
     }
 }
 
@@ -4366,8 +4393,8 @@ function updateComparisonInteractionState() {
         rightEquationsInput.setAttribute("aria-disabled", comparisonEnabled ? "false" : "true");
     }
 
-    if (!comparisonEnabled && lastEquationInsertTargetId === "equations-right") {
-        lastEquationInsertTargetId = "equations";
+    if (!comparisonEnabled && state.lastEquationInsertTargetId === "equations-right") {
+        state.lastEquationInsertTargetId = "equations";
     }
 }
 
@@ -4394,12 +4421,12 @@ function applyFilterInputState(state) {
 
     const leftEquationsInput = document.getElementById("equations");
     if (leftEquationsInput) {
-        leftEquationsInput.value = (comparisonFilterStates.left?.equations ?? "").toString();
+        leftEquationsInput.value = (state.comparisonFilterStates.left?.equations ?? "").toString();
     }
 
     const rightEquationsInput = document.getElementById("equations-right");
     if (rightEquationsInput) {
-        rightEquationsInput.value = (comparisonFilterStates.right?.equations ?? "").toString();
+        rightEquationsInput.value = (state.comparisonFilterStates.right?.equations ?? "").toString();
     }
 }
 
@@ -4437,7 +4464,7 @@ function applyTracksPerEntityFilter(tracks, maxArtist) {
 }
 
 function filterTracks(filtersOverride = null, sourceTracks = null) {
-    const tracksSource = sourceTracks || allTracks;
+    const tracksSource = sourceTracks || state.allTracks;
     if (!tracksSource) return [];
 
     const filterFunctions = {
@@ -4476,76 +4503,76 @@ function filterTracks(filtersOverride = null, sourceTracks = null) {
         // Filters based on user data
 
         "artist-scrobble-count-min": (item, value) => 
-            artistDataMap[item.Artist.toLowerCase()]?.user_scrobbles >= parseInt(value, 10),
+            state.artistDataMap[item.Artist.toLowerCase()]?.user_scrobbles >= parseInt(value, 10),
         "artist-scrobble-count-max": (item, value) =>
-            artistDataMap[item.Artist.toLowerCase()]?.user_scrobbles <= parseInt(value, 10),
+            state.artistDataMap[item.Artist.toLowerCase()]?.user_scrobbles <= parseInt(value, 10),
         "album-scrobble-count-min": (item, value) =>
-            albumDataMap[`${item.Album.toLowerCase()}||${item.Artist.toLowerCase()}`]?.user_scrobbles >= parseInt(value, 10),
+            state.albumDataMap[`${item.Album.toLowerCase()}||${item.Artist.toLowerCase()}`]?.user_scrobbles >= parseInt(value, 10),
         "album-scrobble-count-max": (item, value) =>
-            albumDataMap[`${item.Album.toLowerCase()}||${item.Artist.toLowerCase()}`]?.user_scrobbles <= parseInt(value, 10),
+            state.albumDataMap[`${item.Album.toLowerCase()}||${item.Artist.toLowerCase()}`]?.user_scrobbles <= parseInt(value, 10),
         "track-scrobble-count-min": (item, value) =>
-            trackDataMap[`${item.Track.toLowerCase()}||${item.Artist.toLowerCase()}`]?.user_scrobbles >= parseInt(value, 10),
+            state.trackDataMap[`${item.Track.toLowerCase()}||${item.Artist.toLowerCase()}`]?.user_scrobbles >= parseInt(value, 10),
         "track-scrobble-count-max": (item, value) =>
-            trackDataMap[`${item.Track.toLowerCase()}||${item.Artist.toLowerCase()}`]?.user_scrobbles <= parseInt(value, 10),
+            state.trackDataMap[`${item.Track.toLowerCase()}||${item.Artist.toLowerCase()}`]?.user_scrobbles <= parseInt(value, 10),
         
         "artist-rank-min": (item, value) => 
-            artistDataMap[item.Artist.toLowerCase()]?.rank >= parseInt(value, 10),
+            state.artistDataMap[item.Artist.toLowerCase()]?.rank >= parseInt(value, 10),
 
         "artist-rank-max": (item, value) => 
-            artistDataMap[item.Artist.toLowerCase()]?.rank <= parseInt(value, 10),
+            state.artistDataMap[item.Artist.toLowerCase()]?.rank <= parseInt(value, 10),
 
         "album-rank-min": (item, value) => 
-            albumDataMap[`${item.Album.toLowerCase()}||${item.Artist.toLowerCase()}`]?.rank >= parseInt(value, 10),
+            state.albumDataMap[`${item.Album.toLowerCase()}||${item.Artist.toLowerCase()}`]?.rank >= parseInt(value, 10),
 
         "album-rank-max": (item, value) => 
-            albumDataMap[`${item.Album.toLowerCase()}||${item.Artist.toLowerCase()}`]?.rank <= parseInt(value, 10),
+            state.albumDataMap[`${item.Album.toLowerCase()}||${item.Artist.toLowerCase()}`]?.rank <= parseInt(value, 10),
 
         "track-rank-min": (item, value) => 
-            trackDataMap[`${item.Track.toLowerCase()}||${item.Artist.toLowerCase()}`]?.rank >= parseInt(value, 10),
+            state.trackDataMap[`${item.Track.toLowerCase()}||${item.Artist.toLowerCase()}`]?.rank >= parseInt(value, 10),
 
         "track-rank-max": (item, value) => 
-            trackDataMap[`${item.Track.toLowerCase()}||${item.Artist.toLowerCase()}`]?.rank <= parseInt(value, 10),
+            state.trackDataMap[`${item.Track.toLowerCase()}||${item.Artist.toLowerCase()}`]?.rank <= parseInt(value, 10),
 
         "artist-track-count-min": (item, value) => 
-            artistDataMap[item.Artist.toLowerCase()]?.track_count >= parseInt(value, 10),
+            state.artistDataMap[item.Artist.toLowerCase()]?.track_count >= parseInt(value, 10),
 
         "artist-track-count-max": (item, value) => 
-            artistDataMap[item.Artist.toLowerCase()]?.track_count <= parseInt(value, 10),
+            state.artistDataMap[item.Artist.toLowerCase()]?.track_count <= parseInt(value, 10),
 
         "album-track-count-min": (item, value) => 
-            albumDataMap[`${item.Album.toLowerCase()}||${item.Artist.toLowerCase()}`]?.track_count >= parseInt(value, 10),
+            state.albumDataMap[`${item.Album.toLowerCase()}||${item.Artist.toLowerCase()}`]?.track_count >= parseInt(value, 10),
 
         "album-track-count-max": (item, value) => 
-            albumDataMap[`${item.Album.toLowerCase()}||${item.Artist.toLowerCase()}`]?.track_count <= parseInt(value, 10),
+            state.albumDataMap[`${item.Album.toLowerCase()}||${item.Artist.toLowerCase()}`]?.track_count <= parseInt(value, 10),
 
         "artist-first-scrobble-years": (item, value) => {
-            const firstYear = artistDataMap[item.Artist.toLowerCase()]?.firstscrobble 
-                ? new Date(parseInt(artistDataMap[item.Artist.toLowerCase()].firstscrobble, 10)).getFullYear() 
+            const firstYear = state.artistDataMap[item.Artist.toLowerCase()]?.firstscrobble 
+                ? new Date(parseInt(state.artistDataMap[item.Artist.toLowerCase()].firstscrobble, 10)).getFullYear() 
                 : null;
             return firstYear && value.split(",").map(v => parseInt(v.trim(), 10)).includes(firstYear);
         },
         "album-first-scrobble-years": (item, value) => {
-            const firstYear = albumDataMap[`${item.Album.toLowerCase()}||${item.Artist.toLowerCase()}`]?.firstscrobble
-                ? new Date(parseInt(albumDataMap[`${item.Album.toLowerCase()}||${item.Artist.toLowerCase()}`].firstscrobble, 10)).getFullYear()
+            const firstYear = state.albumDataMap[`${item.Album.toLowerCase()}||${item.Artist.toLowerCase()}`]?.firstscrobble
+                ? new Date(parseInt(state.albumDataMap[`${item.Album.toLowerCase()}||${item.Artist.toLowerCase()}`].firstscrobble, 10)).getFullYear()
                 : null;
             return firstYear && value.split(",").map(v => parseInt(v.trim(), 10)).includes(firstYear);
         },
         "track-first-scrobble-years": (item, value) => {
-            const firstYear = trackDataMap[`${item.Track.toLowerCase()}||${item.Artist.toLowerCase()}`]?.firstscrobble
-                ? new Date(parseInt(trackDataMap[`${item.Track.toLowerCase()}||${item.Artist.toLowerCase()}`].firstscrobble, 10)).getFullYear()
+            const firstYear = state.trackDataMap[`${item.Track.toLowerCase()}||${item.Artist.toLowerCase()}`]?.firstscrobble
+                ? new Date(parseInt(state.trackDataMap[`${item.Track.toLowerCase()}||${item.Artist.toLowerCase()}`].firstscrobble, 10)).getFullYear()
                 : null;
             return firstYear && value.split(",").map(v => parseInt(v.trim(), 10)).includes(firstYear);
         },
         "artist-days-since-last-min": (item, value) => {
             // Look up the artist's last scrobble timestamp from artistDataMap
-            const lastScrobble = artistDataMap[item.Artist.toLowerCase()]?.lastscrobble;
+            const lastScrobble = state.artistDataMap[item.Artist.toLowerCase()]?.lastscrobble;
             if (!lastScrobble) return false;
             // Calculate days since last scrobble
             const daysSince = Math.floor((Date.now() - lastScrobble) / (1000 * 60 * 60 * 24));
             return daysSince >= parseInt(value, 10);
         },
         "artist-days-since-last-max": (item, value) => {
-            const lastScrobble = artistDataMap[item.Artist.toLowerCase()]?.lastscrobble;
+            const lastScrobble = state.artistDataMap[item.Artist.toLowerCase()]?.lastscrobble;
             if (!lastScrobble) return false;
             const daysSince = Math.floor((Date.now() - lastScrobble) / (1000 * 60 * 60 * 24));
             return daysSince <= parseInt(value, 10);
@@ -4553,14 +4580,14 @@ function filterTracks(filtersOverride = null, sourceTracks = null) {
         "album-days-since-last-min": (item, value) => {
             // Construct the album key: "album||artist"
             const albumKey = `${item.Album.toLowerCase()}||${item.Artist.toLowerCase()}`;
-            const lastScrobble = albumDataMap[albumKey]?.lastscrobble;
+            const lastScrobble = state.albumDataMap[albumKey]?.lastscrobble;
             if (!lastScrobble) return false;
             const daysSince = Math.floor((Date.now() - lastScrobble) / (1000 * 60 * 60 * 24));
             return daysSince >= parseInt(value, 10);
         },
         "album-days-since-last-max": (item, value) => {
             const albumKey = `${item.Album.toLowerCase()}||${item.Artist.toLowerCase()}`;
-            const lastScrobble = albumDataMap[albumKey]?.lastscrobble;
+            const lastScrobble = state.albumDataMap[albumKey]?.lastscrobble;
             if (!lastScrobble) return false;
             const daysSince = Math.floor((Date.now() - lastScrobble) / (1000 * 60 * 60 * 24));
             return daysSince <= parseInt(value, 10);
@@ -4568,14 +4595,14 @@ function filterTracks(filtersOverride = null, sourceTracks = null) {
         "track-days-since-last-min": (item, value) => {
             // Construct the track key: "track||artist"
             const trackKey = `${item.Track.toLowerCase()}||${item.Artist.toLowerCase()}`;
-            const lastScrobble = trackDataMap[trackKey]?.lastscrobble;
+            const lastScrobble = state.trackDataMap[trackKey]?.lastscrobble;
             if (!lastScrobble) return false;
             const daysSince = Math.floor((Date.now() - lastScrobble) / (1000 * 60 * 60 * 24));
             return daysSince >= parseInt(value, 10);
         },
         "track-days-since-last-max": (item, value) => {
             const trackKey = `${item.Track.toLowerCase()}||${item.Artist.toLowerCase()}`;
-            const lastScrobble = trackDataMap[trackKey]?.lastscrobble;
+            const lastScrobble = state.trackDataMap[trackKey]?.lastscrobble;
             if (!lastScrobble) return false;
             const daysSince = Math.floor((Date.now() - lastScrobble) / (1000 * 60 * 60 * 24));
             return daysSince <= parseInt(value, 10);
@@ -4583,26 +4610,26 @@ function filterTracks(filtersOverride = null, sourceTracks = null) {
 
         // Filters based on detailed data
 
-        "artist-listeners-min": (item, value) => artistDataMap[item.Artist.toLowerCase()]?.listeners >= parseInt(value, 10),
-        "artist-listeners-max": (item, value) => artistDataMap[item.Artist.toLowerCase()]?.listeners <= parseInt(value, 10),
-        "artist-global-scrobbles-min": (item, value) => artistDataMap[item.Artist.toLowerCase()]?.playcount >= parseInt(value, 10),
-        "artist-global-scrobbles-max": (item, value) => artistDataMap[item.Artist.toLowerCase()]?.playcount <= parseInt(value, 10),
+        "artist-listeners-min": (item, value) => state.artistDataMap[item.Artist.toLowerCase()]?.listeners >= parseInt(value, 10),
+        "artist-listeners-max": (item, value) => state.artistDataMap[item.Artist.toLowerCase()]?.listeners <= parseInt(value, 10),
+        "artist-global-scrobbles-min": (item, value) => state.artistDataMap[item.Artist.toLowerCase()]?.playcount >= parseInt(value, 10),
+        "artist-global-scrobbles-max": (item, value) => state.artistDataMap[item.Artist.toLowerCase()]?.playcount <= parseInt(value, 10),
     
-        "album-listeners-min": (item, value) => albumDataMap[`${item.Album.toLowerCase()}||${item.Artist.toLowerCase()}`]?.listeners >= parseInt(value, 10),
-        "album-listeners-max": (item, value) => albumDataMap[`${item.Album.toLowerCase()}||${item.Artist.toLowerCase()}`]?.listeners <= parseInt(value, 10),
-        "album-global-scrobbles-min": (item, value) => albumDataMap[`${item.Album.toLowerCase()}||${item.Artist.toLowerCase()}`]?.playcount >= parseInt(value, 10),
-        "album-global-scrobbles-max": (item, value) => albumDataMap[`${item.Album.toLowerCase()}||${item.Artist.toLowerCase()}`]?.playcount <= parseInt(value, 10),
+        "album-listeners-min": (item, value) => state.albumDataMap[`${item.Album.toLowerCase()}||${item.Artist.toLowerCase()}`]?.listeners >= parseInt(value, 10),
+        "album-listeners-max": (item, value) => state.albumDataMap[`${item.Album.toLowerCase()}||${item.Artist.toLowerCase()}`]?.listeners <= parseInt(value, 10),
+        "album-global-scrobbles-min": (item, value) => state.albumDataMap[`${item.Album.toLowerCase()}||${item.Artist.toLowerCase()}`]?.playcount >= parseInt(value, 10),
+        "album-global-scrobbles-max": (item, value) => state.albumDataMap[`${item.Album.toLowerCase()}||${item.Artist.toLowerCase()}`]?.playcount <= parseInt(value, 10),
     
-        "track-listeners-min": (item, value) => trackDataMap[`${item.Track.toLowerCase()}||${item.Artist.toLowerCase()}`]?.listeners >= parseInt(value, 10),
-        "track-listeners-max": (item, value) => trackDataMap[`${item.Track.toLowerCase()}||${item.Artist.toLowerCase()}`]?.listeners <= parseInt(value, 10),
-        "track-global-scrobbles-min": (item, value) => trackDataMap[`${item.Track.toLowerCase()}||${item.Artist.toLowerCase()}`]?.playcount >= parseInt(value, 10),
-        "track-global-scrobbles-max": (item, value) => trackDataMap[`${item.Track.toLowerCase()}||${item.Artist.toLowerCase()}`]?.playcount <= parseInt(value, 10),
+        "track-listeners-min": (item, value) => state.trackDataMap[`${item.Track.toLowerCase()}||${item.Artist.toLowerCase()}`]?.listeners >= parseInt(value, 10),
+        "track-listeners-max": (item, value) => state.trackDataMap[`${item.Track.toLowerCase()}||${item.Artist.toLowerCase()}`]?.listeners <= parseInt(value, 10),
+        "track-global-scrobbles-min": (item, value) => state.trackDataMap[`${item.Track.toLowerCase()}||${item.Artist.toLowerCase()}`]?.playcount >= parseInt(value, 10),
+        "track-global-scrobbles-max": (item, value) => state.trackDataMap[`${item.Track.toLowerCase()}||${item.Artist.toLowerCase()}`]?.playcount <= parseInt(value, 10),
     
-        "track-duration-min": (item, value) => trackDataMap[`${item.Track.toLowerCase()}||${item.Artist.toLowerCase()}`]?.duration / 1000 >= parseInt(value, 10),
-        "track-duration-max": (item, value) => trackDataMap[`${item.Track.toLowerCase()}||${item.Artist.toLowerCase()}`]?.duration / 1000 <= parseInt(value, 10),
+        "track-duration-min": (item, value) => state.trackDataMap[`${item.Track.toLowerCase()}||${item.Artist.toLowerCase()}`]?.duration / 1000 >= parseInt(value, 10),
+        "track-duration-max": (item, value) => state.trackDataMap[`${item.Track.toLowerCase()}||${item.Artist.toLowerCase()}`]?.duration / 1000 <= parseInt(value, 10),
 
         "artist-tags": (item, value) => {
-            const detailedArtist = artistDataMap[item.Artist.toLowerCase()];
+            const detailedArtist = state.artistDataMap[item.Artist.toLowerCase()];
             if (!detailedArtist) return false;  // or true if you want to ignore missing details
             return matchFilter(value, detailedArtist.tags || []);
             },
@@ -4649,7 +4676,7 @@ function filterTracks(filtersOverride = null, sourceTracks = null) {
 
         "session-starter-only": (item, value) => {
             if (value !== "use-gap") return true;
-            const previousTimestamp = previousScrobbleTimestampByOrder[item.order];
+            const previousTimestamp = state.previousScrobbleTimestampByOrder[item.order];
             if (previousTimestamp === null || previousTimestamp === undefined) return true;
             const configuredGap = parseFloat(document.getElementById("day-starter-gap-hours")?.value);
             const gapHours = isNaN(configuredGap) ? 6 : configuredGap;
@@ -4660,8 +4687,8 @@ function filterTracks(filtersOverride = null, sourceTracks = null) {
         "day-starter-only": (item, value) => {
             if (!value) return true;
 
-            const isDayStarter = isFirstScrobbleOfDayByOrder[item.order] === true;
-            const previousTimestamp = previousScrobbleTimestampByOrder[item.order];
+            const isDayStarter = state.isFirstScrobbleOfDayByOrder[item.order] === true;
+            const previousTimestamp = state.previousScrobbleTimestampByOrder[item.order];
             const configuredGap = parseFloat(document.getElementById("day-starter-gap-hours")?.value);
             const gapHours = isNaN(configuredGap) ? 6 : configuredGap;
             const minGapMs = gapHours * 60 * 60 * 1000;
@@ -4698,7 +4725,7 @@ function filterTracks(filtersOverride = null, sourceTracks = null) {
         "scrobble-order-to": (item, value) => item.order <= parseInt(value, 10)
     };
 
-    const effectiveFilters = Array.isArray(filtersOverride) ? filtersOverride : activeFilters;
+    const effectiveFilters = Array.isArray(filtersOverride) ? filtersOverride : state.activeFilters;
 
     const activePredicates = effectiveFilters
         .filter(filter => filterFunctions[filter.id])
@@ -4709,7 +4736,7 @@ function filterTracks(filtersOverride = null, sourceTracks = null) {
 
     if (activePredicates.length === 0) {
         if (!filtersOverride && !sourceTracks) {
-            filteredData = tracksSource;
+            state.filteredData = tracksSource;
         }
         return [...tracksSource];
     }
@@ -4725,7 +4752,7 @@ function filterTracks(filtersOverride = null, sourceTracks = null) {
     });
 
     if (!filtersOverride && !sourceTracks) {
-        filteredData = result;
+        state.filteredData = result;
     }
 
     return result;
@@ -4941,54 +4968,54 @@ function updateRaceControlsVisibility() {
 }
 
 function stopRacePlayback() {
-    if (racePlaybackTimerId !== null) {
-        clearInterval(racePlaybackTimerId);
-        racePlaybackTimerId = null;
+    if (state.racePlaybackTimerId !== null) {
+        clearInterval(state.racePlaybackTimerId);
+        state.racePlaybackTimerId = null;
     }
 }
 
 function getRacePlaybackSpeedFromInput() {
-    return Math.max(50, parseInt(document.getElementById("race-speed-ms")?.value, 10) || racePlaybackSpeedMs || 260);
+    return Math.max(50, parseInt(document.getElementById("race-speed-ms")?.value, 10) || state.racePlaybackSpeedMs || 260);
 }
 
 function syncRacePlaybackSpeedFromInput() {
-    racePlaybackSpeedMs = getRacePlaybackSpeedFromInput();
-    if (raceSpeedReadoutElement) {
-        raceSpeedReadoutElement.textContent = `${racePlaybackSpeedMs}ms/frame`;
+    state.racePlaybackSpeedMs = getRacePlaybackSpeedFromInput();
+    if (state.raceSpeedReadoutElement) {
+        state.raceSpeedReadoutElement.textContent = `${state.racePlaybackSpeedMs}ms/frame`;
     }
 }
 
 function startRacePlayback() {
-    if (!activeRaceState || activeRaceState.totalFrames <= 1 || typeof activeRaceState.updateFrame !== "function") {
+    if (!state.activeRaceState || state.activeRaceState.totalFrames <= 1 || typeof state.activeRaceState.updateFrame !== "function") {
         return;
     }
 
     stopRacePlayback();
     syncRacePlaybackSpeedFromInput();
-    racePlaybackTimerId = setInterval(() => {
-        if (!activeRaceState || typeof activeRaceState.updateFrame !== "function") {
+    state.racePlaybackTimerId = setInterval(() => {
+        if (!state.activeRaceState || typeof state.activeRaceState.updateFrame !== "function") {
             stopRacePlayback();
             return;
         }
 
-        const nextIndex = activeRaceState.frameIndex + 1;
-        if (nextIndex >= activeRaceState.totalFrames) {
+        const nextIndex = state.activeRaceState.frameIndex + 1;
+        if (nextIndex >= state.activeRaceState.totalFrames) {
             stopRacePlayback();
             return;
         }
 
-        activeRaceState.updateFrame(nextIndex);
-    }, racePlaybackSpeedMs);
+        state.activeRaceState.updateFrame(nextIndex);
+    }, state.racePlaybackSpeedMs);
 }
 
 function jumpToRaceFrame(target) {
-    if (!activeRaceState || typeof activeRaceState.updateFrame !== "function") return;
+    if (!state.activeRaceState || typeof state.activeRaceState.updateFrame !== "function") return;
     if (target === "first") {
-        activeRaceState.updateFrame(0);
+        state.activeRaceState.updateFrame(0);
         return;
     }
     if (target === "last") {
-        activeRaceState.updateFrame(Math.max(0, activeRaceState.totalFrames - 1));
+        state.activeRaceState.updateFrame(Math.max(0, state.activeRaceState.totalFrames - 1));
     }
 }
 
@@ -5001,23 +5028,23 @@ function adjustRacePlaybackSpeed(multiplier) {
     }
     syncRacePlaybackSpeedFromInput();
 
-    if (racePlaybackTimerId !== null) {
-        const currentFrame = activeRaceState?.frameIndex || 0;
+    if (state.racePlaybackTimerId !== null) {
+        const currentFrame = state.activeRaceState?.frameIndex || 0;
         stopRacePlayback();
-        if (activeRaceState) {
-            activeRaceState.updateFrame(currentFrame);
-            racePlaybackTimerId = setInterval(() => {
-                if (!activeRaceState || typeof activeRaceState.updateFrame !== "function") {
+        if (state.activeRaceState) {
+            state.activeRaceState.updateFrame(currentFrame);
+            state.racePlaybackTimerId = setInterval(() => {
+                if (!state.activeRaceState || typeof state.activeRaceState.updateFrame !== "function") {
                     stopRacePlayback();
                     return;
                 }
-                const nextIndex = activeRaceState.frameIndex + 1;
-                if (nextIndex >= activeRaceState.totalFrames) {
+                const nextIndex = state.activeRaceState.frameIndex + 1;
+                if (nextIndex >= state.activeRaceState.totalFrames) {
                     stopRacePlayback();
                     return;
                 }
-                activeRaceState.updateFrame(nextIndex);
-            }, racePlaybackSpeedMs);
+                state.activeRaceState.updateFrame(nextIndex);
+            }, state.racePlaybackSpeedMs);
         }
     }
 }
@@ -5027,7 +5054,7 @@ function insertRacePlaybackToolbar(targetDiv) {
 
     const toolbar = document.createElement("div");
     toolbar.className = "race-playback-toolbar";
-    raceSpeedReadoutElement = null;
+    state.raceSpeedReadoutElement = null;
 
     const buttonConfigs = [
         { label: "⏮", title: "First frame", onClick: () => jumpToRaceFrame("first") },
@@ -5052,22 +5079,22 @@ function insertRacePlaybackToolbar(targetDiv) {
     speedReadout.className = "race-speed-readout";
     speedReadout.textContent = `${getRacePlaybackSpeedFromInput()}ms/frame`;
     toolbar.appendChild(speedReadout);
-    raceSpeedReadoutElement = speedReadout;
+    state.raceSpeedReadoutElement = speedReadout;
 
     targetDiv.appendChild(toolbar);
 }
 
 function destroyVisualizationState() {
     stopRacePlayback();
-    chartInstances.forEach(chart => {
+    state.chartInstances.forEach(chart => {
         try {
             chart.destroy();
         } catch {
             // Ignore stale chart instance errors
         }
     });
-    chartInstances = [];
-    activeRaceState = null;
+    state.chartInstances = [];
+    state.activeRaceState = null;
 }
 
 function getSelectedChartOrientation() {
@@ -5366,7 +5393,7 @@ function createBarChartInCanvas(canvas, labels, values, sortingBasis, chartTitle
         }
     });
 
-    chartInstances.push(chart);
+    state.chartInstances.push(chart);
     return chart;
 }
 
@@ -5509,7 +5536,7 @@ function formatDateInputValue(dateValue) {
 
 function getFirstScrobbleTimestamp() {
     let earliestTimestamp = Number.POSITIVE_INFINITY;
-    (allTracks || []).forEach(track => {
+    (state.allTracks || []).forEach(track => {
         const timestamp = parseInt(track?.Date, 10);
         if (!isNaN(timestamp) && timestamp < earliestTimestamp) {
             earliestTimestamp = timestamp;
@@ -5697,19 +5724,19 @@ function renderBarRaceSingle(tracks, entityType, targetDiv, sortingBasis) {
     };
     const mounted = mountRaceChart(targetDiv, `Bar Chart Race (${sortingBasis})`, initialFrame, sortingBasis);
 
-    activeRaceState = {
+    state.activeRaceState = {
         mode: "single",
         frameIndex: 0,
         totalFrames: frames.length,
         updateFrame: (frameIndex) => {
             const safeIndex = Math.max(0, Math.min(frames.length - 1, frameIndex));
-            activeRaceState.frameIndex = safeIndex;
+            state.activeRaceState.frameIndex = safeIndex;
             applyRaceFrameToChart(mounted.chart, frames[safeIndex], mounted.frameLabel, sortingBasis);
         }
     };
 
-    activeRaceState.updateFrame(0);
-    if (raceRenderArmed) {
+    state.activeRaceState.updateFrame(0);
+    if (state.raceRenderArmed) {
         startRacePlayback();
     }
 }
@@ -5736,13 +5763,13 @@ function renderBarRaceComparison(leftTracks, rightTracks, leftEntityType, rightE
     const rightMounted = mountRaceChart(rightTargetDiv, `Right (${rightSortingBasis})`, rightInitial, rightSortingBasis);
 
     const totalFrames = Math.max(leftFrames.length, rightFrames.length);
-    activeRaceState = {
+    state.activeRaceState = {
         mode: "comparison",
         frameIndex: 0,
         totalFrames,
         updateFrame: (frameIndex) => {
             const safeIndex = Math.max(0, Math.min(totalFrames - 1, frameIndex));
-            activeRaceState.frameIndex = safeIndex;
+            state.activeRaceState.frameIndex = safeIndex;
 
             const leftFrame = leftFrames[Math.min(safeIndex, leftFrames.length - 1)] || leftInitial;
             const rightFrame = rightFrames[Math.min(safeIndex, rightFrames.length - 1)] || rightInitial;
@@ -5752,8 +5779,8 @@ function renderBarRaceComparison(leftTracks, rightTracks, leftEntityType, rightE
         }
     };
 
-    activeRaceState.updateFrame(0);
-    if (raceRenderArmed) {
+    state.activeRaceState.updateFrame(0);
+    if (state.raceRenderArmed) {
         startRacePlayback();
     }
 }
@@ -5803,7 +5830,7 @@ function displayEntities() {
         ? DISPLAY_MODE_LIST
         : effectiveDisplayMode;
     const raceReady = renderMode !== DISPLAY_MODE_BAR_RACE || hasRaceSettingsReady();
-    const raceCanRender = renderMode !== DISPLAY_MODE_BAR_RACE || (raceReady && raceRenderArmed);
+    const raceCanRender = renderMode !== DISPLAY_MODE_BAR_RACE || (raceReady && state.raceRenderArmed);
 
     if (entityType !== initialEntityType) {
         document.getElementById("entity-type").value = entityType;
@@ -5816,14 +5843,14 @@ function displayEntities() {
     const xValue = parseInt(document.getElementById("x-value").value) || 1;
     const comparisonButtonActive = isComparisonEnabled();
 
-    const baseTracks = filterTracks(activeFilters, allTracks);
-    const leftState = comparisonFilterStates.left || {};
-    const rightState = comparisonFilterStates.right || {};
+    const baseTracks = filterTracks(state.activeFilters, state.allTracks);
+    const leftState = state.comparisonFilterStates.left || {};
+    const rightState = state.comparisonFilterStates.right || {};
     const leftFilters = convertStateToFilterArray(leftState);
     const rightFilters = convertStateToFilterArray(rightState);
 
-    const leftTracksBase = comparisonButtonActive ? filterTracks(leftFilters, allTracks) : baseTracks;
-    const rightTracksBase = comparisonButtonActive ? filterTracks(rightFilters, allTracks) : baseTracks;
+    const leftTracksBase = comparisonButtonActive ? filterTracks(leftFilters, state.allTracks) : baseTracks;
+    const rightTracksBase = comparisonButtonActive ? filterTracks(rightFilters, state.allTracks) : baseTracks;
 
     const equationsLeft = comparisonButtonActive
         ? ((leftState.equations || "").trim())
@@ -5907,7 +5934,7 @@ function displayEntities() {
             equalizeComparisonRowHeights(leftList, rightList);
         }
 
-        lastRenderedListState = {
+        state.lastRenderedListState = {
             isComparison: true,
             current: { entities: leftEntities, entityType: leftEntityType },
             left: { entities: leftEntities, entityType: leftEntityType },
@@ -5925,13 +5952,13 @@ function displayEntities() {
             resultsHeader.textContent = "Comparison Results";
         }
 
-        filteredData = leftEntities;
+        state.filteredData = leftEntities;
         updateActiveFilters();
         return;
     }
 
     const singleEntities = resolveDisplayEntities(leftPipeline, entityType, sortingBasis, xValue, maxPerArtist);
-    filteredData = singleEntities;
+    state.filteredData = singleEntities;
     const resultsTarget = document.getElementById("results");
 
     if (renderMode === DISPLAY_MODE_BAR_CHART) {
@@ -5950,7 +5977,7 @@ function displayEntities() {
         renderEntitiesToContainer(singleEntities, entityType, resultsTarget, sortingBasis);
     }
 
-    lastRenderedListState = {
+    state.lastRenderedListState = {
         isComparison: false,
         current: { entities: singleEntities, entityType },
         left: { entities: [], entityType: "track" },
@@ -6038,21 +6065,21 @@ document.querySelectorAll(".filters").forEach(filter => {
 
         if (isComparisonEnabled()) {
             if (event.target.id === "equations") {
-                comparisonFilterStates.left.equations = value;
+                state.comparisonFilterStates.left.equations = value;
             } else if (event.target.id === "equations-right") {
-                comparisonFilterStates.right.equations = value;
+                state.comparisonFilterStates.right.equations = value;
             } else if (GLOBAL_BASE_SETTING_IDS.has(event.target.id)) {
                 addFilter(event.target.id, value);
             } else {
                 const side = getComparisonEditTarget();
-                comparisonFilterStates[side][event.target.id] = value;
+                state.comparisonFilterStates[side][event.target.id] = value;
             }
             updateActiveFilters();
             return;
         }
 
         if (event.target.id === "equations-right") {
-            comparisonFilterStates.right.equations = value;
+            state.comparisonFilterStates.right.equations = value;
             updateActiveFilters();
             return;
         }
@@ -6230,8 +6257,8 @@ function updateActiveFilters() {
     };
 
     if (isComparisonEnabled()) {
-        const leftState = comparisonFilterStates.left || {};
-        const rightState = comparisonFilterStates.right || {};
+        const leftState = state.comparisonFilterStates.left || {};
+        const rightState = state.comparisonFilterStates.right || {};
         const leftEquationValue = (document.getElementById("equations")?.value || leftState.equations || "").toString().trim();
         const rightEquationValue = (document.getElementById("equations-right")?.value || rightState.equations || rightState["equations-right"] || "").toString().trim();
 
@@ -6350,7 +6377,7 @@ function updateActiveFilters() {
 
 function resetFilters() {
     destroyVisualizationState();
-    raceRenderArmed = false;
+    state.raceRenderArmed = false;
 
     // Reset all input and select elements within #filters-section
     document.querySelectorAll("#filters-section input, #filters-section select, #filters-section textarea").forEach(element => {
@@ -6358,9 +6385,9 @@ function resetFilters() {
     });
     
     // Clear the activeFilters array (using splice or reassigning an empty array)
-    activeFilters.length = 0;
-    comparisonFilterStates = { left: {}, right: {} };
-    comparisonStateInitialized = false;
+    state.activeFilters.length = 0;
+    state.comparisonFilterStates = { left: {}, right: {} };
+    state.comparisonStateInitialized = false;
     
     // Set default values for sorting basis and entity type
     document.getElementById("sorting-basis").value = "scrobbles";
@@ -6375,7 +6402,7 @@ function resetFilters() {
 
     const raceSpeedInput = document.getElementById("race-speed-ms");
     if (raceSpeedInput) raceSpeedInput.value = "260";
-    racePlaybackSpeedMs = 260;
+    state.racePlaybackSpeedMs = 260;
 
     const chartAxis = document.getElementById("chart-axis");
     if (chartAxis) chartAxis.value = "horizontal";
@@ -6413,7 +6440,7 @@ function resetFilters() {
 // Event listener for Apply Filters button
 document.getElementById("apply-filters").addEventListener("click", () => {
     const mode = getSelectedDisplayMode();
-    raceRenderArmed = mode === DISPLAY_MODE_BAR_RACE && hasRaceSettingsReady();
+    state.raceRenderArmed = mode === DISPLAY_MODE_BAR_RACE && hasRaceSettingsReady();
 
     if (isComparisonEnabled()) {
         displayEntities();
@@ -6432,28 +6459,28 @@ document.getElementById("comparison-toggle").addEventListener("click", () => {
     const isActive = button.dataset.active === "true";
     const nextValue = !isActive;
 
-    if (nextValue && !comparisonStateInitialized) {
+    if (nextValue && !state.comparisonStateInitialized) {
         const snapshot = readCurrentFilterInputState();
-        comparisonFilterStates.left = {
+        state.comparisonFilterStates.left = {
             ...snapshot,
             equations: (document.getElementById("equations")?.value || snapshot.equations || "").toString()
         };
-        comparisonFilterStates.right = {
+        state.comparisonFilterStates.right = {
             equations: (document.getElementById("equations-right")?.value || "").toString()
         };
-        comparisonStateInitialized = true;
+        state.comparisonStateInitialized = true;
     }
 
     if (isActive) {
         const currentSide = getComparisonEditTarget();
         const snapshot = readCurrentFilterInputState();
         if (currentSide === "right") {
-            snapshot.equations = (document.getElementById("equations-right")?.value || comparisonFilterStates.right?.equations || "").toString();
+            snapshot.equations = (document.getElementById("equations-right")?.value || state.comparisonFilterStates.right?.equations || "").toString();
         } else {
-            snapshot.equations = (document.getElementById("equations")?.value || comparisonFilterStates.left?.equations || "").toString();
+            snapshot.equations = (document.getElementById("equations")?.value || state.comparisonFilterStates.left?.equations || "").toString();
         }
-        comparisonFilterStates[currentSide] = {
-            ...(comparisonFilterStates[currentSide] || {}),
+        state.comparisonFilterStates[currentSide] = {
+            ...(state.comparisonFilterStates[currentSide] || {}),
             ...snapshot
         };
     }
@@ -6463,9 +6490,9 @@ document.getElementById("comparison-toggle").addEventListener("click", () => {
 
     if (nextValue) {
         const target = getComparisonEditTarget();
-        applyFilterInputState(comparisonFilterStates[target]);
+        applyFilterInputState(state.comparisonFilterStates[target]);
     } else {
-        activeFilters.length = 0;
+        state.activeFilters.length = 0;
         getManagedFilterElements().forEach(element => {
             const value = element.type === "checkbox"
                 ? (element.checked ? "true" : "")
@@ -6475,7 +6502,7 @@ document.getElementById("comparison-toggle").addEventListener("click", () => {
 
         const rightEquationsInput = document.getElementById("equations-right");
         if (rightEquationsInput) {
-            comparisonFilterStates.right.equations = rightEquationsInput.value;
+            state.comparisonFilterStates.right.equations = rightEquationsInput.value;
         }
     }
 
@@ -6489,17 +6516,17 @@ document.getElementById("comparison-edit-target").addEventListener("change", () 
     const previousSide = getComparisonEditTarget() === "left" ? "right" : "left";
     const snapshot = readCurrentFilterInputState();
     if (previousSide === "right") {
-        snapshot.equations = (document.getElementById("equations-right")?.value || comparisonFilterStates.right?.equations || "").toString();
+        snapshot.equations = (document.getElementById("equations-right")?.value || state.comparisonFilterStates.right?.equations || "").toString();
     } else {
-        snapshot.equations = (document.getElementById("equations")?.value || comparisonFilterStates.left?.equations || "").toString();
+        snapshot.equations = (document.getElementById("equations")?.value || state.comparisonFilterStates.left?.equations || "").toString();
     }
-    comparisonFilterStates[previousSide] = {
-        ...(comparisonFilterStates[previousSide] || {}),
+    state.comparisonFilterStates[previousSide] = {
+        ...(state.comparisonFilterStates[previousSide] || {}),
         ...snapshot
     };
 
     const currentSide = getComparisonEditTarget();
-    applyFilterInputState(comparisonFilterStates[currentSide]);
+    applyFilterInputState(state.comparisonFilterStates[currentSide]);
     updateActiveFilters();
 });
 
@@ -6508,7 +6535,7 @@ if (displayModeSelect) {
     displayModeSelect.addEventListener("change", () => {
         updateRaceControlsVisibility();
         if (getSelectedDisplayMode() !== DISPLAY_MODE_BAR_RACE) {
-            raceRenderArmed = false;
+            state.raceRenderArmed = false;
         }
         displayEntities();
     });
@@ -6529,7 +6556,7 @@ if (displayModeSelect) {
     const control = document.getElementById(id);
     if (!control) return;
     control.addEventListener("change", () => {
-        raceRenderArmed = false;
+        state.raceRenderArmed = false;
         if (getSelectedDisplayMode() === DISPLAY_MODE_BAR_RACE) {
             displayEntities();
         }
@@ -6540,23 +6567,23 @@ const raceSpeedInput = document.getElementById("race-speed-ms");
 if (raceSpeedInput) {
     raceSpeedInput.addEventListener("change", () => {
         syncRacePlaybackSpeedFromInput();
-        if (racePlaybackTimerId !== null) {
-            const currentFrame = activeRaceState?.frameIndex || 0;
+        if (state.racePlaybackTimerId !== null) {
+            const currentFrame = state.activeRaceState?.frameIndex || 0;
             stopRacePlayback();
-            if (activeRaceState) {
-                activeRaceState.updateFrame(currentFrame);
-                racePlaybackTimerId = setInterval(() => {
-                    if (!activeRaceState || typeof activeRaceState.updateFrame !== "function") {
+            if (state.activeRaceState) {
+                state.activeRaceState.updateFrame(currentFrame);
+                state.racePlaybackTimerId = setInterval(() => {
+                    if (!state.activeRaceState || typeof state.activeRaceState.updateFrame !== "function") {
                         stopRacePlayback();
                         return;
                     }
-                    const nextIndex = activeRaceState.frameIndex + 1;
-                    if (nextIndex >= activeRaceState.totalFrames) {
+                    const nextIndex = state.activeRaceState.frameIndex + 1;
+                    if (nextIndex >= state.activeRaceState.totalFrames) {
                         stopRacePlayback();
                         return;
                     }
-                    activeRaceState.updateFrame(nextIndex);
-                }, racePlaybackSpeedMs);
+                    state.activeRaceState.updateFrame(nextIndex);
+                }, state.racePlaybackSpeedMs);
             }
         }
     });
@@ -6596,10 +6623,10 @@ function syncEntitySortingSelectors() {
 
     if (isComparisonEnabled()) {
         const side = getComparisonEditTarget();
-        comparisonFilterStates[side] = {
-            ...(comparisonFilterStates[side] || {}),
+        state.comparisonFilterStates[side] = {
+            ...(state.comparisonFilterStates[side] || {}),
             ...readCurrentFilterInputState(),
-            equations: (comparisonFilterStates[side]?.equations ?? "").toString()
+            equations: (state.comparisonFilterStates[side]?.equations ?? "").toString()
         };
     } else {
         addFilter("entity-type", normalized.entityType);
@@ -6697,7 +6724,7 @@ let hlState = null;
 
 // ---- Persistent game records (localStorage) ----
 const GAMES_STORAGE_KEY = "lastfmlists_games_v1";
-let gamesRecords = {
+const gamesRecords = {
     hlBest: { artist: 0, album: 0, track: 0 },
     ftlBest: 0,
     ftlPlayed: 0,
@@ -6709,11 +6736,8 @@ function loadGamesRecords() {
     try {
         const raw = JSON.parse(localStorage.getItem(GAMES_STORAGE_KEY));
         if (raw && typeof raw === "object") {
-            gamesRecords = {
-                ...gamesRecords,
-                ...raw,
-                hlBest: { ...gamesRecords.hlBest, ...(raw.hlBest || {}) }
-            };
+            const hlBest = { ...gamesRecords.hlBest, ...(raw.hlBest || {}) };
+            Object.assign(gamesRecords, raw, { hlBest });
         }
     } catch (e) {
         // ignore malformed/blocked storage
@@ -6733,9 +6757,9 @@ function hlBest(type) {
 }
 
 function hlSourceData(type) {
-    if (type === "artist") return artistsData;
-    if (type === "album") return albumsData;
-    return tracksData;
+    if (type === "artist") return state.artistsData;
+    if (type === "album") return state.albumsData;
+    return state.tracksData;
 }
 
 function hlBuildPool(type) {
@@ -6987,6 +7011,11 @@ function hlStart(type) {
     hlRenderRound();
 }
 
+// Replay the round type that is currently loaded, if any.
+function hlRestartCurrent() {
+    if (hlState) hlStart(hlState.type);
+}
+
 function hlEndGame() {
     hlClearTimer();
     document.getElementById("hl-play").hidden = true;
@@ -7021,13 +7050,25 @@ const FTL_WORDS = [
 ];
 
 let ftlState = null;
-let ftlIndexCache = null;
 
-function ftlToDate(v) { return typeof v === "string" ? parseInt(v, 10) : v; }
+// Cached index over the whole scrobble history, shared by Fill the List and Put
+// Them In Order. Both rebuild it when a game starts.
+let scrobbleIndexCache = null;
+
+function rebuildScrobbleIndex() {
+    scrobbleIndexCache = buildScrobbleIndex();
+    return scrobbleIndexCache;
+}
+
+function getScrobbleIndex() {
+    return scrobbleIndexCache || rebuildScrobbleIndex();
+}
+
+function toScrobbleTime(v) { return typeof v === "string" ? parseInt(v, 10) : v; }
 
 // One pass over allTracks builds per-entity aggregates (count, first/last date,
 // per-artist distinct-track count) plus the "by artist" eligibility lists.
-function ftlBuildIndex() {
+function buildScrobbleIndex() {
     const artist = new Map(), album = new Map(), track = new Map();
     const artistTracks = new Map();
     let minY = Infinity, maxY = -Infinity;
@@ -7040,8 +7081,8 @@ function ftlBuildIndex() {
         if (date > e.last) e.last = date;
     };
 
-    for (const s of allTracks) {
-        const d = ftlToDate(s.Date);
+    for (const s of state.allTracks) {
+        const d = toScrobbleTime(s.Date);
         if (!d) continue;
         const y = new Date(d).getFullYear();
         if (y < minY) minY = y;
@@ -7086,15 +7127,16 @@ function ftlBuildIndex() {
     };
 }
 
-function ftlEntities(type) { return ftlIndexCache[type] || []; }
+function indexEntities(type) { return getScrobbleIndex()[type] || []; }
 
 // Lazily build & cache per-entity sorted scrobble-date lists (for streak/first/
 // fastest facets). Only built for the entity type a sorting facet actually needs.
-function ftlEntitySequences(type) {
-    if (ftlIndexCache.seq[type]) return ftlIndexCache.seq[type];
+function indexEntitySequences(type) {
+    const index = getScrobbleIndex();
+    if (index.seq[type]) return index.seq[type];
     const map = new Map();
-    for (const s of allTracks) {
-        const d = ftlToDate(s.Date);
+    for (const s of state.allTracks) {
+        const d = toScrobbleTime(s.Date);
         if (!d) continue;
         let name, artist = null, key;
         if (type === "artist") {
@@ -7115,7 +7157,7 @@ function ftlEntitySequences(type) {
         e.dates.push(d);
     }
     for (const e of map.values()) e.dates.sort((a, b) => a - b);
-    ftlIndexCache.seq[type] = map;
+    index.seq[type] = map;
     return map;
 }
 
@@ -7158,8 +7200,8 @@ function ftlFormatDuration(ms) {
 // Scrobble-level ranking; pred receives (date, scrobble).
 function ftlRankScrobbles(pred, type) {
     const counts = new Map();
-    for (const s of allTracks) {
-        const d = ftlToDate(s.Date);
+    for (const s of state.allTracks) {
+        const d = toScrobbleTime(s.Date);
         if (!d || !pred(d, s)) continue;
         let name, artist = null, key;
         if (type === "artist") {
@@ -7189,8 +7231,9 @@ function ftlSeen(key) { return !!(ftlState && ftlState.seen && ftlState.seen.has
 // The `key` is the per-session signature; a generator returns null if that exact
 // puzzle was already served this session (so nothing repeats until reload).
 function ftlGenYear(type) {
-    if (!ftlIndexCache.years.length) return null;
-    const y = ftlRandom(ftlIndexCache.years);
+    const { years } = getScrobbleIndex();
+    if (!years.length) return null;
+    const y = ftlRandom(years);
     const key = `year:${type}:${y}`;
     if (ftlSeen(key)) return null;
     const answers = ftlRankScrobbles(d => new Date(d).getFullYear() === y, type);
@@ -7204,8 +7247,9 @@ function ftlGenMonth(type) {
     return answers && { prompt: `Top ${FTL_ENTITY_NOUN[type]} across every ${FTL_MONTHS[m]}`, answers, key };
 }
 function ftlGenYearMonth(type) {
-    if (!ftlIndexCache.years.length) return null;
-    const y = ftlRandom(ftlIndexCache.years);
+    const { years } = getScrobbleIndex();
+    if (!years.length) return null;
+    const y = ftlRandom(years);
     const m = Math.floor(Math.random() * 12);
     const key = `yearmonth:${type}:${y}-${m}`;
     if (ftlSeen(key)) return null;
@@ -7222,7 +7266,7 @@ function ftlGenLastDays(type) {
 }
 function ftlGenInitial(type) {
     const letters = new Set();
-    for (const e of ftlEntities(type)) {
+    for (const e of indexEntities(type)) {
         const c = (e.name || "").trim()[0];
         if (c && /[a-z0-9]/i.test(c)) letters.add(c.toUpperCase());
     }
@@ -7230,7 +7274,7 @@ function ftlGenInitial(type) {
     const L = ftlRandom([...letters]);
     const key = `initial:${type}:${L}`;
     if (ftlSeen(key)) return null;
-    const answers = ftlFinalize(ftlEntities(type).filter(e => (e.name || "").trim().toUpperCase().startsWith(L)));
+    const answers = ftlFinalize(indexEntities(type).filter(e => (e.name || "").trim().toUpperCase().startsWith(L)));
     return answers && { prompt: `Top ${FTL_ENTITY_NOUN[type]} starting with “${L}”`, answers, key };
 }
 function ftlGenWord(type) {
@@ -7238,29 +7282,30 @@ function ftlGenWord(type) {
     const key = `word:${type}:${w}`;
     if (ftlSeen(key)) return null;
     const re = new RegExp(`\\b${w}`, "i");
-    const answers = ftlFinalize(ftlEntities(type).filter(e => re.test(e.name || "")));
+    const answers = ftlFinalize(indexEntities(type).filter(e => re.test(e.name || "")));
     return answers && { prompt: `Top ${FTL_ENTITY_NOUN[type]} with “${w}” in the name`, answers, key };
 }
 function ftlGenArtistLength() {
     const len = 3 + Math.floor(Math.random() * 4); // 3–6
     const key = `alen:${len}`;
     if (ftlSeen(key)) return null;
-    const answers = ftlFinalize(ftlEntities("artist").filter(e => (e.name || "").replace(/\s/g, "").length === len));
+    const answers = ftlFinalize(indexEntities("artist").filter(e => (e.name || "").replace(/\s/g, "").length === len));
     return answers && { prompt: `Top artists whose name is ${len} characters long, not counting spaces`, answers, key };
 }
 function ftlGenTrackLength() {
     const len = 3 + Math.floor(Math.random() * 7); // 3–9
     const key = `tlen:${len}`;
     if (ftlSeen(key)) return null;
-    const answers = ftlFinalize(ftlEntities("track").filter(e => (e.name || "").replace(/\s/g, "").length === len));
+    const answers = ftlFinalize(indexEntities("track").filter(e => (e.name || "").replace(/\s/g, "").length === len));
     return answers && { prompt: `Top tracks whose title is ${len} characters long, not counting spaces`, answers, key };
 }
 function ftlGenDiscovery(type) {
-    if (!ftlIndexCache.years.length) return null;
-    const y = ftlRandom(ftlIndexCache.years);
+    const { years } = getScrobbleIndex();
+    if (!years.length) return null;
+    const y = ftlRandom(years);
     const key = `disc:${type}:${y}`;
     if (ftlSeen(key)) return null;
-    const answers = ftlFinalize(ftlEntities(type).filter(e => new Date(e.first).getFullYear() === y));
+    const answers = ftlFinalize(indexEntities(type).filter(e => new Date(e.first).getFullYear() === y));
     return answers && { prompt: `Top ${FTL_ENTITY_NOUN[type]} you first scrobbled in ${y}`, answers, key };
 }
 function ftlGenDormant(type) {
@@ -7269,23 +7314,23 @@ function ftlGenDormant(type) {
     if (ftlSeen(key)) return null;
     const cutoff = Date.now() - n * 86400000;
     const label = n === 30 ? "a month" : "a year";
-    const answers = ftlFinalize(ftlEntities(type).filter(e => e.last < cutoff));
+    const answers = ftlFinalize(indexEntities(type).filter(e => e.last < cutoff));
     return answers && { prompt: `Top ${FTL_ENTITY_NOUN[type]} you haven't played in over ${label}`, answers, key };
 }
 function ftlGenOneHit() {
     const key = "onehit";
     if (ftlSeen(key)) return null;
-    const answers = ftlFinalize(ftlEntities("artist").filter(e => e.trackCount === 1));
+    const answers = ftlFinalize(indexEntities("artist").filter(e => e.trackCount === 1));
     return answers && { prompt: `Top artists you've only scrobbled one track from`, answers, key };
 }
 function ftlGenByArtist(type) {
-    const pool = ftlIndexCache.byArtistEligible[type] || [];
+    const pool = getScrobbleIndex().byArtistEligible[type] || [];
     if (!pool.length) return null;
     for (let i = 0; i < 8; i++) {
         const a = ftlRandom(pool);
         const key = `byartist:${type}:${a.key}`;
         if (ftlSeen(key)) continue;
-        const answers = ftlFinalize(ftlEntities(type).filter(e => (e.artist || "").toLowerCase() === a.key));
+        const answers = ftlFinalize(indexEntities(type).filter(e => (e.artist || "").toLowerCase() === a.key));
         if (answers) return { prompt: `Top ${FTL_ENTITY_NOUN[type]} by ${a.name}`, answers, key, fixedArtist: a.name };
     }
     return null;
@@ -7294,7 +7339,7 @@ function ftlGenFirstToX(type) {
     const X = ftlRandom([50, 100, 200]);
     const key = `first:${type}:${X}`;
     if (ftlSeen(key)) return null;
-    const seq = ftlEntitySequences(type);
+    const seq = indexEntitySequences(type);
     const rows = [];
     for (const e of seq.values()) if (e.dates.length >= X) rows.push({ name: e.name, artist: e.artist, count: e.dates.length, metric: e.dates[X - 1] });
     const answers = ftlFinalizeBy(rows, true, r => `hit ${X} on ${ftlFormatDay(r.metric)}`);
@@ -7304,7 +7349,7 @@ function ftlGenFastestToX(type) {
     const X = ftlRandom([50, 100, 200]);
     const key = `fastest:${type}:${X}`;
     if (ftlSeen(key)) return null;
-    const seq = ftlEntitySequences(type);
+    const seq = indexEntitySequences(type);
     const rows = [];
     for (const e of seq.values()) if (e.dates.length >= X) rows.push({ name: e.name, artist: e.artist, count: e.dates.length, metric: e.dates[X - 1] - e.dates[0] });
     const answers = ftlFinalizeBy(rows, true, r => `${X} in ${ftlFormatDuration(r.metric)}`);
@@ -7313,7 +7358,7 @@ function ftlGenFastestToX(type) {
 function ftlGenSingleDay(type) {
     const key = `singleday:${type}`;
     if (ftlSeen(key)) return null;
-    const seq = ftlEntitySequences(type);
+    const seq = indexEntitySequences(type);
     const rows = [];
     for (const e of seq.values()) {
         if (e.dates.length < FTL_MIN_SCROBBLES) continue;
@@ -7333,7 +7378,7 @@ function ftlGenSingleDay(type) {
 function ftlGenSeparateDays(type) {
     const key = `sepdays:${type}`;
     if (ftlSeen(key)) return null;
-    const seq = ftlEntitySequences(type);
+    const seq = indexEntitySequences(type);
     const rows = [];
     for (const e of seq.values()) {
         if (e.dates.length < FTL_MIN_SCROBBLES) continue;
@@ -7345,7 +7390,7 @@ function ftlGenSeparateDays(type) {
     return answers && { prompt: `Top ${FTL_ENTITY_NOUN[type]} you've played across the most separate days`, answers, key };
 }
 function ftlGenSequence(type) {
-    const buckets = Math.floor(allTracks.length / FTL_SEQUENCE_BUCKET);
+    const buckets = Math.floor(state.allTracks.length / FTL_SEQUENCE_BUCKET);
     if (buckets < 1) return null;
     const b = Math.floor(Math.random() * buckets);
     const key = `seq:${type}:${b}`;
@@ -7444,7 +7489,7 @@ function ftlGeneratePuzzle() {
     for (const type of ftlState.options.types) {
         const key = `overall:${type}`;
         if (ftlSeen(key)) continue;
-        const answers = ftlFinalize(ftlEntities(type));
+        const answers = ftlFinalize(indexEntities(type));
         if (answers) {
             ftlState.seen.add(key);
             return { prompt: `Your top ${FTL_ENTITY_NOUN[type]}`, answers, entityType: type, facetId: "overall", key };
@@ -7720,7 +7765,7 @@ function ftlStartGame() {
     const types = new Set([...document.querySelectorAll(".ftl-type:checked")].map(c => c.value));
     const cats = new Set([...document.querySelectorAll(".ftl-cat:checked")].map(c => c.value));
     if (!types.size || !cats.size) { ftlShowSetup(true); return; }
-    ftlIndexCache = ftlBuildIndex();
+    rebuildScrobbleIndex();
     ftlState = {
         options: {
             types,
@@ -7793,7 +7838,7 @@ function ordEntityKey(type, e) {
 // Recognisable candidates only: the most-played slice of the library, narrowed
 // further on early rounds so beginners get names they definitely know.
 function ordBasePool(type, depth) {
-    const ents = ftlEntities(type).filter(e => e.count >= ORD_MIN_SCROBBLES);
+    const ents = indexEntities(type).filter(e => e.count >= ORD_MIN_SCROBBLES);
     ents.sort((a, b) => b.count - a.count);
     const limit = Math.min(depth || Infinity, ORD_POOL_LIMIT[type] || 300);
     return ents.slice(0, limit).map(e => ({
@@ -7812,7 +7857,7 @@ function ordConsecutiveMap(type) {
     if (ordConsecutiveCache[type]) return ordConsecutiveCache[type];
     const map = new Map();
     let prevKey = null, run = 0;
-    for (const s of allTracks) {
+    for (const s of state.allTracks) {
         const k = ordScrobbleKey(type, s);
         if (!k) { prevKey = null; run = 0; continue; }
         run = k === prevKey ? run + 1 : 1;
@@ -7827,7 +7872,7 @@ function ordConsecutiveMap(type) {
 function ordTrackStats(type) {
     if (ordTrackStatsCache[type]) return ordTrackStatsCache[type];
     const perEntity = new Map();
-    for (const s of allTracks) {
+    for (const s of state.allTracks) {
         const ek = ordScrobbleKey(type, s);
         if (!ek || !s.Track || s.Track === "Unknown") continue;
         const tk = s.Track.toLowerCase();
@@ -7848,7 +7893,7 @@ function ordTrackStats(type) {
 // Per entity: biggest single day and how many separate days.
 function ordDayStats(type) {
     if (ordDayStatsCache[type]) return ordDayStatsCache[type];
-    const seq = ftlEntitySequences(type);
+    const seq = indexEntitySequences(type);
     const out = new Map();
     for (const [key, e] of seq) {
         const days = new Map();
@@ -7895,7 +7940,7 @@ const ORD_CRITERIA = [
     {
         id: "period", types: ["artist", "album", "track"],
         build: (type, pool) => {
-            const years = ftlIndexCache.years;
+            const years = getScrobbleIndex().years;
             const modes = years.length ? ["year", "yearmonth", "lastdays"] : ["lastdays"];
             const mode = ftlRandom(modes);
             let pred, label;
@@ -7915,8 +7960,8 @@ const ORD_CRITERIA = [
                 label = `in the last ${n} days`;
             }
             const map = new Map();
-            for (const s of allTracks) {
-                const d = ftlToDate(s.Date);
+            for (const s of state.allTracks) {
+                const d = toScrobbleTime(s.Date);
                 if (!d || !pred(d)) continue;
                 const k = ordScrobbleKey(type, s);
                 if (k) map.set(k, (map.get(k) || 0) + 1);
@@ -8156,7 +8201,7 @@ function ordNextRound() {
 }
 
 function ordStart(type) {
-    ftlIndexCache = ftlBuildIndex();
+    rebuildScrobbleIndex();
     ordConsecutiveCache = {};
     ordTrackStatsCache = {};
     ordDayStatsCache = {};
@@ -8263,7 +8308,7 @@ function initGames() {
         btn.addEventListener("click", () => hlGuess(btn.dataset.side)));
 
     const again = document.getElementById("hl-again");
-    if (again) again.addEventListener("click", () => hlState && hlStart(hlState.type));
+    if (again) again.addEventListener("click", hlRestartCurrent);
 
     const changeType = document.getElementById("hl-change-type");
     if (changeType) changeType.addEventListener("click", hlShowSetup);
