@@ -19,6 +19,12 @@ loads `js/main.js` as an ES module; the browser resolves the rest.
 Because it uses ES modules, opening `index.html` straight off disk will not
 work. Serve the folder over HTTP instead (`python3 -m http.server`).
 
+`demo.html` is the same app running on a generated listening history instead of
+a real account: `demo/mock-lastfm.js` intercepts `fetch` and answers the Last.fm
+endpoints from a deterministic library, so the page needs no account and no
+network. It loads the real `js/` modules, so it is a way to try or check the app,
+not a separate copy of it.
+
 Unreleased:
 
 - Failed loads now say what went wrong. A misspelled username, an empty account or an unreachable API used to drop you on an empty page with the reason only in the browser console; you now get a message on the welcome screen and the form back to try again.
