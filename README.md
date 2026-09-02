@@ -1,6 +1,24 @@
 # lastfmlists
 A small project to create lists based on last.fm data
 
+## Project layout
+
+The site is plain HTML, CSS and JavaScript with no build step. `index.html`
+loads `js/main.js` as an ES module; the browser resolves the rest.
+
+    js/config.js          tuning constants, API key, UI copy shared with index.html
+    js/state.js           the mutable state every module reads and writes
+    js/dom.js             long-lived element handles, HTML escaping, modals, control values
+    js/time.js            local-calendar day, week and duration helpers
+    js/api/               rate limiter and the Last.fm endpoint wrappers
+    js/data/              history loading, IndexedDB storage, metrics, equations, filtering
+    js/ui/                shell, lists, charts and the race, filter panel, exporting
+    js/games/             shared scrobble index, records, and the three games
+    js/main.js            entry point: loads a user's data and wires the flows that span modules
+
+Because it uses ES modules, opening `index.html` straight off disk will not
+work. Serve the folder over HTTP instead (`python3 -m http.server`).
+
 Unreleased:
 
 - Failed loads now say what went wrong. A misspelled username, an empty account or an unreachable API used to drop you on an empty page with the reason only in the browser console; you now get a message on the welcome screen and the form back to try again.
@@ -11,6 +29,8 @@ Unreleased:
 - Your light/dark choice is remembered between visits, and the page starts in your system theme instead of always starting light.
 - Escape closes the export dialogs.
 - Usernames with characters that need URL encoding are handled correctly.
+- Split the single 8,400-line script.js into modules under `js/`. No behaviour
+  change; the page now loads `js/main.js` as an ES module.
 
 Version 2.1 changelog:
 
