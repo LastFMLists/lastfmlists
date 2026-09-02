@@ -22,6 +22,7 @@ import {
     ordCheck,
     ordNextRound,
     ordOpenGame,
+    ordRestartCurrent,
     ordShowSetup,
     ordStart
 } from './ordering.js';
@@ -98,6 +99,12 @@ export function initGames() {
 
     const ordChangeType = document.getElementById("ord-change-type");
     if (ordChangeType) ordChangeType.addEventListener("click", () => ordShowSetup(false));
+
+    const ordAgain = document.getElementById("ord-again");
+    if (ordAgain) ordAgain.addEventListener("click", ordRestartCurrent);
+
+    const ordOverChangeType = document.getElementById("ord-over-change-type");
+    if (ordOverChangeType) ordOverChangeType.addEventListener("click", () => ordShowSetup(false));
 
     initOrderingControls();
 }

@@ -164,7 +164,36 @@ if (loadAllDetailsButton) {
 // user sees lists forming instead of a frozen "loading" message. This is a raw
 // scrobble-count tally only; the full filter/sort pipeline runs once loading
 // finishes and replaces this.
-export function renderLoadingPreview({ artistTally, trackTally, scrobbles, pagesLoaded, totalPages }) {
+// Tally a set of scrobbles by artist and by track, in the shape the preview
+// renderer expects.
+function tallyScrobbles(tracks) {
+    const artistTally = new Map();
+    const trackTally = new Map();
+    for (const t of tracks) {
+        if (!t || !t.Artist) continue;
+        artistTally.set(t.Artist, (artistTally.get(t.Artist) || 0) + 1);
+        const trackKey = `${t.Track}||||${t.Artist}`;
+        trackTally.set(trackKey, (trackTally.get(trackKey) || 0) + 1);
+    }
+    return { artistTally, trackTally };
+}
+
+// Returning users already have their whole history on disk, so show them their
+// lists straight away instead of an empty page while the sync runs. The real,
+// filtered lists replace this once the new scrobbles are merged in.
+export function renderSavedDataPreview(savedTracks) {
+    if (!Array.isArray(savedTracks) || savedTracks.length === 0) return;
+    const { artistTally, trackTally } = tallyScrobbles(savedTracks);
+    renderLoadingPreview({
+        artistTally,
+        trackTally,
+        headingText: label => `Your top ${label} · ${savedTracks.length.toLocaleString()} saved scrobbles`,
+        noteText: "From your saved data, ranked by scrobble count. Checking Last.fm for new scrobbles; your filters apply once that finishes.",
+        countLabel: "Scrobbles"
+    });
+}
+
+export function renderLoadingPreview({ artistTally, trackTally, headingText, noteText, countLabel }) {
     const results = document.getElementById("results");
     if (!results) return;
 
@@ -174,10 +203,7 @@ export function renderLoadingPreview({ artistTally, trackTally, scrobbles, pages
 
     const useArtists = entityType === "artist";
     const heading = document.querySelector("#results-section h2");
-    if (heading) {
-        const label = useArtists ? "artists" : "tracks";
-        heading.textContent = `Building your top ${label}… ${scrobbles.toLocaleString()} scrobbles (page ${pagesLoaded}/${totalPages})`;
-    }
+    if (heading) heading.textContent = headingText(useArtists ? "artists" : "tracks");
 
     let entries;
     if (useArtists) {
@@ -200,13 +226,13 @@ export function renderLoadingPreview({ artistTally, trackTally, scrobbles, pages
 
     const banner = document.createElement("div");
     banner.className = "loading-preview-banner";
-    banner.textContent = "Live preview, still loading. Ranked by scrobble count, and your filters apply once loading finishes.";
+    banner.textContent = noteText;
     fragment.appendChild(banner);
 
     top.forEach((entry, index) => {
         const row = document.createElement("div");
         row.classList.add(useArtists ? "artist" : "track");
-        row.innerHTML = `<strong>${index + 1}.</strong> ${entry.title}<br>Scrobbles so far: ${entry.count.toLocaleString()}`;
+        row.innerHTML = `<strong>${index + 1}.</strong> ${entry.title}<br>${countLabel}: ${entry.count.toLocaleString()}`;
         fragment.appendChild(row);
     });
 
@@ -282,7 +308,13 @@ export async function fetchListeningHistory(username, onPreview = null) {
         const now = Date.now();
         if (!force && now - lastPreviewAt < 400) return; // throttle DOM work
         lastPreviewAt = now;
-        onPreview({ artistTally, trackTally, scrobbles: lastfmData.length, pagesLoaded, totalPages });
+        onPreview({
+            artistTally,
+            trackTally,
+            headingText: label => `Building your top ${label}… ${lastfmData.length.toLocaleString()} scrobbles (page ${pagesLoaded}/${totalPages})`,
+            noteText: "Live preview, still loading. Ranked by scrobble count, and your filters apply once loading finishes.",
+            countLabel: "Scrobbles so far"
+        });
     };
 
     loadingDiv.innerHTML = `<p>Loading data... Page 1 of ${totalPages}</p>`;

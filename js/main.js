@@ -8,7 +8,8 @@ import {
     buildHistoryContextMaps,
     fetchListeningHistory,
     fetchRecentTracksSince,
-    renderLoadingPreview
+    renderLoadingPreview,
+    renderSavedDataPreview
 } from './data/history.js';
 import { getUserData, mergeData, saveUserData } from './data/storage.js';
 import { loadingDiv } from './dom.js';
@@ -74,6 +75,9 @@ document.getElementById("username-form").addEventListener("submit", async (event
                 if (ts > latestTimestamp) latestTimestamp = ts;
             });
     
+            // Show the saved lists while the sync runs, so the page isn't blank.
+            renderSavedDataPreview(savedAllTracks);
+
             // Fetch recent tracks - The function now handles its own progress messages
             let newTracks = await fetchRecentTracksSince(username, latestTimestamp);
 

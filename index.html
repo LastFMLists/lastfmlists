@@ -763,10 +763,19 @@
                     </div>
                     <ol id="ord-list" class="ord-list"></ol>
                     <p class="ord-hint">Drag the rows, or use the arrows, then check your order.</p>
-                    <div class="ftl-actions">
+                    <div class="ftl-actions" id="ord-actions">
                         <button type="button" id="ord-check" class="hl-primary">Check order</button>
                         <button type="button" id="ord-next" class="hl-secondary" hidden>Next round</button>
                         <button type="button" id="ord-change-type" class="hl-secondary">Change type</button>
+                    </div>
+
+                    <div id="ord-over" class="ord-over" hidden>
+                        <h3>Streak over</h3>
+                        <p class="hl-over-score">You reached <strong id="ord-final">0</strong>. Your best: <strong id="ord-best">0</strong>.</p>
+                        <div class="hl-over-actions">
+                            <button type="button" id="ord-again" class="hl-primary">Play again</button>
+                            <button type="button" id="ord-over-change-type" class="hl-secondary">Change type</button>
+                        </div>
                     </div>
                 </div>
             </div>

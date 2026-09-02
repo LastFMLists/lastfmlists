@@ -353,6 +353,8 @@ function ordRenderRound() {
     document.getElementById("ord-instruction").textContent = ordState.round.instruction;
     document.getElementById("ord-check").hidden = false;
     document.getElementById("ord-next").hidden = true;
+    document.getElementById("ord-actions").hidden = false;
+    document.getElementById("ord-over").hidden = true;
     ordUpdateScore();
 }
 
@@ -394,21 +396,35 @@ export function ordCheck() {
     });
 
     ordState.rounds += 1;
-    if (right === correct.length) {
+    const perfect = right === correct.length;
+    if (perfect) {
         ordState.streak += 1;
         if (ordState.streak > (gamesRecords.ordBest || 0)) {
             gamesRecords.ordBest = ordState.streak;
         }
-    } else {
-        ordState.streak = 0;
     }
     gamesRecords.ordPlayed = (gamesRecords.ordPlayed || 0) + 1;
     saveGamesRecords();
 
-    document.getElementById("ord-score").textContent =
-        `${right} of ${correct.length} in the right place · perfect streak ${ordState.streak} · best ${gamesRecords.ordBest || 0}`;
+    const best = gamesRecords.ordBest || 0;
     document.getElementById("ord-check").hidden = true;
-    document.getElementById("ord-next").hidden = false;
+
+    if (perfect) {
+        document.getElementById("ord-score").textContent =
+            `${right} of ${correct.length} in the right place · perfect streak ${ordState.streak} · best ${best}`;
+        document.getElementById("ord-next").hidden = false;
+        return;
+    }
+
+    // One row out of place ends the run. The board stays on screen with the
+    // "belongs at #n" badges so the answer is still readable.
+    document.getElementById("ord-score").textContent =
+        `${right} of ${correct.length} in the right place`;
+    document.getElementById("ord-final").textContent = ordState.streak;
+    document.getElementById("ord-best").textContent = best;
+    document.getElementById("ord-actions").hidden = true;
+    document.getElementById("ord-over").hidden = false;
+    ordState.streak = 0;
 }
 
 export function ordNextRound() {
@@ -427,11 +443,23 @@ export function ordStart(type) {
     ordConsecutiveCache = {};
     ordTrackStatsCache = {};
     ordDayStatsCache = {};
-    ordState = { type, round: null, checked: false, rounds: 0, streak: 0, criterionLastUsed: new Map() };
     if (ordBasePool(type, Infinity).length < ORD_TIERS[0].items) {
+        ordState = { type, round: null, checked: false, rounds: 0, streak: 0, criterionLastUsed: new Map() };
         ordShowSetup(true);
         return;
     }
+    beginRun(type);
+}
+
+// Play the same type again after a miss. The caches are derived from the play
+// history and are still valid, so only the run resets: the streak goes back to
+// zero and the difficulty ramp starts again at round one.
+export function ordRestartCurrent() {
+    if (ordState) beginRun(ordState.type);
+}
+
+function beginRun(type) {
+    ordState = { type, round: null, checked: false, rounds: 0, streak: 0, criterionLastUsed: new Map() };
     document.getElementById("ord-setup").hidden = true;
     document.getElementById("ord-play").hidden = false;
     ordNextRound();
