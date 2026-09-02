@@ -364,13 +364,16 @@ export async function fetchRecentTracksSince(username, latestTimestamp) {
         }
 
         if (page === 1 && data.recenttracks['@attr'] && data.recenttracks['@attr'].totalPages) {
+            // The page count for the WHOLE history: only an upper bound for the
+            // loop, since the walk stops at the first already-known scrobble.
             totalPages = parseInt(data.recenttracks['@attr'].totalPages, 10);
-            console.log(`Syncing started. Total pages to check: ${totalPages}`);
         }
 
-        // ADDED LOGS FOR SYNC
-        console.log(`Syncing: Processing page ${page}/${totalPages}...`);
-        loadingDiv.innerHTML = `<p>Fetching recent tracks... Page ${page} of ${totalPages}</p>`;
+        // Don't show that upper bound: a sync almost always reads one page, and
+        // announcing "page 1 of 1580" makes a quick check look like a full reload.
+        loadingDiv.innerHTML = page === 1
+            ? `<p>Checking for new scrobbles...</p>`
+            : `<p>Fetching new scrobbles... page ${page} (${newTracks.length.toLocaleString()} so far)</p>`;
 
         for (const track of data.recenttracks.track) {
             if (!track.date || !track.date.uts) continue;
@@ -393,6 +396,6 @@ export async function fetchRecentTracksSince(username, latestTimestamp) {
         page++;
     }
 
-    console.log(`Sync complete. Found ${newTracks.length} new tracks.`);
+    console.log(`Sync complete after ${page - 1} page(s). Found ${newTracks.length} new tracks.`);
     return newTracks;
 }

@@ -18,6 +18,22 @@ import { enableGamesTab, setAppLoadedState } from '../ui/shell.js';
 import { filterTracks } from './filters.js';
 import { buildHistoryContextMaps } from './history.js';
 
+// Rank-ordered stand-ins for the user.getTop* responses, rebuilt from the saved
+// dataset. Rankings are derived from the user's own scrobbles, so with no new
+// scrobbles they cannot have moved: re-fetching them would cost hundreds of API
+// pages to arrive at exactly these values.
+export function topListsFromSavedData() {
+    const byRank = (a, b) => (a.rank ?? Infinity) - (b.rank ?? Infinity);
+    return {
+        artists: [...state.artistsData].sort(byRank)
+            .map(a => ({ name: a.name, user_scrobbles: a.user_scrobbles })),
+        albums: [...state.albumsData].sort(byRank)
+            .map(a => ({ name: a.name, artist: a.artist, user_scrobbles: a.user_scrobbles })),
+        tracks: [...state.tracksData].sort(byRank)
+            .map(t => ({ name: t.name, artist: t.artist, user_scrobbles: t.user_scrobbles }))
+    };
+}
+
 // Helper function to merge new data into an existing array by matching a key
 export function mergeData(existingArray = [], newData, keyFn) {
     if (!Array.isArray(existingArray)) {
