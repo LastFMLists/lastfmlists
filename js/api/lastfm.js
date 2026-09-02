@@ -18,12 +18,20 @@ export function getLastfmErrorMessage(data) {
     return data.message ? `Last.fm returned an error: ${data.message}` : "Last.fm returned an error.";
 }
 
+// Which account the avatar on screen belongs to. The load flow marks the app as
+// loaded more than once, and without this each pass costs another user.getInfo.
+let avatarLoadedFor = null;
+
 export async function updateSessionAvatar(username) {
     const avatar = document.getElementById('session-avatar');
     const avatarFallback = document.getElementById('session-avatar-fallback');
     if (!avatar || !avatarFallback || !username) {
         return;
     }
+    if (avatarLoadedFor === username) {
+        return;
+    }
+    avatarLoadedFor = username;
 
     avatar.style.display = 'none';
     avatar.removeAttribute('src');
@@ -42,6 +50,8 @@ export async function updateSessionAvatar(username) {
             avatarFallback.style.display = 'none';
         }
     } catch (error) {
+        // Let a later load try again after a network blip.
+        avatarLoadedFor = null;
         console.warn('Could not load profile image:', error);
     }
 }
