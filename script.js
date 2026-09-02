@@ -82,6 +82,21 @@ let extendedDataLoaded = false;
 const LOAD_DETAILS_TOOLTIP = "Load extended data for your top artists, albums and tracks. That means Last.fm metadata like track length, genre/country tags, and global listeners/playcount. It unlocks the duration, tags and global-stats filters plus the “Time spent listening” and “Percentage of global scrobbles” sorts. Enough for most stats and much faster than “Load All Details”.";
 const LOAD_ALL_DETAILS_TOOLTIP = "Same extended metadata (track length, tags, global listeners/playcount) but for EVERY song you've ever scrobbled, not just your top ones. Unlocks the duration, tags and global-stats filters and the “Time spent listening” / “Percentage of global scrobbles” sorts for your whole library. This makes thousands of requests and can take a very long time.";
 
+// Dumping allTracks / artistsData to the console keeps every object alive in
+// devtools and stalls the tab on big libraries. Set localStorage
+// "lastfmlists-debug" to "1" to get the old dumps back.
+const DEBUG_DATA_LOGS = (() => {
+    try {
+        return localStorage.getItem("lastfmlists-debug") === "1";
+    } catch (e) {
+        return false;
+    }
+})();
+
+function debugLogDataset(label, value) {
+    if (DEBUG_DATA_LOGS) console.log(label, value);
+}
+
 const resultsDiv = document.getElementById("results");
 const loadingDiv = document.getElementById("loading-stats");
 const albumCoverCache = new Map();
@@ -124,6 +139,42 @@ function setAppLoadedState(username) {
     if (username) {
         updateSessionAvatar(username);
     }
+}
+
+// Undo setAppLoadedState so a failed load returns to the welcome screen
+// instead of stranding the user on an empty app shell.
+function clearAppLoadedState() {
+    document.body.classList.remove('app-loaded');
+    if (loadingDiv) loadingDiv.innerHTML = "";
+    const heading = document.querySelector("#results-section h2");
+    if (heading) heading.textContent = "Results";
+    if (resultsDiv) resultsDiv.innerHTML = "";
+}
+
+function showLoadError(message) {
+    const box = document.getElementById('load-error');
+    if (!box) return;
+    box.textContent = message;
+    box.hidden = false;
+}
+
+function clearLoadError() {
+    const box = document.getElementById('load-error');
+    if (!box) return;
+    box.textContent = "";
+    box.hidden = true;
+}
+
+// Last.fm answers errors with HTTP 200 and a JSON body like
+// { error: 6, message: "User not found" }, so a successful fetch says nothing
+// about whether the request worked. Returns the message, or null when fine.
+function getLastfmErrorMessage(data) {
+    if (!data || typeof data !== "object") return null;
+    if (data.error === undefined || data.error === null) return null;
+    const code = parseInt(data.error, 10);
+    if (code === 6) return "That Last.fm username doesn't exist. Check the spelling and try again.";
+    if (code === 8 || code === 16 || code === 29) return "Last.fm is busy or rate-limiting requests right now. Please try again in a minute.";
+    return data.message ? `Last.fm returned an error: ${data.message}` : "Last.fm returned an error.";
 }
 
 // Message shown when hovering a control that needs extended metadata.
@@ -801,6 +852,14 @@ async function mapWithConcurrency(items, mapper, concurrency = 4) {
     return results;
 }
 
+// Whole days since 1970-01-01 in the LOCAL calendar. Reading the calendar
+// fields instead of subtracting a fixed offset keeps this correct across DST
+// changes, where new Date().getTimezoneOffset() is wrong for historic dates.
+function getLocalDayIndex(timestamp) {
+    const date = new Date(timestamp);
+    return Math.floor(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / 86400000);
+}
+
 function getLocalDayKeyFromTimestamp(timestamp) {
     const date = new Date(timestamp);
     const year = date.getFullYear();
@@ -1054,10 +1113,13 @@ function getUserData(username) {
 document.getElementById("username-form").addEventListener("submit", async (event) => {
 	event.preventDefault();
 	const username = document.getElementById("username").value.trim();
+	const submitButton = document.getElementById("load-data");
 
-    if (username) {
-        setAppLoadedState(username);
-    }
+	clearLoadError();
+	if (!username) return;
+
+	if (submitButton) submitButton.disabled = true;
+	setAppLoadedState(username);
 
 	// Try to load saved data for the username from IndexedDB
 	let savedData = await getUserData(username).catch(err => {
@@ -1065,6 +1127,7 @@ document.getElementById("username-form").addEventListener("submit", async (event
 		return null;
 	});
 
+    try {
     if (savedData) {
         // Saved data exists – retrieve the saved tracks, artists, and albums.
         let { allTracks: savedAllTracks, artistsData: savedArtistsData, albumsData: savedAlbumsData, tracksData: savedTracksData } = savedData.data;
@@ -1098,6 +1161,16 @@ document.getElementById("username-form").addEventListener("submit", async (event
         // No saved data exists, fetch all history (with a live preview as pages arrive).
         allTracks = await fetchListeningHistory(username, renderLoadingPreview);
     }
+    } catch (loadError) {
+        // A bad username or an unreachable API used to leave the user staring at
+        // an empty app with the failure only in the console.
+        console.error("Load failed:", loadError);
+        clearAppLoadedState();
+        showLoadError(loadError && loadError.message ? loadError.message : "Something went wrong while loading your data.");
+        if (submitButton) submitButton.disabled = false;
+        return;
+    }
+    if (submitButton) submitButton.disabled = false;
     
     allTracks = allTracks.filter(track => {
         if (!track.Date) {
@@ -1233,9 +1306,9 @@ document.getElementById("username-form").addEventListener("submit", async (event
     tracksData = mergeData(tracksData, newTracksData, 
         item => `${item.name.trim().toLowerCase()}_${item.artist.trim().toLowerCase()}`);
     
-    console.log("Merged artistsData:", artistsData);
-	console.log("Merged albumsData:", albumsData);
-	console.log("Merged tracksData:", tracksData);
+    debugLogDataset("Merged artistsData:", artistsData);
+	debugLogDataset("Merged albumsData:", albumsData);
+	debugLogDataset("Merged tracksData:", tracksData);
 
     loadingDiv.innerHTML = "<p>Mapping artists...</p>";
 
@@ -1270,7 +1343,7 @@ document.getElementById("username-form").addEventListener("submit", async (event
         loadAllDetailsBtn.title = LOAD_ALL_DETAILS_TOOLTIP;
     }
 
-	console.log("Final allTracks:", allTracks);
+	debugLogDataset("Final allTracks:", allTracks);
 	loadingDiv.innerHTML = ""; // Clear loading message
 
     setAppLoadedState(username);
@@ -1365,9 +1438,9 @@ async function loadDetailedMetadata(loadAll = false) {
     tracksData = mergeData(tracksData, newTracksData, 
         item => `${item.name.trim().toLowerCase()}_${item.artist.trim().toLowerCase()}`);
 
-	console.log("Merged artistsData:", artistsData);
-	console.log("Merged albumsData:", albumsData);
-	console.log("Merged tracksData:", tracksData);
+	debugLogDataset("Merged artistsData:", artistsData);
+	debugLogDataset("Merged albumsData:", albumsData);
+	debugLogDataset("Merged tracksData:", tracksData);
 
 	// Detailed metadata is now available: unlock the gated filters/sorts.
 	extendedDataLoaded = true;
@@ -1481,6 +1554,12 @@ if (confirmGridExportButton) {
         closeModal(gridExportModal);
     });
 }
+
+// Escape closes whichever modal is open, matching the click-outside behaviour.
+document.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") return;
+    document.querySelectorAll(".modal-overlay.is-open").forEach(closeModal);
+});
   
 // Map a raw Last.fm recenttracks entry to our internal shape.
 function mapRecentTrack(track) {
@@ -1552,7 +1631,7 @@ async function fetchListeningHistory(username, onPreview = null) {
     rateLimitBackoffUntil = 0;
 
     const buildUrl = (limit, page) =>
-        `https://ws.audioscrobbler.com/2.0/?method=user.getrecenttracks&user=${username}&api_key=${API_KEY}&format=json&extended=1&limit=${limit}&autocorrect=0&page=${page}`;
+        `https://ws.audioscrobbler.com/2.0/?method=user.getrecenttracks&user=${encodeURIComponent(username)}&api_key=${API_KEY}&format=json&extended=1&limit=${limit}&autocorrect=0&page=${page}`;
 
     // Try a large page size first; if the API rejects it (empty/invalid page 1),
     // transparently fall back to the known-good size. Either way the real page
@@ -1567,9 +1646,15 @@ async function fetchListeningHistory(username, onPreview = null) {
         firstData = await fetchJsonWithRetry(buildUrl(pageSize, 1));
     }
 
+    const apiError = getLastfmErrorMessage(firstData);
+    if (apiError) throw new Error(apiError);
+
     if (!firstData || !firstData.recenttracks || !Array.isArray(firstData.recenttracks.track)) {
-        console.error("Error: Could not connect to Last.fm.");
-        return [];
+        throw new Error("Couldn't reach Last.fm. Check your connection and try again.");
+    }
+
+    if (firstData.recenttracks.track.length === 0) {
+        throw new Error("That account has no scrobbles yet, so there's nothing to build a list from.");
     }
 
     const attr = firstData.recenttracks["@attr"] || {};
@@ -1638,7 +1723,7 @@ async function fetchListeningHistory(username, onPreview = null) {
 }
 
 async function fetchRecentTracksSince(username, latestTimestamp) {
-    const baseUrl = `https://ws.audioscrobbler.com/2.0/?method=user.getrecenttracks&user=${username}&api_key=${API_KEY}&format=json&extended=1&limit=200&autocorrect=0`;
+    const baseUrl = `https://ws.audioscrobbler.com/2.0/?method=user.getrecenttracks&user=${encodeURIComponent(username)}&api_key=${API_KEY}&format=json&extended=1&limit=200&autocorrect=0`;
     let newTracks = [];
     let page = 1;
     let totalPages = 1;
@@ -1647,7 +1732,13 @@ async function fetchRecentTracksSince(username, latestTimestamp) {
     while (keepFetching && page <= totalPages) {
         const data = await fetchJsonWithRetry(`${baseUrl}&page=${page}`);
 
+        const syncError = getLastfmErrorMessage(data);
+        if (syncError && page === 1) throw new Error(syncError);
+
         if (!data || !data.recenttracks || !Array.isArray(data.recenttracks.track)) {
+            if (page === 1) {
+                throw new Error("Couldn't reach Last.fm to sync new scrobbles. Check your connection and try again.");
+            }
             console.error(`Sync Error: No tracks found on page ${page}.`);
             break;
         }
@@ -1784,7 +1875,7 @@ async function fetchJsonWithRetry(url, maxRetries = 3, delayMs = 1000) {
 
 // Fetch the user's top artists from Last.fm
 async function fetchTopArtists(username) {
-    const baseUrl = `https://ws.audioscrobbler.com/2.0/?method=user.gettopartists&user=${username}&api_key=${API_KEY}&format=json&limit=200&autocorrect=0`;
+    const baseUrl = `https://ws.audioscrobbler.com/2.0/?method=user.gettopartists&user=${encodeURIComponent(username)}&api_key=${API_KEY}&format=json&limit=200&autocorrect=0`;
     
     try {
       // Fetch the first page
@@ -2204,7 +2295,7 @@ if (csvFileInput) csvFileInput.addEventListener('change', async (event) => {
         ]);
 
         // ✅ Ensure first scrobbles are properly retrieved
-        console.log("First Scrobbles Data:", firstScrobbles);
+        debugLogDataset("First Scrobbles Data:", firstScrobbles);
 
         // ✅ Update data arrays with correct first scrobbles
         artistsData = topArtists.map((artist, index) => {
@@ -2286,10 +2377,10 @@ if (csvFileInput) csvFileInput.addEventListener('change', async (event) => {
         setAppLoadedState(username);
         enableGamesTab();
 
-        console.log("Final allTracks:", allTracks);
-        console.log("Updated artistsData:", artistsData);
-        console.log("Updated albumsData:", albumsData);
-        console.log("Updated tracksData:", tracksData);
+        debugLogDataset("Final allTracks:", allTracks);
+        debugLogDataset("Updated artistsData:", artistsData);
+        debugLogDataset("Updated albumsData:", albumsData);
+        debugLogDataset("Updated tracksData:", tracksData);
 
         loadingDiv.innerHTML = ""; // Clear loading message
 
@@ -2524,7 +2615,6 @@ function calculateConsecutiveScrobbles(tracks, entityType = 'track') {
 
 function calculateConsecutivePeriods(tracks, period, entityType = 'track') {
 	const sortedTracks = [...tracks].sort((a, b) => parseInt(a.Date, 10) - parseInt(b.Date, 10));
-    const timezoneOffsetMs = new Date().getTimezoneOffset() * 60000;
 
 	const groupKeyFunc = (track) => {
 		if (entityType === 'track') return `${track.Artist} - ${track.Track}`;
@@ -2536,14 +2626,13 @@ function calculateConsecutivePeriods(tracks, period, entityType = 'track') {
     const getPeriodKey = (timestamp) => {
         const date = new Date(timestamp);
         switch (period) {
-            case 'day':
-                return Math.floor((timestamp - timezoneOffsetMs) / 86400000);
             case 'week':
                 return getWeekIdentifier(date);
             case 'month':
                 return date.getFullYear() * 12 + date.getMonth();
+            case 'day':
             default:
-                return Math.floor((timestamp - timezoneOffsetMs) / 86400000);
+                return getLocalDayIndex(timestamp);
         }
     };
 
@@ -2622,37 +2711,13 @@ function calculateConsecutivePeriods(tracks, period, entityType = 'track') {
 	return Object.values(results);
 }
 
-// Helper function to find a matching track's timestamp
-function getMatchingTrackTime(groupTracks, periodKey, period) {
-    const timezoneOffset = new Date().getTimezoneOffset(); // Minutes
-    const timezoneOffsetMs = timezoneOffset * 60000; 
-	const matchingTrack = groupTracks.find((t) => {
-		const ts = parseInt(t.Date);
-		const d = new Date(ts);
-		let pKey;
-		switch (period) {
-			case 'day':
-				pKey = Math.floor((ts - timezoneOffsetMs) / 86400000);
-				break;
-			case 'week':
-				pKey = getWeekIdentifier(d);
-				break;
-			case 'month':
-				pKey = d.getFullYear() * 12 + d.getMonth();
-				break;
-		}
-		return pKey === periodKey;
-	});
-	return matchingTrack ? matchingTrack.Date : null;
-}
-
-// Convert a date to a unique week identifier
+// A strictly increasing week number: whole weeks since the Monday of the epoch
+// week. The old "year * 52 + weekOfYear" scheme collided at year boundaries (a
+// year can contain 53 weeks), which merged two real weeks into one and
+// under-counted consecutive-week streaks. 1970-01-01 was a Thursday, so the
+// "+ 3" puts week boundaries on Monday.
 function getWeekIdentifier(date) {
-    const timezoneOffset = new Date().getTimezoneOffset(); // Minutes
-    const timezoneOffsetMs = timezoneOffset * 60000; 
-    const firstJan = new Date(date.getFullYear(), 0, 1);
-    const daysOffset = Math.floor((date - timezoneOffsetMs - firstJan) / 86400000);
-    return date.getFullYear() * 52 + Math.ceil((daysOffset + firstJan.getDay()) / 7);
+    return Math.floor((getLocalDayIndex(date.getTime()) + 3) / 7);
 }
 
 // Check if two periods are consecutive
@@ -3281,7 +3346,7 @@ function getAdditionalInfo(sortingBasis, entity) {
             if (hiddenByDefaultEquationDetailFields.has(sortStep.field) && !shownFieldSet.has(sortStep.field)) {
                 return;
             }
-            const line = `${formatEquationFieldLabel(sortStep.field)}: ${sortStep.value}`;
+            const line = `${escapeHTML(formatEquationFieldLabel(sortStep.field))}: ${escapeHTML(sortStep.value)}`;
             if (!seenLines.has(line)) {
                 seenLines.add(line);
                 lines.push(line);
@@ -3291,7 +3356,7 @@ function getAdditionalInfo(sortingBasis, entity) {
         showFields.forEach(fieldName => {
             const fieldValue = getEquationFieldValue(entity, fieldName);
             if (fieldValue === null || fieldValue === undefined) return;
-            const line = `${formatEquationFieldLabel(fieldName)}: ${fieldValue}`;
+            const line = `${escapeHTML(formatEquationFieldLabel(fieldName))}: ${escapeHTML(fieldValue)}`;
             if (!seenLines.has(line)) {
                 seenLines.add(line);
                 lines.push(line);
@@ -3303,7 +3368,7 @@ function getAdditionalInfo(sortingBasis, entity) {
                 !hiddenByDefaultEquationDetailFields.has(entity.equationPipelineUniqueField)
                 || shownFieldSet.has(entity.equationPipelineUniqueField)
             ) {
-                const uniqueLine = `${formatEquationFieldLabel(entity.equationPipelineUniqueField)}: ${entity.equationPipelineUniqueValue ?? 'N/A'}`;
+                const uniqueLine = `${escapeHTML(formatEquationFieldLabel(entity.equationPipelineUniqueField))}: ${escapeHTML(entity.equationPipelineUniqueValue ?? 'N/A')}`;
                 if (!seenLines.has(uniqueLine)) {
                     seenLines.add(uniqueLine);
                     lines.push(uniqueLine);
@@ -3321,11 +3386,11 @@ function getAdditionalInfo(sortingBasis, entity) {
 	} else if (sortingBasis === 'separate-months') {
 		return `Different months: ${entity.count}`;
     } else if (sortingBasis === 'max-single-day') {
-        return `Max scrobbles in a day: ${entity.count}<br>Day: ${entity.periodLabel}`;
+        return `Max scrobbles in a day: ${entity.count}<br>Day: ${escapeHTML(entity.periodLabel)}`;
     } else if (sortingBasis === 'max-single-week') {
-        return `Max scrobbles in a week: ${entity.count}<br>Week: ${entity.periodLabel}`;
+        return `Max scrobbles in a week: ${entity.count}<br>Week: ${escapeHTML(entity.periodLabel)}`;
     } else if (sortingBasis === 'max-single-month') {
-        return `Max scrobbles in a month: ${entity.count}<br>Month: ${entity.periodLabel}`;
+        return `Max scrobbles in a month: ${entity.count}<br>Month: ${escapeHTML(entity.periodLabel)}`;
     } else if (isRollingWindowSortingBasis(sortingBasis)) {
         const start = entity.windowStart ? new Date(entity.windowStart).toLocaleString() : 'N/A';
         const end = entity.windowEnd ? new Date(entity.windowEnd).toLocaleString() : 'N/A';
@@ -3339,7 +3404,7 @@ function getAdditionalInfo(sortingBasis, entity) {
         return `Listening %: ${entity.listeningPercentage.toFixed(2)}%<br>Scrobbles: ${entity.scrobbles}<br>Playcount: ${entity.playcount}`;
     } else if (sortingBasis === 'time-spent-listening') {
         return `Listening time: ${formatDuration(entity.listeningDuration)}`;
-    } else if (sortingBasis === 'first-n-scrobbles') {;
+    } else if (sortingBasis === 'first-n-scrobbles') {
         const firstScrobbleDate = entity.dates?.[0] ? new Date(parseInt(entity.dates[0], 10)).toISOString().split('T')[0] : 'N/A';
 		const reachedDate = entity.dateReached ? new Date(parseInt(entity.dateReached, 10)).toISOString().split('T')[0] : 'N/A';
         return `First scrobble: ${firstScrobbleDate}<br>Date reached: ${reachedDate}`
@@ -3357,10 +3422,13 @@ function getAdditionalInfo(sortingBasis, entity) {
 	}
 }
 
+// Week of the year (1-53). Counted in whole local days: the previous version
+// divided a millisecond difference, so the same calendar day could land in two
+// different weeks depending on the time of day.
 function getWeekNumber(date) {
     const firstDayOfYear = new Date(date.getFullYear(), 0, 1);
-    const pastDaysOfYear = (date - firstDayOfYear) / 86400000;
-    return Math.ceil((pastDaysOfYear + firstDayOfYear.getDay() + 1) / 7);
+    const pastDaysOfYear = getLocalDayIndex(date.getTime()) - getLocalDayIndex(firstDayOfYear.getTime());
+    return Math.floor((pastDaysOfYear + firstDayOfYear.getDay()) / 7) + 1;
 }
 
 function normalizeText(str) {
@@ -5016,9 +5084,11 @@ function getListLengthLimit() {
     return Math.max(1, parseInt(document.getElementById("list-length")?.value, 10) || 10);
 }
 
+const HTML_ESCAPES = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
+
 function escapeHTML(str) {
-    if (typeof str !== "string") return str;
-    return str.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    if (str === null || str === undefined) return "";
+    return String(str).replace(/[&<>"']/g, ch => HTML_ESCAPES[ch]);
 }
 
 function getEntityLabel(entity, entityType) {
@@ -5923,18 +5993,21 @@ function displayScrobbles(scrobbles, targetDiv = null, order = "asc") {
         return order === "desc" ? bDate - aDate : aDate - bDate;
     });
 
-    // Object to track how many scrobbles per artist have been added
+    // Apply the per-artist cap BEFORE trimming to the list length, otherwise a
+    // capped artist eats slots and the list comes back shorter than requested.
     const artistCounts = {};
-
-    tracks.slice(0, listLength).forEach((track) => {
+    const visible = [];
+    for (const track of tracks) {
+        if (visible.length >= listLength) break;
         const artist = track.Artist;
         if (!artistCounts[artist]) artistCounts[artist] = 0;
+        if (artistCounts[artist] >= maxPerArtist) continue;
+        artistCounts[artist]++;
+        visible.push(track);
+    }
 
-        // Skip this track if the artist has already reached the max limit
-        if (artistCounts[artist] >= maxPerArtist) return;
-
-        artistCounts[artist]++; // Count this track for the artist
-
+    visible.forEach((track) => {
+        const artist = track.Artist;
         const trackDiv = document.createElement("div");
         trackDiv.classList.add("track");
 
@@ -5947,8 +6020,8 @@ function displayScrobbles(scrobbles, targetDiv = null, order = "asc") {
             String(date.getMinutes()).padStart(2, "0");
 
         trackDiv.innerHTML = `
-            <strong>${track.Track}</strong> by ${artist}
-            <br>Album: ${track.Album || "Unknown"}
+            <strong>${escapeHTML(track.Track)}</strong> by ${escapeHTML(artist)}
+            <br>Album: ${escapeHTML(track.Album || "Unknown")}
             <br>Scrobbled on: ${formattedDate}
         `;
 

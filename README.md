@@ -1,6 +1,17 @@
 # lastfmlists
 A small project to create lists based on last.fm data
 
+Unreleased:
+
+- Failed loads now say what went wrong. A misspelled username, an empty account or an unreachable API used to drop you on an empty page with the reason only in the browser console; you now get a message on the welcome screen and the form back to try again.
+- Fixed the week grouping. "Different weeks" and the bar race could put one calendar day into two different weeks depending on what time you scrobbled, and "max consecutive weeks" merged the last week of a year with the first week of the next, which cut streaks short.
+- Fixed day grouping across daylight saving. Day-based streaks used the current UTC offset for every historic scrobble, so late-evening plays from the other half of the year landed on the wrong day.
+- The "show all scrobbles" list respects both settings at once. With a per-artist cap set, it returned fewer rows than the list length you asked for.
+- Track, artist and album names are escaped everywhere they are shown, so a name containing HTML renders as text instead of being interpreted by the browser.
+- Your light/dark choice is remembered between visits, and the page starts in your system theme instead of always starting light.
+- Escape closes the export dialogs.
+- Usernames with characters that need URL encoding are handled correctly.
+
 Version 2.1 changelog:
 
 - Faster first load: history pages are now fetched in parallel instead of one at a time. Big accounts (hundreds of thousands of scrobbles) load much quicker.

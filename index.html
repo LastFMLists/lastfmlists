@@ -6,6 +6,19 @@
 	<title>lastfmlists: advanced lists &amp; metrics for Last.fm</title>
 	<meta name="description" content="Generate advanced lists, charts, and statistics from your Last.fm scrobbles.">
 	<meta name="theme-color" content="#FFFCF8">
+	<script>
+		// Runs before the stylesheet paints, so a saved dark theme doesn't flash light.
+		(function () {
+			try {
+				var stored = localStorage.getItem('lastfmlists-theme');
+				var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+				var theme = stored || (prefersDark ? 'dark' : 'light');
+				document.documentElement.setAttribute('data-theme', theme);
+			} catch (e) {
+				document.documentElement.setAttribute('data-theme', 'light');
+			}
+		})();
+	</script>
 	<link rel="icon" type="image/png" href="logo.png" sizes="32x32">
 	<link rel="icon" type="image/png" href="logo.png" sizes="16x16">
 	<link rel="apple-touch-icon" href="logo.png" sizes="180x180">
@@ -31,6 +44,8 @@
                         <button type="submit" id="load-data">Load my data <i class="fas fa-arrow-right" aria-hidden="true"></i></button>
                     </div>
                 </form>
+
+                <p id="load-error" class="load-error" role="alert" hidden></p>
 
                 <div class="top-links">
                     <a href="https://github.com/LastFMLists/lastfmlists" target="_blank" rel="noopener" aria-label="GitHub" title="GitHub"><i class="fab fa-github"></i></a>
@@ -820,17 +835,31 @@
         <p>created by <a href="https://www.reddit.com/user/Alet404/" target="_blank" rel="noopener">u/Alet404</a></p>
     </footer>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/gif.js.optimized/dist/gif.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gif.js.optimized@1.0.1/dist/gif.js"></script>
     <script src="script.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 
     <script>
         const themeToggle = document.getElementById('theme-toggle');
+        const THEME_STORAGE_KEY = 'lastfmlists-theme';
+
+        const paintThemeToggle = (theme) => {
+            themeToggle.innerHTML = theme === 'dark' ? '<i class="fas fa-sun"></i>' : '<i class="fas fa-moon"></i>';
+            themeToggle.setAttribute('aria-label', theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme');
+        };
+
+        paintThemeToggle(document.documentElement.getAttribute('data-theme'));
+
         themeToggle.addEventListener('click', () => {
             const currentTheme = document.documentElement.getAttribute('data-theme');
             const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
             document.documentElement.setAttribute('data-theme', newTheme);
-            themeToggle.innerHTML = newTheme === 'dark' ? '<i class="fas fa-sun"></i>' : '<i class="fas fa-moon"></i>';
+            paintThemeToggle(newTheme);
+            try {
+                localStorage.setItem(THEME_STORAGE_KEY, newTheme);
+            } catch (e) {
+                // Private browsing with storage blocked: the toggle still works for this visit.
+            }
         });
     </script>
 </body>

@@ -278,6 +278,19 @@ body.app-loaded #input-section {
     transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
+.load-error {
+    margin: 0.9rem auto 0;
+    max-width: 34rem;
+    padding: 0.6rem 1rem;
+    border: 1px solid var(--accent-strong);
+    border-radius: var(--radius-md);
+    background-color: var(--accent-soft);
+    color: var(--primary-text-color);
+    font-size: 0.9rem;
+    line-height: 1.45;
+    text-align: center;
+}
+
 .input-shell:focus-within {
     border-color: var(--primary-accent-color);
     box-shadow: var(--ring);
@@ -323,11 +336,16 @@ body.app-loaded #input-section {
     transition: background-color 0.15s ease, transform 0.15s ease;
 }
 
-#load-data:hover {
+#load-data:hover:not(:disabled) {
     background-color: var(--accent-strong);
 }
 
-#load-data:active {
+#load-data:disabled {
+    opacity: 0.6;
+    cursor: progress;
+}
+
+#load-data:active:not(:disabled) {
     transform: scale(0.97);
 }
 
