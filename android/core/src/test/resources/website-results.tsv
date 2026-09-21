@@ -1,0 +1,360 @@
+artist	scrobbles	Alpha		54
+artist	scrobbles	Beta		53
+artist	scrobbles	Gamma		53
+artist	separate-days	Alpha		40
+artist	separate-days	Beta		40
+artist	separate-days	Gamma		40
+artist	separate-weeks	Alpha		8
+artist	separate-weeks	Beta		8
+artist	separate-weeks	Gamma		8
+artist	separate-months	Alpha		2
+artist	separate-months	Beta		2
+artist	separate-months	Gamma		2
+artist	consecutive-scrobbles	Alpha		1
+artist	consecutive-scrobbles	Beta		1
+artist	consecutive-scrobbles	Gamma		1
+artist	consecutive-days	Alpha		40
+artist	consecutive-days	Beta		40
+artist	consecutive-days	Gamma		40
+artist	consecutive-weeks	Alpha		7
+artist	consecutive-weeks	Beta		7
+artist	consecutive-weeks	Gamma		7
+artist	consecutive-months	Alpha		2
+artist	consecutive-months	Beta		2
+artist	consecutive-months	Gamma		2
+artist	first-n-scrobbles	Alpha		1734782400000
+artist	first-n-scrobbles	Beta		1734784200000
+artist	first-n-scrobbles	Gamma		1734786000000
+artist	fastest-n-scrobbles	Alpha		129600000
+artist	fastest-n-scrobbles	Beta		129600000
+artist	fastest-n-scrobbles	Gamma		129600000
+artist	oldest-average-listening-time	Beta		1736339400000
+artist	oldest-average-listening-time	Gamma		1736341200000
+artist	oldest-average-listening-time	Alpha		1736370000000
+artist	newest-average-listening-time	Alpha		1736370000000
+artist	newest-average-listening-time	Gamma		1736341200000
+artist	newest-average-listening-time	Beta		1736339400000
+artist	max-single-day	Alpha		2
+artist	max-single-day	Beta		2
+artist	max-single-day	Gamma		2
+artist	max-single-week	Alpha		10
+artist	max-single-week	Beta		10
+artist	max-single-week	Gamma		10
+artist	max-single-month	Alpha		38
+artist	max-single-month	Beta		37
+artist	max-single-month	Gamma		37
+artist	max-rolling-xh	Alpha		1
+artist	max-rolling-xh	Beta		1
+artist	max-rolling-xh	Gamma		1
+artist	max-rolling-24h	Alpha		2
+artist	max-rolling-24h	Beta		2
+artist	max-rolling-24h	Gamma		2
+artist	max-rolling-168h	Alpha		10
+artist	max-rolling-168h	Beta		10
+artist	max-rolling-168h	Gamma		10
+artist	time-spent-listening	Alpha		9720000
+artist	time-spent-listening	Beta		9540000
+artist	time-spent-listening	Gamma		9540000
+artist	highest-listening-percentage	Alpha		0.54
+artist	highest-listening-percentage	Beta		0.53
+artist	highest-listening-percentage	Gamma		0.53
+album	scrobbles	Alpha Album	Alpha	54
+album	scrobbles	Beta Album	Beta	53
+album	scrobbles	Gamma Album	Gamma	53
+album	separate-days	Alpha Album	Alpha	40
+album	separate-days	Beta Album	Beta	40
+album	separate-days	Gamma Album	Gamma	40
+album	separate-weeks	Alpha Album	Alpha	8
+album	separate-weeks	Beta Album	Beta	8
+album	separate-weeks	Gamma Album	Gamma	8
+album	separate-months	Alpha Album	Alpha	2
+album	separate-months	Beta Album	Beta	2
+album	separate-months	Gamma Album	Gamma	2
+album	consecutive-scrobbles	Alpha Album	Alpha	1
+album	consecutive-scrobbles	Beta Album	Beta	1
+album	consecutive-scrobbles	Gamma Album	Gamma	1
+album	consecutive-days	Alpha Album	Alpha	40
+album	consecutive-days	Beta Album	Beta	40
+album	consecutive-days	Gamma Album	Gamma	40
+album	consecutive-weeks	Alpha Album	Alpha	7
+album	consecutive-weeks	Beta Album	Beta	7
+album	consecutive-weeks	Gamma Album	Gamma	7
+album	consecutive-months	Alpha Album	Alpha	2
+album	consecutive-months	Beta Album	Beta	2
+album	consecutive-months	Gamma Album	Gamma	2
+album	first-n-scrobbles	Alpha Album	Alpha	1734782400000
+album	first-n-scrobbles	Beta Album	Beta	1734784200000
+album	first-n-scrobbles	Gamma Album	Gamma	1734786000000
+album	fastest-n-scrobbles	Alpha Album	Alpha	129600000
+album	fastest-n-scrobbles	Beta Album	Beta	129600000
+album	fastest-n-scrobbles	Gamma Album	Gamma	129600000
+album	oldest-average-listening-time	Beta Album	Beta	1736339400000
+album	oldest-average-listening-time	Gamma Album	Gamma	1736341200000
+album	oldest-average-listening-time	Alpha Album	Alpha	1736370000000
+album	newest-average-listening-time	Alpha Album	Alpha	1736370000000
+album	newest-average-listening-time	Gamma Album	Gamma	1736341200000
+album	newest-average-listening-time	Beta Album	Beta	1736339400000
+album	max-single-day	Alpha Album	Alpha	2
+album	max-single-day	Beta Album	Beta	2
+album	max-single-day	Gamma Album	Gamma	2
+album	max-single-week	Alpha Album	Alpha	10
+album	max-single-week	Beta Album	Beta	10
+album	max-single-week	Gamma Album	Gamma	10
+album	max-single-month	Alpha Album	Alpha	38
+album	max-single-month	Beta Album	Beta	37
+album	max-single-month	Gamma Album	Gamma	37
+album	max-rolling-xh	Alpha Album	Alpha	1
+album	max-rolling-xh	Beta Album	Beta	1
+album	max-rolling-xh	Gamma Album	Gamma	1
+album	max-rolling-24h	Alpha Album	Alpha	2
+album	max-rolling-24h	Beta Album	Beta	2
+album	max-rolling-24h	Gamma Album	Gamma	2
+album	max-rolling-168h	Alpha Album	Alpha	10
+album	max-rolling-168h	Beta Album	Beta	10
+album	max-rolling-168h	Gamma Album	Gamma	10
+album	time-spent-listening	Alpha Album	Alpha	9720000
+album	time-spent-listening	Beta Album	Beta	9540000
+album	time-spent-listening	Gamma Album	Gamma	9540000
+album	highest-listening-percentage	Alpha Album	Alpha	0.54
+album	highest-listening-percentage	Beta Album	Beta	0.53
+album	highest-listening-percentage	Gamma Album	Gamma	0.53
+track	scrobbles	One	Alpha	14
+track	scrobbles	Two	Beta	14
+track	scrobbles	Three	Gamma	14
+track	scrobbles	Four	Alpha	14
+track	scrobbles	One	Beta	13
+track	scrobbles	Two	Gamma	13
+track	scrobbles	Three	Alpha	13
+track	scrobbles	Four	Beta	13
+track	scrobbles	One	Gamma	13
+track	scrobbles	Two	Alpha	13
+track	scrobbles	Three	Beta	13
+track	scrobbles	Four	Gamma	13
+track	separate-days	One	Alpha	14
+track	separate-days	Two	Beta	14
+track	separate-days	Three	Gamma	14
+track	separate-days	Four	Alpha	14
+track	separate-days	One	Beta	13
+track	separate-days	Two	Gamma	13
+track	separate-days	Three	Alpha	13
+track	separate-days	Four	Beta	13
+track	separate-days	One	Gamma	13
+track	separate-days	Two	Alpha	13
+track	separate-days	Three	Beta	13
+track	separate-days	Four	Gamma	13
+track	separate-weeks	One	Alpha	8
+track	separate-weeks	Two	Beta	8
+track	separate-weeks	Three	Gamma	8
+track	separate-weeks	Four	Alpha	8
+track	separate-weeks	Three	Alpha	8
+track	separate-weeks	Four	Beta	8
+track	separate-weeks	One	Gamma	8
+track	separate-weeks	One	Beta	7
+track	separate-weeks	Two	Gamma	7
+track	separate-weeks	Two	Alpha	7
+track	separate-weeks	Three	Beta	7
+track	separate-weeks	Four	Gamma	7
+track	separate-months	One	Alpha	2
+track	separate-months	Two	Beta	2
+track	separate-months	Three	Gamma	2
+track	separate-months	Four	Alpha	2
+track	separate-months	One	Beta	2
+track	separate-months	Two	Gamma	2
+track	separate-months	Three	Alpha	2
+track	separate-months	Four	Beta	2
+track	separate-months	One	Gamma	2
+track	separate-months	Two	Alpha	2
+track	separate-months	Three	Beta	2
+track	separate-months	Four	Gamma	2
+track	consecutive-scrobbles	One	Alpha	1
+track	consecutive-scrobbles	Two	Beta	1
+track	consecutive-scrobbles	Three	Gamma	1
+track	consecutive-scrobbles	Four	Alpha	1
+track	consecutive-scrobbles	One	Beta	1
+track	consecutive-scrobbles	Two	Gamma	1
+track	consecutive-scrobbles	Three	Alpha	1
+track	consecutive-scrobbles	Four	Beta	1
+track	consecutive-scrobbles	One	Gamma	1
+track	consecutive-scrobbles	Two	Alpha	1
+track	consecutive-scrobbles	Three	Beta	1
+track	consecutive-scrobbles	Four	Gamma	1
+track	consecutive-days	One	Alpha	1
+track	consecutive-days	Two	Beta	1
+track	consecutive-days	Three	Gamma	1
+track	consecutive-days	Four	Alpha	1
+track	consecutive-days	One	Beta	1
+track	consecutive-days	Two	Gamma	1
+track	consecutive-days	Three	Alpha	1
+track	consecutive-days	Four	Beta	1
+track	consecutive-days	One	Gamma	1
+track	consecutive-days	Two	Alpha	1
+track	consecutive-days	Three	Beta	1
+track	consecutive-days	Four	Gamma	1
+track	consecutive-weeks	One	Alpha	7
+track	consecutive-weeks	Two	Beta	7
+track	consecutive-weeks	Three	Gamma	7
+track	consecutive-weeks	Four	Alpha	7
+track	consecutive-weeks	Two	Alpha	7
+track	consecutive-weeks	Three	Beta	7
+track	consecutive-weeks	Four	Gamma	7
+track	consecutive-weeks	One	Beta	6
+track	consecutive-weeks	Two	Gamma	6
+track	consecutive-weeks	Three	Alpha	6
+track	consecutive-weeks	Four	Beta	6
+track	consecutive-weeks	One	Gamma	6
+track	consecutive-months	One	Alpha	2
+track	consecutive-months	Two	Beta	2
+track	consecutive-months	Three	Gamma	2
+track	consecutive-months	Four	Alpha	2
+track	consecutive-months	One	Beta	2
+track	consecutive-months	Two	Gamma	2
+track	consecutive-months	Three	Alpha	2
+track	consecutive-months	Four	Beta	2
+track	consecutive-months	One	Gamma	2
+track	consecutive-months	Two	Alpha	2
+track	consecutive-months	Three	Beta	2
+track	consecutive-months	Four	Gamma	2
+track	first-n-scrobbles	One	Alpha	1735171200000
+track	first-n-scrobbles	Two	Beta	1735173000000
+track	first-n-scrobbles	Three	Gamma	1735174800000
+track	first-n-scrobbles	Four	Alpha	1735236000000
+track	first-n-scrobbles	One	Beta	1735237800000
+track	first-n-scrobbles	Two	Gamma	1735239600000
+track	first-n-scrobbles	Three	Alpha	1735300800000
+track	first-n-scrobbles	Four	Beta	1735302600000
+track	first-n-scrobbles	One	Gamma	1735304400000
+track	first-n-scrobbles	Two	Alpha	1735365600000
+track	first-n-scrobbles	Three	Beta	1735367400000
+track	first-n-scrobbles	Four	Gamma	1735369200000
+track	fastest-n-scrobbles	One	Alpha	518400000
+track	fastest-n-scrobbles	Two	Beta	518400000
+track	fastest-n-scrobbles	Three	Gamma	518400000
+track	fastest-n-scrobbles	Four	Alpha	518400000
+track	fastest-n-scrobbles	One	Beta	518400000
+track	fastest-n-scrobbles	Two	Gamma	518400000
+track	fastest-n-scrobbles	Three	Alpha	518400000
+track	fastest-n-scrobbles	Four	Beta	518400000
+track	fastest-n-scrobbles	One	Gamma	518400000
+track	fastest-n-scrobbles	Two	Alpha	518400000
+track	fastest-n-scrobbles	Three	Beta	518400000
+track	fastest-n-scrobbles	Four	Gamma	518400000
+track	oldest-average-listening-time	One	Beta	1736274600000
+track	oldest-average-listening-time	Two	Gamma	1736276400000
+track	oldest-average-listening-time	One	Alpha	1736337600000
+track	oldest-average-listening-time	Three	Alpha	1736337600000
+track	oldest-average-listening-time	Two	Beta	1736339400000
+track	oldest-average-listening-time	Four	Beta	1736339400000
+track	oldest-average-listening-time	Three	Gamma	1736341200000
+track	oldest-average-listening-time	One	Gamma	1736341200000
+track	oldest-average-listening-time	Four	Alpha	1736402400000
+track	oldest-average-listening-time	Two	Alpha	1736402400000
+track	oldest-average-listening-time	Three	Beta	1736404200000
+track	oldest-average-listening-time	Four	Gamma	1736406000000
+track	newest-average-listening-time	Four	Gamma	1736406000000
+track	newest-average-listening-time	Three	Beta	1736404200000
+track	newest-average-listening-time	Four	Alpha	1736402400000
+track	newest-average-listening-time	Two	Alpha	1736402400000
+track	newest-average-listening-time	Three	Gamma	1736341200000
+track	newest-average-listening-time	One	Gamma	1736341200000
+track	newest-average-listening-time	Two	Beta	1736339400000
+track	newest-average-listening-time	Four	Beta	1736339400000
+track	newest-average-listening-time	One	Alpha	1736337600000
+track	newest-average-listening-time	Three	Alpha	1736337600000
+track	newest-average-listening-time	Two	Gamma	1736276400000
+track	newest-average-listening-time	One	Beta	1736274600000
+track	max-single-day	One	Alpha	1
+track	max-single-day	Two	Beta	1
+track	max-single-day	Three	Gamma	1
+track	max-single-day	Four	Alpha	1
+track	max-single-day	One	Beta	1
+track	max-single-day	Two	Gamma	1
+track	max-single-day	Three	Alpha	1
+track	max-single-day	Four	Beta	1
+track	max-single-day	One	Gamma	1
+track	max-single-day	Two	Alpha	1
+track	max-single-day	Three	Beta	1
+track	max-single-day	Four	Gamma	1
+track	max-single-week	One	Alpha	3
+track	max-single-week	Two	Beta	3
+track	max-single-week	Three	Gamma	3
+track	max-single-week	Four	Alpha	3
+track	max-single-week	One	Beta	3
+track	max-single-week	Two	Gamma	3
+track	max-single-week	Three	Alpha	3
+track	max-single-week	Four	Beta	3
+track	max-single-week	One	Gamma	3
+track	max-single-week	Two	Alpha	3
+track	max-single-week	Three	Beta	3
+track	max-single-week	Four	Gamma	3
+track	max-single-month	One	Alpha	10
+track	max-single-month	Two	Beta	10
+track	max-single-month	Three	Gamma	10
+track	max-single-month	Four	Alpha	10
+track	max-single-month	One	Beta	9
+track	max-single-month	Two	Gamma	9
+track	max-single-month	Three	Alpha	9
+track	max-single-month	Four	Beta	9
+track	max-single-month	One	Gamma	9
+track	max-single-month	Two	Alpha	9
+track	max-single-month	Three	Beta	9
+track	max-single-month	Four	Gamma	9
+track	max-rolling-xh	One	Alpha	1
+track	max-rolling-xh	Two	Beta	1
+track	max-rolling-xh	Three	Gamma	1
+track	max-rolling-xh	Four	Alpha	1
+track	max-rolling-xh	One	Beta	1
+track	max-rolling-xh	Two	Gamma	1
+track	max-rolling-xh	Three	Alpha	1
+track	max-rolling-xh	Four	Beta	1
+track	max-rolling-xh	One	Gamma	1
+track	max-rolling-xh	Two	Alpha	1
+track	max-rolling-xh	Three	Beta	1
+track	max-rolling-xh	Four	Gamma	1
+track	max-rolling-24h	One	Alpha	1
+track	max-rolling-24h	Two	Beta	1
+track	max-rolling-24h	Three	Gamma	1
+track	max-rolling-24h	Four	Alpha	1
+track	max-rolling-24h	One	Beta	1
+track	max-rolling-24h	Two	Gamma	1
+track	max-rolling-24h	Three	Alpha	1
+track	max-rolling-24h	Four	Beta	1
+track	max-rolling-24h	One	Gamma	1
+track	max-rolling-24h	Two	Alpha	1
+track	max-rolling-24h	Three	Beta	1
+track	max-rolling-24h	Four	Gamma	1
+track	max-rolling-168h	One	Alpha	3
+track	max-rolling-168h	Two	Beta	3
+track	max-rolling-168h	Three	Gamma	3
+track	max-rolling-168h	Four	Alpha	3
+track	max-rolling-168h	One	Beta	3
+track	max-rolling-168h	Two	Gamma	3
+track	max-rolling-168h	Three	Alpha	3
+track	max-rolling-168h	Four	Beta	3
+track	max-rolling-168h	One	Gamma	3
+track	max-rolling-168h	Two	Alpha	3
+track	max-rolling-168h	Three	Beta	3
+track	max-rolling-168h	Four	Gamma	3
+track	time-spent-listening	One	Alpha	2520000
+track	time-spent-listening	Two	Beta	2520000
+track	time-spent-listening	Three	Gamma	2520000
+track	time-spent-listening	Four	Alpha	2520000
+track	time-spent-listening	One	Beta	2340000
+track	time-spent-listening	Two	Gamma	2340000
+track	time-spent-listening	Three	Alpha	2340000
+track	time-spent-listening	Four	Beta	2340000
+track	time-spent-listening	One	Gamma	2340000
+track	time-spent-listening	Two	Alpha	2340000
+track	time-spent-listening	Three	Beta	2340000
+track	time-spent-listening	Four	Gamma	2340000
+track	highest-listening-percentage	One	Alpha	0.13999999999999999
+track	highest-listening-percentage	Two	Beta	0.13999999999999999
+track	highest-listening-percentage	Three	Gamma	0.13999999999999999
+track	highest-listening-percentage	Four	Alpha	0.13999999999999999
+track	highest-listening-percentage	One	Beta	0.13
+track	highest-listening-percentage	Two	Gamma	0.13
+track	highest-listening-percentage	Three	Alpha	0.13
+track	highest-listening-percentage	Four	Beta	0.13
+track	highest-listening-percentage	One	Gamma	0.13
+track	highest-listening-percentage	Two	Alpha	0.13
+track	highest-listening-percentage	Three	Beta	0.13
+track	highest-listening-percentage	Four	Gamma	0.13

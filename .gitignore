@@ -1,0 +1,9 @@
+# Native Android tooling and generated artifacts
+.gradle/
+**/build/
+local.properties
+.idea/
+*.iml
+*.jks
+*.keystore
+work/
