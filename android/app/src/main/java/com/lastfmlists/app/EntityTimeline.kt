@@ -26,7 +26,8 @@ import java.time.LocalDate
 @Composable fun EntityTimeline(engine: Analytics,row: ResultRow,onOpen: (Query)->Unit) {
     var range by rememberSaveable(row.key) {mutableStateOf("all")}
     var resolution by rememberSaveable(row.key) {mutableStateOf("month")}
-    val first=engine.date(engine.history.first()).toLocalDate();val last=engine.date(engine.history.last()).toLocalDate()
+    val entityPlays=remember(engine,row.key,row.type) {engine.history.filter {it.key(row.type)==row.key}}
+    val first=engine.date(entityPlays.first()).toLocalDate();val last=engine.date(engine.history.last()).toLocalDate()
     var from by rememberSaveable(row.key) {mutableStateOf(first.toString())};var until by rememberSaveable(row.key) {mutableStateOf(last.toString())}
     val start=when(range) {"year"->last.minusYears(1).plusDays(1);"quarter"->last.minusMonths(3).plusDays(1);"custom"->runCatching {LocalDate.parse(from)}.getOrNull();else->first}
     val end=if(range=="custom") runCatching {LocalDate.parse(until)}.getOrNull() else last

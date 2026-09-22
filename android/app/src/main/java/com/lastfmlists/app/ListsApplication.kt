@@ -47,6 +47,7 @@ class SyncRepository(private val app: ListsApplication) {
         status.value=DownloadStatus(true,"Preparing metadata…",account=name)
         try {
             withContext(Dispatchers.IO) {
+                if(all) {app.store.startFullDetails(name);revision.value++}
                 val history=app.store.history(name); val saved=app.store.metadata(name)
                 val items=listOf(EntityType.ARTIST,EntityType.ALBUM,EntityType.TRACK).flatMap { type ->
                     val groups=history.groupBy { it.key(type) }.values.sortedByDescending { it.size }
@@ -57,9 +58,10 @@ class SyncRepository(private val app: ListsApplication) {
                 items.forEachIndexed { i,(type,s) ->
                     currentCoroutineContext().ensureActive()
                     try { app.store.saveMetadata(name,type,s.key(type),api.detail(type,s)) }
-                    catch(e: IllegalArgumentException) { unavailable++ }
+                    catch(e: LastFmUnavailable) { unavailable++ }
                     status.value=DownloadStatus(true,"Details ${i+1}/${items.size} · $unavailable unavailable",i+1,items.size,name)
                 }
+                if(all) app.store.finishFullDetails(name)
                 status.value=DownloadStatus(message="Details saved · $unavailable entries unavailable on Last.fm",account=name)
             }
         } catch(e: CancellationException) { status.value=DownloadStatus(message="Metadata paused; completed entries are saved.",account=name); throw e }

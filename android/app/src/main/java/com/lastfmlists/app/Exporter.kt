@@ -145,7 +145,6 @@ object Exporter {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
         Text("Export image",style=MaterialTheme.typography.headlineMedium)
         if(notice.isNotBlank()) Text(notice,color=MaterialTheme.colorScheme.primary)
-        Text("Android will show an image preview and sharing options. On Android 14 or newer, Save to Downloads is the first action.",color=MaterialTheme.colorScheme.onSurfaceVariant)
         SettingSwitch("Dark export","Choose the image palette.",dark) {dark=it}
         SettingSwitch("Include active filters","Add the list settings to PNG exports.",filters) {filters=it}
         Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {Button(onClick={runExport {Exporter.png(context,vm.displayName,sets,false,dark,filters)}},enabled=!busy,modifier=Modifier.weight(1f)) {Text("List PNG")};Button(onClick={runExport {Exporter.png(context,vm.displayName,sets,true,dark,filters)}},enabled=!busy,modifier=Modifier.weight(1f)) {Text("Chart PNG")}}

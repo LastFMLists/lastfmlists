@@ -70,7 +70,8 @@ class MainViewModel(application: Application): AndroidViewModel(application) {
                 val result=withContext(Dispatchers.IO) {
                     val accounts=app.store.accounts()
                     val history=if(name=="sample-library") demoHistory() else app.store.history(name)
-                    Triple(accounts,accounts.firstOrNull { it.name==name },Analytics(history,if(name=="sample-library") emptyMap() else app.store.metadata(name)))
+                    val selected=accounts.firstOrNull {it.name==name}
+                    Triple(accounts,selected,Analytics(history,if(selected?.detailsComplete==true) app.store.metadata(name) else emptyMap()))
                 }
                 if(username!=name) return@launch
                 accounts=result.first; account=result.second; analytics=result.third
@@ -158,7 +159,7 @@ class MainViewModel(application: Application): AndroidViewModel(application) {
     }
     fun record(game: String,score: Int): Int { val key="record.$username.$game"; val best=maxOf(score,app.prefs.getInt(key,0)); app.prefs.edit().putInt(key,best).apply(); return best }
     fun savedRecord(game: String)=app.prefs.getInt("record.$username.$game",0)
-    fun hasDetails()=analytics?.metadata?.isNotEmpty()==true
+    fun hasDetails()=account?.detailsComplete==true
     private fun readQuery(key: String): Query = runCatching {
         val j=JSONObject(app.prefs.getString("query.$key","{}") ?: "{}")
         val f=j.optJSONObject("filters") ?: JSONObject()
@@ -189,7 +190,8 @@ class GameSession {
     var categories by mutableStateOf(Games.categories.toSet())
     var types by mutableStateOf(setOf(EntityType.ARTIST,EntityType.ALBUM,EntityType.TRACK))
     var busy by mutableStateOf(false)
-    fun reset() { mode=""; streak=0; pair=emptyList(); puzzle=null; ordered=emptyList(); feedback=null; lost=false; found=emptySet(); answer=""; revealed=false; deadline=0 }
+    var celebration by mutableIntStateOf(0)
+    fun reset() { mode=""; streak=0; pair=emptyList(); puzzle=null; ordered=emptyList(); feedback=null; lost=false; found=emptySet(); answer=""; revealed=false; deadline=0;celebration=0 }
 }
 
 fun demoHistory(): List<Scrobble> {

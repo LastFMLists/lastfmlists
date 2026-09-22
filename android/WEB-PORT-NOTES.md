@@ -1,4 +1,24 @@
-# Android implementation handoff (0.2–0.4)
+# Android implementation handoff (0.2–0.5)
+
+## 0.5 additions (supersede conflicting behaviour below)
+
+### Reliable metadata completion
+
+Metadata-dependent filters, duration rankings, percentage rankings and metadata equations remain unavailable until a complete all-metadata batch succeeds. Partial rows can be saved for resume, but do not feed analysis. An HTTP 404 or Last.fm error 6 for one entity means that entity is unavailable and does not abort the batch; transport, authentication and other API failures still stop it. Any listening-history change invalidates metadata completion.
+
+### Entity pages
+
+Add Last 7, 30, 90 and 365 days rankings. Put the best nonempty placement directly below the library and within-artist ranks; put all four nonempty links in an expandable Recent activity section. Remove the artist-wide play total and the buttons for all of the artist’s tracks/albums.
+
+When an entity has several #1 months or weeks, show only the one with the most entity scrobbles and append “and in X more months/weeks.” The listening graph’s All time range begins with this entity’s first scrobble and ends with the latest downloaded account scrobble.
+
+### Lists, games and export
+
+The summary under a list reads “X tracks/albums/artists · Y scrobbles”; a scrobble list shows only its scrobble count. Label the comparison control “Comparison.” The active-filter strip consists only of clickable chips plus its expand/collapse control; do not repeat the same values in a separate settings-style text row.
+
+Successful game answers show a centered green animated confirmation with an exclamation mark. Fill the List gives the same feedback for each accepted answer and a distinct completion message for the final answer.
+
+The Export image screen starts directly with its actual settings and actions. Do not include implementation commentary about the Android Sharesheet in the public UI.
 
 ## 0.4 additions (supersede conflicting behaviour below)
 

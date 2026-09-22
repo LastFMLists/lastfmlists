@@ -10,6 +10,8 @@ import java.net.URI
 import java.net.URLEncoder
 import java.io.IOException
 
+class LastFmUnavailable(message: String): Exception(message)
+
 class LastFm(private val apiKey: String) {
     private val requests=Mutex()
     private var lastRequest=0L
@@ -22,10 +24,11 @@ class LastFm(private val apiKey: String) {
                 lastRequest=android.os.SystemClock.elapsedRealtime()
                 val query=(parameters.toList()+listOf("method" to method,"api_key" to apiKey,"format" to "json","autocorrect" to "0")).joinToString("&") { (k,v) -> "${URLEncoder.encode(k,"UTF-8")}=${URLEncoder.encode(v,"UTF-8")}" }
                 val connection=URI("https://ws.audioscrobbler.com/2.0/?$query").toURL().openConnection() as HttpURLConnection
-                connection.connectTimeout=15000; connection.readTimeout=20000; connection.setRequestProperty("User-Agent","lastfmlists-android/0.4")
+                connection.connectTimeout=15000; connection.readTimeout=20000; connection.setRequestProperty("User-Agent","lastfmlists-android/0.5")
                 try {
                     val code=connection.responseCode
                     if(code==429 || code>=500) throw IOException("Last.fm is busy. Your download has been saved and can resume.")
+                    if(code==404) throw LastFmUnavailable("Not found on Last.fm")
                     if(code !in 200..299) throw IllegalStateException("Last.fm returned HTTP $code")
                     val body=connection.inputStream.bufferedReader().use { it.readText() }
                     currentCoroutineContext().ensureActive()
@@ -33,6 +36,7 @@ class LastFm(private val apiKey: String) {
                     if(json.has("error")) {
                         val error=json.optInt("error")
                         if(error in listOf(11,16,29)) throw IOException("Last.fm is temporarily unavailable. Please try again.")
+                        if(error==6) throw LastFmUnavailable(json.optString("message","Not found on Last.fm"))
                         throw IllegalArgumentException(json.optString("message","Last.fm rejected the request"))
                     }
                     return@withLock json

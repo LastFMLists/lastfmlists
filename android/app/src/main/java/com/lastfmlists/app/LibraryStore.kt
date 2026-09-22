@@ -8,21 +8,23 @@ import com.lastfmlists.core.*
 import org.json.JSONArray
 import org.json.JSONObject
 
-data class Account(val name: String,val avatar: String="",val lastSync: Long=0,val from: Long=0,val until: Long=0,val nextPage: Int=1,val totalPages: Int=0) { val pending get()=until>0 }
+data class Account(val name: String,val avatar: String="",val lastSync: Long=0,val from: Long=0,val until: Long=0,val nextPage: Int=1,val totalPages: Int=0,val detailsComplete: Boolean=false) { val pending get()=until>0 }
 
 /** Pages and their checkpoints commit together. No timestamp-only deduplication: repeated plays are preserved. */
-class LibraryStore(context: Context,name: String="library.db"): SQLiteOpenHelper(context,name,null,1) {
+class LibraryStore(context: Context,name: String="library.db"): SQLiteOpenHelper(context,name,null,2) {
     init { setWriteAheadLoggingEnabled(true) }
     override fun onCreate(db: SQLiteDatabase) {
-        db.execSQL("CREATE TABLE accounts(name TEXT PRIMARY KEY,avatar TEXT NOT NULL DEFAULT '',last_sync INTEGER NOT NULL DEFAULT 0,start INTEGER NOT NULL DEFAULT 0,until INTEGER NOT NULL DEFAULT 0,next_page INTEGER NOT NULL DEFAULT 1,total_pages INTEGER NOT NULL DEFAULT 0)")
+        db.execSQL("CREATE TABLE accounts(name TEXT PRIMARY KEY,avatar TEXT NOT NULL DEFAULT '',last_sync INTEGER NOT NULL DEFAULT 0,start INTEGER NOT NULL DEFAULT 0,until INTEGER NOT NULL DEFAULT 0,next_page INTEGER NOT NULL DEFAULT 1,total_pages INTEGER NOT NULL DEFAULT 0,details_complete INTEGER NOT NULL DEFAULT 0)")
         db.execSQL("CREATE TABLE plays(id INTEGER PRIMARY KEY,account TEXT NOT NULL,artist TEXT NOT NULL,album TEXT NOT NULL,track TEXT NOT NULL,time INTEGER NOT NULL,image TEXT NOT NULL)")
         db.execSQL("CREATE INDEX plays_account_time ON plays(account,time)")
         db.execSQL("CREATE TABLE pages(account TEXT NOT NULL,page INTEGER NOT NULL,position INTEGER NOT NULL,artist TEXT NOT NULL,album TEXT NOT NULL,track TEXT NOT NULL,time INTEGER NOT NULL,image TEXT NOT NULL,PRIMARY KEY(account,page,position))")
         db.execSQL("CREATE TABLE metadata(account TEXT NOT NULL,kind TEXT NOT NULL,entity_key TEXT NOT NULL,json TEXT NOT NULL,PRIMARY KEY(account,kind,entity_key))")
     }
-    override fun onUpgrade(db: SQLiteDatabase,oldVersion: Int,newVersion: Int) { error("No destructive migrations allowed") }
+    override fun onUpgrade(db: SQLiteDatabase,oldVersion: Int,newVersion: Int) {
+        if(oldVersion<2) db.execSQL("ALTER TABLE accounts ADD COLUMN details_complete INTEGER NOT NULL DEFAULT 0")
+    }
     private inline fun transaction(block: (SQLiteDatabase)->Unit) { val db=writableDatabase; db.beginTransaction(); try { block(db); db.setTransactionSuccessful() } finally { db.endTransaction() } }
-    fun accounts(): List<Account> = readableDatabase.rawQuery("SELECT name,avatar,last_sync,start,until,next_page,total_pages FROM accounts ORDER BY name",null).use { c -> buildList { while(c.moveToNext()) add(Account(c.getString(0),c.getString(1),c.getLong(2),c.getLong(3),c.getLong(4),c.getInt(5),c.getInt(6))) } }
+    fun accounts(): List<Account> = readableDatabase.rawQuery("SELECT name,avatar,last_sync,start,until,next_page,total_pages,details_complete FROM accounts ORDER BY name",null).use { c -> buildList { while(c.moveToNext()) add(Account(c.getString(0),c.getString(1),c.getLong(2),c.getLong(3),c.getLong(4),c.getInt(5),c.getInt(6),c.getInt(7)!=0)) } }
     fun account(name: String)=accounts().firstOrNull { it.name==name.canonical() }
     fun ensure(name: String,avatar: String="") { writableDatabase.insertWithOnConflict("accounts",null,ContentValues().apply { put("name",name.canonical()); put("avatar",avatar) },SQLiteDatabase.CONFLICT_IGNORE); if(avatar.isNotBlank()) writableDatabase.execSQL("UPDATE accounts SET avatar=? WHERE name=?",arrayOf(avatar,name.canonical())) }
     fun begin(name: String): Account {
@@ -30,7 +32,7 @@ class LibraryStore(context: Context,name: String="library.db"): SQLiteOpenHelper
         val account=account(name)!!
         if(account.pending) return account
         val start=readableDatabase.rawQuery("SELECT MAX(time) FROM plays WHERE account=?",arrayOf(name)).use { c -> c.moveToFirst(); c.getLong(0)/1000 }
-        writableDatabase.execSQL("UPDATE accounts SET start=?,until=?,next_page=1,total_pages=0 WHERE name=?",arrayOf(start,System.currentTimeMillis()/1000,name))
+        writableDatabase.execSQL("UPDATE accounts SET start=?,until=?,next_page=1,total_pages=0,details_complete=0 WHERE name=?",arrayOf(start,System.currentTimeMillis()/1000,name))
         return account(name)!!
     }
     fun savePage(name: String,page: Int,records: List<Scrobble>,total: Int) = transaction { db ->
@@ -64,10 +66,12 @@ class LibraryStore(context: Context,name: String="library.db"): SQLiteOpenHelper
         val j=JSONObject().put("listeners",m.listeners ?: JSONObject.NULL).put("plays",m.globalPlays ?: JSONObject.NULL).put("duration",m.durationMs ?: JSONObject.NULL).put("tags",JSONArray(m.tags)).put("image",m.image)
         writableDatabase.insertWithOnConflict("metadata",null,ContentValues().apply { put("account",name); put("kind",type.name); put("entity_key",key); put("json",j.toString()) },SQLiteDatabase.CONFLICT_REPLACE)
     }
+    fun startFullDetails(name: String) { writableDatabase.execSQL("UPDATE accounts SET details_complete=0 WHERE name=?",arrayOf(name)) }
+    fun finishFullDetails(name: String) { writableDatabase.execSQL("UPDATE accounts SET details_complete=1 WHERE name=?",arrayOf(name)) }
     fun importHistory(name: String,records: List<Scrobble>) = transaction { db ->
         ensure(name)
         listOf("plays","pages","metadata").forEach { db.delete(it,"account=?",arrayOf(name)) }
-        db.execSQL("UPDATE accounts SET last_sync=0,start=0,until=0,next_page=1,total_pages=0 WHERE name=?",arrayOf(name))
+        db.execSQL("UPDATE accounts SET last_sync=0,start=0,until=0,next_page=1,total_pages=0,details_complete=0 WHERE name=?",arrayOf(name))
         val insert=db.compileStatement("INSERT INTO plays(account,artist,album,track,time,image) VALUES(?,?,?,?,?,?)")
         insert.use { stmt -> records.forEach { s -> stmt.clearBindings(); stmt.bindString(1,name); stmt.bindString(2,s.artist); stmt.bindString(3,s.album); stmt.bindString(4,s.track); stmt.bindLong(5,s.timestamp); stmt.bindString(6,s.image); stmt.executeInsert() } }
     }

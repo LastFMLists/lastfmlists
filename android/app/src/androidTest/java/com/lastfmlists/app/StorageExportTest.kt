@@ -47,6 +47,14 @@ class StorageExportTest {
         assertTrue(store.metadata("two").isEmpty())
         store.deleteAccount("one");assertEquals(1,store.history("two").size);assertTrue(store.metadata("one").isEmpty())
     }
+    @Test fun metadataDependentListsUnlockOnlyAfterAFullBatchFinishes() {
+        store.ensure("listener")
+        assertFalse(store.account("listener")!!.detailsComplete)
+        store.finishFullDetails("listener")
+        assertTrue(store.account("listener")!!.detailsComplete)
+        store.startFullDetails("listener")
+        assertFalse(store.account("listener")!!.detailsComplete)
+    }
     @Test fun nativePngRendererCreatesReadableNonEmptyImage() {
         val engine=Analytics(listOf(Scrobble("Artist","Album","Song",1700000000000)))
         val q=Query();val result=Exporter.render("listener",listOf(q to engine.analyze(q).rows),false,false,true)

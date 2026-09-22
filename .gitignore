@@ -1,5 +1,6 @@
 # Native Android tooling and generated artifacts
 .gradle/
+.kotlin/
 **/build/
 local.properties
 .idea/

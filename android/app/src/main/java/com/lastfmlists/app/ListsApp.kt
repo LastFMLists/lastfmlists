@@ -159,7 +159,7 @@ import kotlinx.coroutines.*
                 if(compact) IconButton(onClick=onHistory) {Icon(Icons.Rounded.History,"List history")}
                 if(compact) IconButton(onClick=onExport) {Icon(Icons.Rounded.IosShare,"Export and share")}
                 Box(Modifier.fillMaxWidth()) {
-                    IconToggleButton(checked=vm.comparison,onCheckedChange=vm::compare,modifier=Modifier.align(Alignment.CenterStart)) { Icon(Icons.Rounded.CompareArrows,if(vm.comparison) "Disable comparison" else "Compare two lists") }
+                    FilterChip(selected=vm.comparison,onClick={vm.compare(!vm.comparison)},modifier=Modifier.align(Alignment.CenterStart),label={Text("Comparison")},leadingIcon={Icon(Icons.Rounded.CompareArrows,if(vm.comparison) "Disable comparison" else "Compare two lists",Modifier.size(18.dp))})
                     Button(onClick={onFilter("left",null)},modifier=Modifier.align(Alignment.Center)) { Icon(Icons.Rounded.FilterAlt,"Edit filters"); Spacer(Modifier.width(6.dp));Text("Filters") }
                     TextButton(onClick={vm.updateQuery(Query(type=vm.left.type))},modifier=Modifier.align(Alignment.CenterEnd)) {Icon(Icons.Rounded.RestartAlt,"Reset filters");if(!compact) {Spacer(Modifier.width(4.dp));Text("Reset")}}
                 }
@@ -182,17 +182,21 @@ import kotlinx.coroutines.*
     key(query,result) { Column(modifier) {
         val sortLabel=Catalog.sorts.firstOrNull {it.first==query.sort}?.second?.replace("X",query.x.toString()) ?: query.sort
         val active=query.filters.filterValues {it.isNotBlank()}.map {(id,value)->Triple(id,Catalog.fields.firstOrNull {it.id==id}?.label ?: id,value)}
-        val summary=(listOf(sortLabel)+active.map {"${it.second}: ${it.third}"}+(if(query.equations.isNotBlank()) listOf("Equations") else emptyList())).joinToString(" · ")
-        Row(Modifier.fillMaxWidth().padding(horizontal=8.dp),verticalAlignment=Alignment.CenterVertically) {
-            TextButton(onClick={onFilter(null)},modifier=Modifier.weight(1f)) {Icon(Icons.Rounded.Tune,null,Modifier.size(16.dp));Spacer(Modifier.width(6.dp));Text((if(title.isBlank()) "" else "$title · ")+summary,maxLines=1,overflow=TextOverflow.Ellipsis)}
-            IconButton(onClick={expanded=!expanded}) {Icon(if(expanded) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,if(expanded) "Collapse active filters" else "Show all active filters")}
-        }
-        if(expanded) FlowRow(Modifier.padding(horizontal=12.dp),horizontalArrangement=Arrangement.spacedBy(6.dp)) {
+        if(!expanded) Row(Modifier.fillMaxWidth().padding(horizontal=8.dp),verticalAlignment=Alignment.CenterVertically) {
+            Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(6.dp)) {
+                AssistChip(onClick={onFilter("__display__")},label={Text("Rank by: $sortLabel")})
+                active.forEach {(id,label,value)->AssistChip(onClick={onFilter(id)},label={Text("$label: $value",maxLines=1,overflow=TextOverflow.Ellipsis)})}
+                if(query.equations.isNotBlank()) AssistChip(onClick={onFilter("__equations__")},label={Text("Equations")})
+            }
+            IconButton(onClick={expanded=true}) {Icon(Icons.Rounded.ExpandMore,"Show all active filters")}
+        } else FlowRow(Modifier.padding(horizontal=12.dp),horizontalArrangement=Arrangement.spacedBy(6.dp),verticalArrangement=Arrangement.spacedBy(2.dp)) {
             AssistChip(onClick={onFilter("__display__")},label={Text("Rank by: $sortLabel")})
             active.forEach {(id,label,value)->AssistChip(onClick={onFilter(id)},label={Text("$label: $value",maxLines=1,overflow=TextOverflow.Ellipsis)})}
             if(query.equations.isNotBlank()) AssistChip(onClick={onFilter("__equations__")},label={Text("Equations")})
+            IconButton(onClick={expanded=false}) {Icon(Icons.Rounded.ExpandLess,"Collapse active filters")}
         }
-        Text("${result.totalEntities} results · ${"%,d".format(result.matchingScrobbles)} matching plays",Modifier.padding(horizontal=20.dp,vertical=2.dp),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+        val resultSummary=if(query.type==EntityType.SCROBBLE) "${"%,d".format(result.matchingScrobbles)} scrobbles" else "${"%,d".format(result.totalEntities)} ${query.type.title.lowercase()} · ${"%,d".format(result.matchingScrobbles)} scrobbles"
+        Text(resultSummary,Modifier.padding(horizontal=20.dp,vertical=2.dp),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
         if(result.rows.isEmpty()) EmptyState("No matches yet","Try another filter, or download more of your listening history.")
         else if(display=="Chart") ChartRows(result.rows,query,onSelect,Modifier.weight(1f))
         else LazyColumn(Modifier.weight(1f).testTag("results-${title.ifBlank {"main"}}"),contentPadding=PaddingValues(horizontal=16.dp,vertical=10.dp),verticalArrangement=Arrangement.spacedBy(7.dp)) {
@@ -305,7 +309,7 @@ import kotlinx.coroutines.*
             if(status.message.isNotBlank()) Text(status.message,style=MaterialTheme.typography.bodySmall)
             Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) { Button(onClick=vm::sync,enabled=vm.canSync && !status.running) { Text(if(vm.account?.pending==true) "Resume download" else "Refresh") }; TextButton(onClick={switch=true},enabled=!status.running) { Text("Switch account") } }
         } } }
-        item { Text("Music metadata",style=MaterialTheme.typography.titleMedium); Text("Download tags, durations and global statistics. Missing Last.fm metadata stays unavailable.",style=MaterialTheme.typography.bodySmall) }
+        item { Text("Music metadata",style=MaterialTheme.typography.titleMedium); Text("Download tags, durations and global statistics. Metadata-based lists unlock only after All details finishes; partial progress stays saved for the next attempt.",style=MaterialTheme.typography.bodySmall) }
         item { Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) { OutlinedButton(onClick={vm.details(false)},enabled=!vm.isDemo && !status.running,modifier=Modifier.weight(1f)) { Text("Load details") }; OutlinedButton(onClick={allDetails=true},enabled=!vm.isDemo && !status.running,modifier=Modifier.weight(1f)) { Text("All details") } } }
         item { HorizontalDivider() }
         item { Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) { OutlinedButton(onClick={importer.launch(arrayOf("text/*","application/csv","application/octet-stream"))},enabled=!status.running,modifier=Modifier.weight(1f)) { Text("Import CSV") }; OutlinedButton(onClick={scope.launch { runCatching { Exporter.csv(context,vm.username,vm.analytics?.history ?: emptyList()) }.onFailure { snackbar.showSnackbar(it.message ?: "Export failed") } }},modifier=Modifier.weight(1f)) { Text("Export history") } } }

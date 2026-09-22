@@ -74,9 +74,11 @@ class OfflineJourneyTest {
         loadDemo();compose.onNodeWithText("Hidden Place").performClick()
         compose.waitUntil(30000) {compose.onAllNodesWithText("High placements").fetchSemanticsNodes().isNotEmpty()}
         compose.onNodeWithText("Show all lists").performScrollTo().performClick()
-        compose.onNodeWithTag("entity-page").performScrollToIndex(21)
-        compose.onNodeWithText("Other rankings · top 10").performClick()
-        compose.onAllNodesWithText("Names starting with H").onLast().performScrollTo().performClick()
+        compose.onNodeWithTag("entity-page").performScrollToIndex(22)
+        compose.onNodeWithText("Other rankings · top 10").performScrollTo().performClick()
+        compose.waitUntil(30000) {compose.onAllNodesWithText("Names starting with H").fetchSemanticsNodes().isNotEmpty()}
+        compose.onNodeWithTag("entity-page").performScrollToNode(hasText("Names starting with H"))
+        compose.onAllNodesWithText("Names starting with H").onLast().performClick()
         compose.onNodeWithText("Back to list").assertDoesNotExist()
         scenario.onActivity {activity ->
             val vm=androidx.lifecycle.ViewModelProvider(activity)[MainViewModel::class.java]
@@ -85,13 +87,13 @@ class OfflineJourneyTest {
     }
     @Test fun visualEquationExampleAppliesAndResetClearsIt() {
         loadDemo();compose.onNodeWithContentDescription("Edit filters").performClick()
-        compose.onNodeWithText("Equations").performScrollTo().performClick()
+        compose.onNode(hasTextExactly("Equations") and isSelectable()).performScrollTo().performClick()
         compose.onNodeWithText("How to use rules").performScrollTo().performClick()
         compose.onNodeWithText("Tracks with at least 10 plays").performScrollTo().performClick()
         compose.onNodeWithText("Apply filters").performClick()
         scenario.onActivity {activity ->assertTrue(androidx.lifecycle.ViewModelProvider(activity)[MainViewModel::class.java].left.equations.contains("track-scrobble-count"))}
         compose.onNodeWithContentDescription("Edit filters").performClick()
-        compose.onNodeWithText("Equations").performScrollTo().performClick()
+        compose.onNode(hasTextExactly("Equations") and isSelectable()).performScrollTo().performClick()
         compose.onAllNodesWithText("Reset").onLast().performClick()
         compose.onNodeWithText("Apply filters").performClick()
         scenario.onActivity {activity ->assertEquals("",androidx.lifecycle.ViewModelProvider(activity)[MainViewModel::class.java].left.equations)}

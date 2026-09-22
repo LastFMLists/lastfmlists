@@ -3,6 +3,7 @@ package com.lastfmlists.app
 
 import android.os.SystemClock
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.*
@@ -18,6 +19,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
@@ -30,6 +32,8 @@ import kotlinx.coroutines.*
 
 @Composable fun GamesScreen(vm: MainViewModel) {
     val g=vm.game; val scope=rememberCoroutineScope(); val haptic=LocalHapticFeedback.current
+    var celebrate by remember {mutableStateOf(false)}
+    LaunchedEffect(g.celebration) {if(g.celebration>0) {celebrate=true;delay(900);celebrate=false}}
     fun newRound(mode: String,reset: Boolean=false) {
         if(g.busy) return
         if(reset) {g.streak=0;g.best=vm.savedRecord("$mode.${g.type.name}")}
@@ -57,8 +61,9 @@ import kotlinx.coroutines.*
         val candidates=g.puzzle?.answers?.filter { it.key !in g.found && Games.matches(text,it.title,enter) } ?: return
         if(candidates.size==1 || (!enter && candidates.isNotEmpty())) {
             g.found=g.found+candidates.map {it.key}; g.answer="";haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            g.celebration++
             g.best=vm.record("Fill the List",g.found.size)
-            if(g.found.size==g.puzzle?.answers?.size) {g.revealed=true;g.feedback="All answers found."}
+            if(g.found.size==g.puzzle?.answers?.size) {g.revealed=true;g.feedback="All answers found!"}
         }
     }
     BackHandler(enabled=g.mode.isNotEmpty()) {g.mode=""}
@@ -78,7 +83,7 @@ import kotlinx.coroutines.*
         }
         return
     }
-    Column(Modifier.fillMaxSize()) {
+    Box(Modifier.fillMaxSize()) {Column(Modifier.fillMaxSize()) {
         if(g.mode.isNotEmpty()) Row(Modifier.padding(horizontal=12.dp),verticalAlignment=Alignment.CenterVertically) { IconButton(onClick={g.mode=""}) {Icon(Icons.AutoMirrored.Rounded.ArrowBack,"All games")};Text(g.mode,Modifier.weight(1f),style=MaterialTheme.typography.titleLarge);if(g.mode=="Fill the List") TextButton(onClick={g.mode="Fill the List options"}) {Text("Options")} }
         if(g.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
         if(g.mode.isEmpty()) LazyColumn(contentPadding=PaddingValues(20.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
@@ -89,7 +94,7 @@ import kotlinx.coroutines.*
             item { GameCard("Fill the List","Name the ten items that match the list.",Icons.Rounded.EditNote) {g.mode="Fill the List options"} }
         } else {
             if(g.mode!="Fill the List") Row(Modifier.fillMaxWidth().padding(horizontal=24.dp,vertical=8.dp),horizontalArrangement=Arrangement.SpaceBetween) {Text("STREAK  ${g.streak}",style=MaterialTheme.typography.labelLarge,color=MaterialTheme.colorScheme.primary);Text("BEST  ${g.best}",style=MaterialTheme.typography.labelLarge)}
-            g.feedback?.let { Text(it,Modifier.padding(horizontal=24.dp,vertical=8.dp),style=MaterialTheme.typography.titleMedium,color=MaterialTheme.colorScheme.primary) }
+            g.feedback?.takeUnless {it in listOf("Correct!","All answers found!") }?.let { Text(it,Modifier.padding(horizontal=24.dp,vertical=8.dp),style=MaterialTheme.typography.titleMedium,color=MaterialTheme.colorScheme.primary) }
             when(g.mode) {
                 "Higher or Lower" -> {
                     Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(20.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
@@ -98,7 +103,7 @@ import kotlinx.coroutines.*
                             if(g.feedback==null) {
                                 val correct=row.count==g.pair.maxOf {it.count}
                                 g.lost=!correct
-                                if(correct) {g.streak++;g.best=vm.record("Higher or Lower.${g.type.name}",g.streak);g.feedback="Correct."} else g.feedback="Streak over. You reached ${g.streak}."
+                                if(correct) {g.streak++;g.best=vm.record("Higher or Lower.${g.type.name}",g.streak);g.feedback="Correct!";g.celebration++} else g.feedback="Streak over. You reached ${g.streak}."
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             }
                         },enabled=g.feedback==null,colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceContainer),shape=RoundedCornerShape(24.dp)) {
@@ -116,7 +121,7 @@ import kotlinx.coroutines.*
                     Button(onClick={if(g.revealed) newRound(g.mode,g.lost) else {
                         val correct=g.ordered.map {it.key}==g.puzzle?.answers?.map {it.key}
                         g.revealed=true;g.lost=!correct
-                        if(correct) {g.streak++;g.best=vm.record("Put Them In Order.${g.type.name}",g.streak);g.feedback="Correct order."} else {g.feedback="Here’s the right order. Your streak: ${g.streak}.";g.ordered=g.puzzle?.answers ?: emptyList()}
+                        if(correct) {g.streak++;g.best=vm.record("Put Them In Order.${g.type.name}",g.streak);g.feedback="Correct!";g.celebration++} else {g.feedback="Here’s the right order. Your streak: ${g.streak}.";g.ordered=g.puzzle?.answers ?: emptyList()}
                     }},enabled=g.ordered.isNotEmpty(),modifier=Modifier.padding(20.dp).fillMaxWidth()) {Text(if(g.revealed) (if(g.lost) "Play again" else "Next round") else "Check order")}
                 }
                 else -> {
@@ -131,6 +136,14 @@ import kotlinx.coroutines.*
                         }
                     }
                     Row(Modifier.padding(20.dp),horizontalArrangement=Arrangement.spacedBy(12.dp)) {OutlinedButton(onClick={g.revealed=true;g.feedback="${g.found.size} of 10 found. Here’s the full list."},enabled=!g.revealed && g.puzzle!=null,modifier=Modifier.weight(1f)) {Text("Reveal")};Button(onClick={g.mode="Fill the List options"},modifier=Modifier.weight(1f)) {Text("New list")}}
+                }
+            }
+        }
+    }
+        AnimatedVisibility(visible=celebrate,modifier=Modifier.align(Alignment.Center),enter=fadeIn()+scaleIn(initialScale=0.7f),exit=fadeOut()+scaleOut(targetScale=1.15f)) {
+            Surface(shape=RoundedCornerShape(28.dp),color=Color(0xFF1B7F3A),shadowElevation=12.dp) {
+                Row(Modifier.padding(horizontal=28.dp,vertical=20.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+                    Icon(Icons.Rounded.CheckCircle,null,tint=Color.White,modifier=Modifier.size(38.dp));Text(if(g.feedback=="All answers found!") "All answers found!" else "Correct!",color=Color.White,style=MaterialTheme.typography.headlineSmall,fontWeight=androidx.compose.ui.text.font.FontWeight.Bold)
                 }
             }
         }

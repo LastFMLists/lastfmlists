@@ -10,8 +10,8 @@ android {
         applicationId = "com.lastfmlists.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 4
-        versionName = "0.4.0"
+        versionCode = 5
+        versionName = "0.5.0"
         buildConfigField("boolean", "EXTERNAL_TIPS_ENABLED", providers.gradleProperty("externalTipsEnabled").orElse("false").get())
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

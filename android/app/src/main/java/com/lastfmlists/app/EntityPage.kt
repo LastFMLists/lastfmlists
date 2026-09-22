@@ -30,6 +30,7 @@ import java.time.Instant
     var rankings by remember(input.key,engine) {mutableStateOf<Pair<List<RankedLink>,List<RankedLink>>?>(null)}
     var weekly by remember(input.key,engine) {mutableStateOf<List<RankedLink>>(emptyList())}
     var allMonths by remember(input.key,engine) {mutableStateOf<List<RankedLink>>(emptyList())}
+    var recent by remember(input.key,engine) {mutableStateOf<List<RankedLink>>(emptyList())}
     var error by remember {mutableStateOf<String?>(null)}
     var year by rememberSaveable(input.key) {mutableStateOf("")}
     var all by rememberSaveable(input.key) {mutableStateOf(false)}
@@ -43,16 +44,23 @@ import java.time.Instant
             if(year.isBlank()) year=info!!.years.last().label
             weekly=withContext(Dispatchers.Default) {pages.weeks(info!!.row)}
             allMonths=withContext(Dispatchers.Default) {info!!.years.flatMap {pages.months(info!!.row,it.label.toInt())}}
+            recent=withContext(Dispatchers.Default) {pages.recent(info!!.row)}
             rankings=withContext(Dispatchers.Default) {pages.rankings(info!!.row)}
         } catch(e: CancellationException) {throw e} catch(e: Exception) {error=e.message}
     }
     LaunchedEffect(year,info) {info?.let {i ->year.toIntOrNull()?.let {y ->months=withContext(Dispatchers.Default) {pages.months(i.row,y)}}}}
     LaunchedEffect(info,milestone) {info?.let {i ->milestoneLinks=withContext(Dispatchers.Default) {pages.milestones(i.row,milestone)}}}
     val highlights=remember(info,rankings,weekly,allMonths) {
+        fun summarizedFirst(links: List<RankedLink>,unit: String): RankedLink? {
+            val firsts=links.filter {it.rank==1}
+            val best=firsts.maxByOrNull {it.count} ?: return null
+            return best.copy(label=best.label+(if(firsts.size>1) " · and in ${firsts.size-1} more $unit" else ""))
+        }
         val candidates=buildList {
             addAll(info?.years.orEmpty().filter {it.rank?.let {rank->rank<=10}==true}.map {0 to it})
-            addAll(allMonths.filter {it.rank?.let {rank->rank<=10}==true}.map {1 to it})
-            addAll(weekly.filter {it.rank==1}.map {2 to it})
+            addAll(allMonths.filter {it.rank?.let {rank->rank in 2..10}==true}.map {1 to it})
+            summarizedFirst(allMonths,"months")?.let {add(1 to it)}
+            summarizedFirst(weekly,"weeks")?.let {add(2 to it)}
             addAll(rankings?.first.orEmpty().filter {it.rank?.let {rank->rank<=10}==true}.map {3 to it})
             addAll(rankings?.second.orEmpty().filter {it.query.sort !in listOf("first-n-scrobbles","fastest-n-scrobbles") && it.rank?.let {rank->rank<=10}==true}.map {4 to it})
         }
@@ -66,6 +74,7 @@ import java.time.Instant
         info?.let {i ->
             item {RankingLink(RankedLink("Library",i.row.fullCount,i.row.fullRank,Query(type=i.row.type,limit=0)),onOpen)}
             artist?.let {relative ->item {RankingLink(relative,onOpen)}}
+            recent.filter {it.count>0 && it.rank!=null}.minWithOrNull(compareBy<RankedLink> {it.rank}.thenByDescending {it.count})?.let {best ->item {RankingLink(best,onOpen)}}
             item {Text("First: ${Instant.ofEpochMilli(i.first).atZone(engine.zone).toLocalDate()} · Last: ${Instant.ofEpochMilli(i.last).atZone(engine.zone).toLocalDate()}",style=MaterialTheme.typography.bodySmall)}
             item {TextButton(onClick={
                 val base="https://www.last.fm/music/"+Uri.encode(i.row.sample.artist)
@@ -77,10 +86,7 @@ import java.time.Instant
             item {EntityTimeline(engine,i.row,onOpen)}
             item {Button(onClick={all=!all},modifier=Modifier.fillMaxWidth()) {Text(if(all) "Show important lists only" else "Show all lists")}}
             if(all) {
-                item {Text("${i.artistPlays} total plays of ${i.row.sample.artist}");Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick={onOpen(i.artistQuery)}) {Text("Artist’s tracks")}
-                    OutlinedButton(onClick={onOpen(i.artistQuery.copy(type=EntityType.ALBUM))}) {Text("Artist’s albums")}
-                }}
+                item {ExpandableRankingSection("Recent activity",recent.filter {it.count>0},onOpen,false,"No scrobbles in the last 365 days.")}
                 item {Text("By year",style=MaterialTheme.typography.titleLarge)}
                 items(i.years.filter {it.count>0}) {RankingLink(it,onOpen)}
                 item {Choice("Detailed year",year,i.years.map {it.label to it.label},{year=it})}
@@ -127,7 +133,7 @@ import java.time.Instant
     OutlinedCard(onClick={onOpen(link.query)},modifier=Modifier.fillMaxWidth()) {
         Row(Modifier.padding(horizontal=12.dp,vertical=8.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
             Text(link.label,Modifier.weight(1f),style=MaterialTheme.typography.bodyMedium)
-            Text(if(metric) metricText(link.value,link.query.sort) else "${link.count} plays",style=MaterialTheme.typography.bodyMedium)
+            Text(if(metric) metricText(link.value,link.query.sort) else "${link.count} scrobbles",style=MaterialTheme.typography.bodyMedium)
             Text(link.rank?.let {"#$it"} ?: "—",color=MaterialTheme.colorScheme.primary)
         }
     }

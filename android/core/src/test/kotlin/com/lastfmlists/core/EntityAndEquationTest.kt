@@ -15,6 +15,17 @@ class EntityAndEquationTest {
         val months=EntityPages(engine).months(row,2021)
         assertEquals(12,months.size);assertEquals(2,months[1].count);assertEquals(1,months[1].rank)
     }
+    @Test fun recentLinksUseTheRequestedWindowsAndReproduceTheirRanks() {
+        val current=Analytics(engine.history,zone=ZoneId.of("UTC"),now=Instant.parse("2021-02-05T12:00:00Z").toEpochMilli())
+        val currentRow=current.analyze(Query(limit=0)).rows.first {it.title=="Alpha" && it.artist=="Artist"}
+        val links=EntityPages(current).recent(currentRow)
+        assertEquals(listOf("7","30","90","365"),links.map {it.query.filters["last-n-days"]})
+        links.forEach {link ->
+            val rows=current.analyze(link.query).rows;val index=rows.indexOfFirst {it.key==currentRow.key}
+            assertEquals(if(index<0) null else index+1,link.rank)
+            assertEquals(if(index<0) 0 else rows[index].count,link.count)
+        }
+    }
     @Test fun periodAndInitialLinksReproduceTheDisplayedRanking() {
         val page=EntityPages(engine).overview(row)
         for(link in page.years+page.initial+EntityPages(engine).months(row,2021)) {

@@ -35,6 +35,11 @@ class EntityPages(private val engine: Analytics) {
             week=week.plusWeeks(1)
         }}
     }
+    fun recent(row: ResultRow): List<RankedLink> = listOf(7,30,90,365).map {days ->
+        val q=Query(type=row.type,limit=0,filters=mapOf("last-n-days" to days.toString()))
+        val result=countRank(engine.filtered(q),row.type,row.key)
+        RankedLink("Last $days days",result.count,result.rank,q,entries=result.entries)
+    }
     fun overview(input: ResultRow): EntityOverview {
         val type=if(input.type==EntityType.SCROBBLE) EntityType.TRACK else input.type
         val key=input.sample.key(type)
