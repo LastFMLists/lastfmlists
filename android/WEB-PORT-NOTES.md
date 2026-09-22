@@ -14,7 +14,7 @@ When an entity has several #1 months or weeks, show only the one with the most e
 
 ### Lists, games and export
 
-The summary under a list reads “X tracks/albums/artists · Y scrobbles”; a scrobble list shows only its scrobble count. Label the comparison control “Comparison.” The active-filter strip consists only of clickable chips plus its expand/collapse control; do not repeat the same values in a separate settings-style text row.
+The summary under a list reads “X tracks/albums/artists · Y scrobbles”; a scrobble list shows only its scrobble count. Comparison, Filters and Reset are equal-width filled buttons with the same height, shape, icon size, spacing and typography. Comparison may change container color when active, but must remain the same button component. The active-filter strip consists only of clickable chips plus its expand/collapse control; do not repeat the same values in a separate settings-style text row.
 
 Successful game answers show a centered green animated confirmation with an exclamation mark. Fill the List gives the same feedback for each accepted answer and a distinct completion message for the final answer.
 

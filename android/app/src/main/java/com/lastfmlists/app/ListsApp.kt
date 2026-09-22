@@ -158,10 +158,10 @@ import kotlinx.coroutines.*
                 if(compact) Choice("List type",vm.left.type.name,EntityType.entries.map {it.name to it.title},{vm.updateQuery(vm.left.copy(type=EntityType.valueOf(it)))},Modifier.width(140.dp))
                 if(compact) IconButton(onClick=onHistory) {Icon(Icons.Rounded.History,"List history")}
                 if(compact) IconButton(onClick=onExport) {Icon(Icons.Rounded.IosShare,"Export and share")}
-                Box(Modifier.fillMaxWidth()) {
-                    FilterChip(selected=vm.comparison,onClick={vm.compare(!vm.comparison)},modifier=Modifier.align(Alignment.CenterStart),label={Text("Comparison")},leadingIcon={Icon(Icons.Rounded.CompareArrows,if(vm.comparison) "Disable comparison" else "Compare two lists",Modifier.size(18.dp))})
-                    Button(onClick={onFilter("left",null)},modifier=Modifier.align(Alignment.Center)) { Icon(Icons.Rounded.FilterAlt,"Edit filters"); Spacer(Modifier.width(6.dp));Text("Filters") }
-                    TextButton(onClick={vm.updateQuery(Query(type=vm.left.type))},modifier=Modifier.align(Alignment.CenterEnd)) {Icon(Icons.Rounded.RestartAlt,"Reset filters");if(!compact) {Spacer(Modifier.width(4.dp));Text("Reset")}}
+                Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                    Button(onClick={vm.compare(!vm.comparison)},modifier=Modifier.weight(1f).heightIn(min=48.dp),contentPadding=PaddingValues(horizontal=8.dp),colors=if(vm.comparison) ButtonDefaults.buttonColors(containerColor=MaterialTheme.colorScheme.secondary,contentColor=MaterialTheme.colorScheme.onSecondary) else ButtonDefaults.buttonColors()) {Icon(Icons.Rounded.CompareArrows,if(vm.comparison) "Disable comparison" else "Compare two lists",Modifier.size(18.dp));Spacer(Modifier.width(4.dp));Text("Comparison",maxLines=1)}
+                    Button(onClick={onFilter("left",null)},modifier=Modifier.weight(1f).heightIn(min=48.dp),contentPadding=PaddingValues(horizontal=8.dp)) {Icon(Icons.Rounded.FilterAlt,"Edit filters",Modifier.size(18.dp));Spacer(Modifier.width(4.dp));Text("Filters",maxLines=1)}
+                    Button(onClick={vm.updateQuery(Query(type=vm.left.type))},modifier=Modifier.weight(1f).heightIn(min=48.dp),contentPadding=PaddingValues(horizontal=8.dp)) {Icon(Icons.Rounded.RestartAlt,"Reset filters",Modifier.size(18.dp));Spacer(Modifier.width(4.dp));Text("Reset",maxLines=1)}
                 }
             }
             if(vm.calculating) LinearProgressIndicator(Modifier.fillMaxWidth())
