@@ -1,3 +1,4 @@
+@file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 package com.lastfmlists.app
 
 import android.content.Intent
@@ -56,15 +57,13 @@ import java.time.Instant
             val best=firsts.maxByOrNull {it.count} ?: return null
             return best.copy(label=best.label+(if(firsts.size>1) " · and in ${firsts.size-1} more $unit" else ""))
         }
-        val candidates=buildList {
-            addAll(info?.years.orEmpty().filter {it.rank?.let {rank->rank<=10}==true}.map {0 to it})
-            addAll(allMonths.filter {it.rank?.let {rank->rank in 2..10}==true}.map {1 to it})
-            summarizedFirst(allMonths,"months")?.let {add(1 to it)}
-            summarizedFirst(weekly,"weeks")?.let {add(2 to it)}
-            addAll(rankings?.first.orEmpty().filter {it.rank?.let {rank->rank<=10}==true}.map {3 to it})
-            addAll(rankings?.second.orEmpty().filter {it.query.sort !in listOf("first-n-scrobbles","fastest-n-scrobbles") && it.rank?.let {rank->rank<=10}==true}.map {4 to it})
-        }
-        candidates.sortedWith(compareBy<Pair<Int,RankedLink>> {it.second.rank}.thenByDescending {it.second.entries}.thenBy {it.first}).map {it.second}.take(3)
+        val preference=compareBy<RankedLink> {it.rank ?: Int.MAX_VALUE}.thenByDescending {it.entries}.thenByDescending {it.count}
+        val annual=info?.years.orEmpty().filter {it.rank?.let {rank->rank<=10}==true}.minWithOrNull(preference)
+        val streak=rankings?.first.orEmpty().filter {it.rank?.let {rank->rank<=10}==true}.minWithOrNull(preference)
+        val shortPeriod=(allMonths.filter {it.rank?.let {rank->rank in 2..10}==true}+
+            listOfNotNull(summarizedFirst(allMonths,"months"),summarizedFirst(weekly,"weeks"))).minWithOrNull(preference)
+        val other=rankings?.second.orEmpty().filter {it.query.sort !in listOf("first-n-scrobbles","fastest-n-scrobbles") && it.rank?.let {rank->rank<=10}==true}.minWithOrNull(preference)
+        listOfNotNull(annual,streak,shortPeriod,other).take(3)
     }
     BackHandler(onBack=onBack)
     LazyColumn(Modifier.fillMaxSize().testTag("entity-page"),contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
@@ -74,6 +73,13 @@ import java.time.Instant
         info?.let {i ->
             item {RankingLink(RankedLink("Library",i.row.fullCount,i.row.fullRank,Query(type=i.row.type,limit=0)),onOpen)}
             artist?.let {relative ->item {RankingLink(relative,onOpen)}}
+            item {FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                val artistFilter=mapOf("artist-name" to i.row.sample.artist)
+                OutlinedButton(onClick={onOpen(Query(type=EntityType.TRACK,limit=0,filters=artistFilter))}) {Text("Artist tracks")}
+                OutlinedButton(onClick={onOpen(Query(type=EntityType.ALBUM,limit=0,filters=artistFilter))}) {Text("Artist albums")}
+                if(i.row.type!=EntityType.ARTIST && i.row.sample.album.isNotBlank())
+                    OutlinedButton(onClick={onOpen(Query(type=EntityType.TRACK,limit=0,filters=artistFilter+("album-name" to i.row.sample.album)))}) {Text("Album tracks")}
+            }}
             recent.filter {it.count>0 && it.rank!=null}.minWithOrNull(compareBy<RankedLink> {it.rank}.thenByDescending {it.count})?.let {best ->item {RankingLink(best,onOpen)}}
             item {Text("First: ${Instant.ofEpochMilli(i.first).atZone(engine.zone).toLocalDate()} · Last: ${Instant.ofEpochMilli(i.last).atZone(engine.zone).toLocalDate()}",style=MaterialTheme.typography.bodySmall)}
             item {TextButton(onClick={
@@ -83,8 +89,8 @@ import java.time.Instant
             }) {Text("Open on Last.fm")}}
             if(highlights.isNotEmpty()) item {Text("High placements",style=MaterialTheme.typography.titleMedium)}
             items(highlights) {RankingLink(it,onOpen,it.query.sort!="scrobbles")}
-            item {EntityTimeline(engine,i.row,onOpen)}
             item {Button(onClick={all=!all},modifier=Modifier.fillMaxWidth()) {Text(if(all) "Show important lists only" else "Show all lists")}}
+            item {EntityTimeline(engine,i.row,onOpen)}
             if(all) {
                 item {ExpandableRankingSection("Recent activity",recent.filter {it.count>0},onOpen,false,"No scrobbles in the last 365 days.")}
                 item {Text("By year",style=MaterialTheme.typography.titleLarge)}
@@ -105,8 +111,8 @@ import java.time.Instant
                         }
                     }
                 }
-                item {ExpandableRankingSection("Streak rankings · top 100",rankings?.first.orEmpty(),onOpen,true,"This ${i.row.type.title.lowercase().removeSuffix("s")} does not feature in the top 100 of any list measured in this section.")}
-                item {ExpandableRankingSection("Other rankings · top 10",rankings?.second.orEmpty().filter {it.query.sort !in listOf("first-n-scrobbles","fastest-n-scrobbles")}+listOfNotNull(i.initial,length),onOpen,true,"This ${i.row.type.title.lowercase().removeSuffix("s")} does not feature in the top 10 of any list measured in this section.")}
+                item {ExpandableRankingSection("Streak rankings",rankings?.first.orEmpty(),onOpen,true,"This ${i.row.type.title.lowercase().removeSuffix("s")} has no placement in the lists measured in this section.")}
+                item {ExpandableRankingSection("Other rankings",rankings?.second.orEmpty().filter {it.query.sort !in listOf("first-n-scrobbles","fastest-n-scrobbles")}+listOfNotNull(i.initial,length),onOpen,true,"This ${i.row.type.title.lowercase().removeSuffix("s")} has no placement in the lists measured in this section.")}
             }
             item {Text("Based on downloaded history${if(vm.account?.pending==true) "; download is incomplete" else ""}. Tap a ranking to open its list.",style=MaterialTheme.typography.bodySmall)}
         }

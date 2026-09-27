@@ -32,7 +32,7 @@ class LibraryStore(context: Context,name: String="library.db"): SQLiteOpenHelper
         val account=account(name)!!
         if(account.pending) return account
         val start=readableDatabase.rawQuery("SELECT MAX(time) FROM plays WHERE account=?",arrayOf(name)).use { c -> c.moveToFirst(); c.getLong(0)/1000 }
-        writableDatabase.execSQL("UPDATE accounts SET start=?,until=?,next_page=1,total_pages=0,details_complete=0 WHERE name=?",arrayOf(start,System.currentTimeMillis()/1000,name))
+        writableDatabase.execSQL("UPDATE accounts SET start=?,until=?,next_page=1,total_pages=0 WHERE name=?",arrayOf(start,System.currentTimeMillis()/1000,name))
         return account(name)!!
     }
     fun savePage(name: String,page: Int,records: List<Scrobble>,total: Int) = transaction { db ->
@@ -66,8 +66,8 @@ class LibraryStore(context: Context,name: String="library.db"): SQLiteOpenHelper
         val j=JSONObject().put("listeners",m.listeners ?: JSONObject.NULL).put("plays",m.globalPlays ?: JSONObject.NULL).put("duration",m.durationMs ?: JSONObject.NULL).put("tags",JSONArray(m.tags)).put("image",m.image)
         writableDatabase.insertWithOnConflict("metadata",null,ContentValues().apply { put("account",name); put("kind",type.name); put("entity_key",key); put("json",j.toString()) },SQLiteDatabase.CONFLICT_REPLACE)
     }
-    fun startFullDetails(name: String) { writableDatabase.execSQL("UPDATE accounts SET details_complete=0 WHERE name=?",arrayOf(name)) }
-    fun finishFullDetails(name: String) { writableDatabase.execSQL("UPDATE accounts SET details_complete=1 WHERE name=?",arrayOf(name)) }
+    fun startDetails(name: String) { writableDatabase.execSQL("UPDATE accounts SET details_complete=0 WHERE name=?",arrayOf(name)) }
+    fun finishDetails(name: String) { writableDatabase.execSQL("UPDATE accounts SET details_complete=1 WHERE name=?",arrayOf(name)) }
     fun importHistory(name: String,records: List<Scrobble>) = transaction { db ->
         ensure(name)
         listOf("plays","pages","metadata").forEach { db.delete(it,"account=?",arrayOf(name)) }

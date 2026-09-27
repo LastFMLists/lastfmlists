@@ -4,6 +4,9 @@ package com.lastfmlists.app
 import android.os.SystemClock
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.*
@@ -24,6 +27,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -33,7 +37,19 @@ import kotlinx.coroutines.*
 @Composable fun GamesScreen(vm: MainViewModel) {
     val g=vm.game; val scope=rememberCoroutineScope(); val haptic=LocalHapticFeedback.current
     var celebrate by remember {mutableStateOf(false)}
-    LaunchedEffect(g.celebration) {if(g.celebration>0) {celebrate=true;delay(900);celebrate=false}}
+    val celebrationScale=remember {Animatable(0.72f)}
+    val celebrationAlpha=remember {Animatable(0f)}
+    LaunchedEffect(g.celebration) {if(g.celebration>0) {
+        celebrate=true
+        celebrationScale.snapTo(0.72f);celebrationAlpha.snapTo(0f)
+        coroutineScope {
+            launch {celebrationScale.animateTo(1.06f,spring(dampingRatio=0.55f,stiffness=320f));celebrationScale.animateTo(1f,spring(dampingRatio=0.8f))}
+            launch {celebrationAlpha.animateTo(1f,tween(150))}
+        }
+        delay(450)
+        celebrationAlpha.animateTo(0f,tween(220))
+        celebrate=false
+    }}
     fun newRound(mode: String,reset: Boolean=false) {
         if(g.busy) return
         if(reset) {g.streak=0;g.best=vm.savedRecord("$mode.${g.type.name}")}
@@ -140,7 +156,7 @@ import kotlinx.coroutines.*
             }
         }
     }
-        AnimatedVisibility(visible=celebrate,modifier=Modifier.align(Alignment.Center),enter=fadeIn()+scaleIn(initialScale=0.7f),exit=fadeOut()+scaleOut(targetScale=1.15f)) {
+        if(celebrate) Box(Modifier.align(Alignment.Center).graphicsLayer {scaleX=celebrationScale.value;scaleY=celebrationScale.value;alpha=celebrationAlpha.value}) {
             Surface(shape=RoundedCornerShape(28.dp),color=Color(0xFF1B7F3A),shadowElevation=12.dp) {
                 Row(Modifier.padding(horizontal=28.dp,vertical=20.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
                     Icon(Icons.Rounded.CheckCircle,null,tint=Color.White,modifier=Modifier.size(38.dp));Text(if(g.feedback=="All answers found!") "All answers found!" else "Correct!",color=Color.White,style=MaterialTheme.typography.headlineSmall,fontWeight=androidx.compose.ui.text.font.FontWeight.Bold)

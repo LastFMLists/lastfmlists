@@ -9,5 +9,6 @@ import androidx.activity.viewModels
 class MainActivity: ComponentActivity() {
     private val model: MainViewModel by viewModels()
     override fun onCreate(savedInstanceState: Bundle?) { super.onCreate(savedInstanceState); enableEdgeToEdge(); setContent { ListsTheme(model.theme) { ListsApp(model) } } }
+    override fun onStart() { super.onStart(); model.onForeground() }
     override fun onStop() { super.onStop(); if(!isChangingConfigurations) model.onBackground() }
 }

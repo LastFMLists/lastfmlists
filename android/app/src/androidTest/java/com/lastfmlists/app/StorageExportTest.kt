@@ -47,12 +47,16 @@ class StorageExportTest {
         assertTrue(store.metadata("two").isEmpty())
         store.deleteAccount("one");assertEquals(1,store.history("two").size);assertTrue(store.metadata("one").isEmpty())
     }
-    @Test fun metadataDependentListsUnlockOnlyAfterAFullBatchFinishes() {
+    @Test fun metadataDependentListsUnlockAfterCompletedDetailsAndStayReadyDuringHistorySync() {
         store.ensure("listener")
         assertFalse(store.account("listener")!!.detailsComplete)
-        store.finishFullDetails("listener")
+        store.startDetails("listener")
+        assertFalse(store.account("listener")!!.detailsComplete)
+        store.finishDetails("listener")
         assertTrue(store.account("listener")!!.detailsComplete)
-        store.startFullDetails("listener")
+        store.begin("listener")
+        assertTrue(store.account("listener")!!.detailsComplete)
+        store.startDetails("listener")
         assertFalse(store.account("listener")!!.detailsComplete)
     }
     @Test fun nativePngRendererCreatesReadableNonEmptyImage() {

@@ -72,7 +72,8 @@ import kotlinx.coroutines.*
                 if(status.pages>0) LinearProgressIndicator(progress={status.page.toFloat()/status.pages},modifier=Modifier.fillMaxWidth()) else LinearProgressIndicator(Modifier.fillMaxWidth())
             }
             vm.error?.let { message -> Card(Modifier.padding(horizontal=16.dp,vertical=4.dp),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.errorContainer)) { Row(Modifier.padding(12.dp),verticalAlignment=Alignment.CenterVertically) { Text(message,Modifier.weight(1f),color=MaterialTheme.colorScheme.onErrorContainer); IconButton(onClick={vm.error=null}) { Icon(Icons.Rounded.Close,"Dismiss error") } } } }
-            if(!hasLibrary) Welcome(vm,status)
+            if(!hasLibrary && vm.username.isNotBlank() && vm.loading && vm.error==null) Box(Modifier.fillMaxSize(),contentAlignment=Alignment.Center) {CircularProgressIndicator()}
+            else if(!hasLibrary) Welcome(vm,status)
             else if(selected!=null) EntityPage(selected!!,vm,{vm.selectedEntity=null}) { q -> vm.updateQuery(q);vm.compare(false);vm.tab=0;vm.selectedEntity=null }
             else when(vm.tab) {
                 0 -> ListsScreen(vm,{side,field->filterSide=side;filterField=field},{vm.selectedEntity=it},{export=true},{history=true},listDisplay,{listDisplay=it},showTotals,{showTotals=it})
@@ -309,7 +310,7 @@ import kotlinx.coroutines.*
             if(status.message.isNotBlank()) Text(status.message,style=MaterialTheme.typography.bodySmall)
             Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) { Button(onClick=vm::sync,enabled=vm.canSync && !status.running) { Text(if(vm.account?.pending==true) "Resume download" else "Refresh") }; TextButton(onClick={switch=true},enabled=!status.running) { Text("Switch account") } }
         } } }
-        item { Text("Music metadata",style=MaterialTheme.typography.titleMedium); Text("Download tags, durations and global statistics. Metadata-based lists unlock only after All details finishes; partial progress stays saved for the next attempt.",style=MaterialTheme.typography.bodySmall) }
+        item { Text("Music metadata",style=MaterialTheme.typography.titleMedium); Text("Download tags, durations and global statistics. Metadata-based lists unlock when either details download finishes. Partial progress stays saved for the next attempt.",style=MaterialTheme.typography.bodySmall) }
         item { Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) { OutlinedButton(onClick={vm.details(false)},enabled=!vm.isDemo && !status.running,modifier=Modifier.weight(1f)) { Text("Load details") }; OutlinedButton(onClick={allDetails=true},enabled=!vm.isDemo && !status.running,modifier=Modifier.weight(1f)) { Text("All details") } } }
         item { HorizontalDivider() }
         item { Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) { OutlinedButton(onClick={importer.launch(arrayOf("text/*","application/csv","application/octet-stream"))},enabled=!status.running,modifier=Modifier.weight(1f)) { Text("Import CSV") }; OutlinedButton(onClick={scope.launch { runCatching { Exporter.csv(context,vm.username,vm.analytics?.history ?: emptyList()) }.onFailure { snackbar.showSnackbar(it.message ?: "Export failed") } }},modifier=Modifier.weight(1f)) { Text("Export history") } } }

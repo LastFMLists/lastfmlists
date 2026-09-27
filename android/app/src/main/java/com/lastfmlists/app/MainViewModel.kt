@@ -8,7 +8,7 @@ import androidx.lifecycle.viewModelScope
 import com.lastfmlists.core.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.collectLatest
-import org.json.JSONObject
+import kotlinx.coroutines.flow.drop
 import java.time.*
 
 class MainViewModel(application: Application): AndroidViewModel(application) {
@@ -17,13 +17,13 @@ class MainViewModel(application: Application): AndroidViewModel(application) {
     var accounts by mutableStateOf<List<Account>>(emptyList()); private set
     var account by mutableStateOf<Account?>(null); private set
     var analytics by mutableStateOf<Analytics?>(null); private set
-    var left by mutableStateOf(readQuery("left")); private set
-    var right by mutableStateOf(readQuery("right")); private set
-    var comparison by mutableStateOf(app.prefs.getBoolean("comparison",false)); private set
+    var left by mutableStateOf(Query()); private set
+    var right by mutableStateOf(Query()); private set
+    var comparison by mutableStateOf(false); private set
     var leftResult by mutableStateOf(Analysis(emptyList(),0,0)); private set
     var rightResult by mutableStateOf(Analysis(emptyList(),0,0)); private set
     var calculating by mutableStateOf(false); private set
-    var loading by mutableStateOf(false); private set
+    var loading by mutableStateOf(username.isNotBlank()); private set
     var error by mutableStateOf<String?>(null)
     var background by mutableStateOf(app.prefs.getBoolean("background",false)); private set
     var wifiOnly by mutableStateOf(app.prefs.getBoolean("wifiOnly",true)); private set
@@ -46,12 +46,13 @@ class MainViewModel(application: Application): AndroidViewModel(application) {
     }
     fun supportShown() {app.prefs.edit().putBoolean("listSupportShown",true).apply()}
     fun dismissSupport(forever: Boolean=false) {supportPrompt=false;if(forever) app.prefs.edit().putBoolean("hideSupportPrompt",true).apply()}
-    fun restoreList(s: ListSnapshot) {left=s.left;right=s.right;comparison=s.comparison;saveQuery("left",left);saveQuery("right",right);app.prefs.edit().putBoolean("comparison",comparison).apply();tab=0;analyze()}
+    fun restoreList(s: ListSnapshot) {left=s.left;right=s.right;comparison=s.comparison;tab=0;analyze()}
     var games: Games?=null; private set
     val game=GameSession()
     private var download: Job?=null
     private var calculation: Job?=null
     private var reloadJob: Job?=null
+    private var foreground=false
     val displayName get()=accountLabel(username)
     fun accountLabel(key: String)=app.prefs.getString("displayName.$key",key) ?: key
     val isDemo get()=username=="sample-library"
@@ -59,7 +60,8 @@ class MainViewModel(application: Application): AndroidViewModel(application) {
     val canSync get()=!isDemo && !isImported && username.isNotBlank()
     val status get()=app.sync.status
     init {
-        viewModelScope.launch { app.sync.revision.collectLatest { reload() } }
+        reload()
+        viewModelScope.launch { app.sync.revision.drop(1).collectLatest { reload() } }
     }
     fun reload() {
         reloadJob?.cancel()
@@ -108,11 +110,20 @@ class MainViewModel(application: Application): AndroidViewModel(application) {
         }
     }
     fun stopDownload() { download?.cancel(); DownloadWorker.cancel(app) }
-    fun onBackground() { download?.cancel() }
+    fun onBackground() { foreground=false; download?.cancel() }
+    fun onForeground() {
+        if(foreground) return
+        foreground=true
+        viewModelScope.launch {
+            reloadJob?.join()
+            download?.join()
+            if(foreground && canSync && account!=null) sync()
+        }
+    }
     fun updateBackgroundConsent(value: Boolean) { background=value; app.prefs.edit().putBoolean("background",value).apply(); if(!value) DownloadWorker.cancel(app) }
     fun setWifi(value: Boolean) { wifiOnly=value; app.prefs.edit().putBoolean("wifiOnly",value).apply() }
     fun changeTheme(value: String) { theme=value; app.prefs.edit().putString("theme",value).apply() }
-    fun compare(value: Boolean) { comparison=value; app.prefs.edit().putBoolean("comparison",value).apply(); analyze() }
+    fun compare(value: Boolean) { comparison=value; analyze() }
     fun updateQuery(q: Query,isRight: Boolean=false) {
         val normalized=when {
             q.type==EntityType.SCROBBLE && q.sort !in listOf("earliest-to-latest","latest-to-earliest") -> q.copy(sort="earliest-to-latest")
@@ -120,7 +131,7 @@ class MainViewModel(application: Application): AndroidViewModel(application) {
             else -> q
         }
         if(isRight) right=normalized else left=normalized
-        saveQuery(if(isRight) "right" else "left",normalized); analyze()
+        analyze()
     }
     fun analyze() {
         calculation?.cancel()
@@ -160,15 +171,6 @@ class MainViewModel(application: Application): AndroidViewModel(application) {
     fun record(game: String,score: Int): Int { val key="record.$username.$game"; val best=maxOf(score,app.prefs.getInt(key,0)); app.prefs.edit().putInt(key,best).apply(); return best }
     fun savedRecord(game: String)=app.prefs.getInt("record.$username.$game",0)
     fun hasDetails()=account?.detailsComplete==true
-    private fun readQuery(key: String): Query = runCatching {
-        val j=JSONObject(app.prefs.getString("query.$key","{}") ?: "{}")
-        val f=j.optJSONObject("filters") ?: JSONObject()
-        Query(EntityType.valueOf(j.optString("type","TRACK")),j.optString("sort","scrobbles"),j.optInt("x",10),j.optInt("limit",50),j.optInt("max",0),f.keys().asSequence().associateWith { f.getString(it) },j.optString("equations"))
-    }.getOrDefault(Query())
-    private fun saveQuery(key: String,q: Query) {
-        val j=JSONObject().put("type",q.type.name).put("sort",q.sort).put("x",q.x).put("limit",q.limit).put("max",q.maxPerArtist).put("filters",JSONObject(q.filters)).put("equations",q.equations)
-        app.prefs.edit().putString("query.$key",j.toString()).apply()
-    }
 }
 
 class GameSession {

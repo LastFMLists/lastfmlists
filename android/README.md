@@ -10,10 +10,10 @@ Native Kotlin / Jetpack Compose Android preview, developed on the `android-app` 
 - Higher or Lower, Put in Order and Fill the List using saved history, with touch controls, haptics and local records. Ordering supports long-press dragging and accessible move buttons.
 - Optional metadata downloads for tags, duration and global statistics. Unavailable data is never silently treated as zero.
 - Light/dark/system appearance, an illustrative sample library, and separate saved accounts.
-- History downloads stay in the foreground by default. An explicit consent dialog enables WorkManager downloads with a progress notification, pause action and Wi-Fi-only default. This continues requested downloads; it is not a periodic automatic refresh.
+- A saved Last.fm account refreshes on reopening the app. Downloads stay in the foreground by default. An explicit consent dialog enables WorkManager downloads with a progress notification, pause action and Wi-Fi-only default.
 - No advertisements or analytics SDKs. A voluntary Ko-fi link appears in preview builds and a dismissible support prompt is rate-limited.
 
-Preview 0.5 makes metadata downloads resilient to missing Last.fm entities and keeps metadata-based analysis locked until a full download succeeds. Entity pages add recent-period rankings, condensed monthly/weekly wins, and entity-relative graph ranges. Lists have clearer counts and controls, while games show animated success feedback. Equations retain their visual editor, nested calculations, examples and optional advanced syntax. See [WEB-PORT-NOTES.md](WEB-PORT-NOTES.md) for the complete 0.2–0.5 web implementation contract. The website has not been modified.
+Preview 0.6 unlocks metadata lists after a completed simple-details download, keeps saved list history while resetting filters on launch, and refreshes saved Last.fm history when the app reopens. Entity pages offer artist/album list shortcuts and all available ranking positions. Games vary rounds more and use smoother success feedback. Equations retain their visual editor, nested calculations, examples and optional advanced syntax. See [WEB-PORT-NOTES.md](WEB-PORT-NOTES.md) for the complete 0.2–0.6 web implementation contract. The website has not been modified.
 
 ## Build and test
 

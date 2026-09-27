@@ -51,6 +51,21 @@ class OfflineJourneyTest {
         compose.waitUntil(30000) {compose.onAllNodesWithText("Sample library").fetchSemanticsNodes().isNotEmpty()}
         compose.onNodeWithText("Sample library").assertIsDisplayed()
     }
+    @Test fun freshLaunchResetsFiltersAndKeepsListHistory() {
+        loadDemo()
+        val filtered=Query(filters=mapOf("track-includes" to "Hidden"))
+        ListHistory(app.prefs).record("sample-library",ListSnapshot(filtered,Query(),false))
+        scenario.onActivity {activity ->androidx.lifecycle.ViewModelProvider(activity)[MainViewModel::class.java].updateQuery(filtered)}
+        scenario.close()
+        scenario=ActivityScenario.launch(MainActivity::class.java)
+        compose.waitUntil(30000) {compose.onAllNodesWithText("Sample library").fetchSemanticsNodes().isNotEmpty()}
+        scenario.onActivity {activity ->
+            val vm=androidx.lifecycle.ViewModelProvider(activity)[MainViewModel::class.java]
+            assertEquals(Query(),vm.left)
+            assertFalse(vm.comparison)
+            assertTrue(ListHistory(app.prefs).read("sample-library").any {it.left==filtered})
+        }
+    }
     @Test fun switchingListStartsAtTheTop() {
         loadDemo()
         compose.onNodeWithTag("results-main").performScrollToIndex(20)
@@ -73,11 +88,14 @@ class OfflineJourneyTest {
     @Test fun entityInitialLinkOpensAnUnlimitedFilteredList() {
         loadDemo();compose.onNodeWithText("Hidden Place").performClick()
         compose.waitUntil(30000) {compose.onAllNodesWithText("High placements").fetchSemanticsNodes().isNotEmpty()}
-        compose.onNodeWithText("Show all lists").performScrollTo().performClick()
-        compose.onNodeWithTag("entity-page").performScrollToIndex(22)
-        compose.onNodeWithText("Other rankings · top 10").performScrollTo().performClick()
-        compose.waitUntil(30000) {compose.onAllNodesWithText("Names starting with H").fetchSemanticsNodes().isNotEmpty()}
+        compose.onNodeWithTag("entity-page").performScrollToNode(hasText("Show all lists"))
+        compose.waitForIdle()
+        compose.onNodeWithText("Show all lists",useUnmergedTree=true).performClick()
+        compose.onNodeWithTag("entity-page").performScrollToNode(hasText("Other rankings"))
+        compose.waitForIdle()
+        compose.onNodeWithText("Other rankings",useUnmergedTree=true).performClick()
         compose.onNodeWithTag("entity-page").performScrollToNode(hasText("Names starting with H"))
+        compose.waitForIdle()
         compose.onAllNodesWithText("Names starting with H").onLast().performClick()
         compose.onNodeWithText("Back to list").assertDoesNotExist()
         scenario.onActivity {activity ->

@@ -5,39 +5,48 @@ import kotlin.random.Random
 
 class Games(private val analytics: Analytics,private val random: Random=Random.Default) {
     data class Puzzle(val prompt: String,val query: Query,val answers: List<ResultRow>,val category: String)
-    private val recent=ArrayDeque<String>()
+    private val recentOrdering=ArrayDeque<String>()
+    private val recentFill=ArrayDeque<String>()
     private val recentPairs=ArrayDeque<String>()
     private val categoryDeck=ArrayDeque<String>()
+    private var lastPair=""
+    private var lastOrdering=""
+    private var lastFill=""
     fun pair(type: EntityType,round: Int): List<ResultRow> {
-        val depth=when { round<3 -> 50; round<6 -> 100; round<10 -> 250; round<15 -> 500; else -> Int.MAX_VALUE }
+        val progress=(round.coerceAtLeast(0)/20.0).coerceAtMost(1.0)
+        val depth=(45+progress*555).toInt()
         val rankMax=when(type) {EntityType.ARTIST -> 300;EntityType.ALBUM -> 500;else -> 1000}
         val minCount=when(type) {EntityType.ARTIST -> 100;EntityType.ALBUM -> 50;else -> 10}
         val pool=analytics.analyze(Query(type=type,limit=0)).rows.filterIndexed {i,row -> i<rankMax || row.count>=minCount}.take(depth)
         if(pool.size<2) return emptyList()
-        val candidates=pool.shuffled(random).sortedBy {if(it.key in recentPairs) 1 else 0}
-        val ratio=when { round<3 -> 2.0; round<6 -> 1.6; round<10 -> 1.35; round<15 -> 1.15; else -> 1.01 }
-        val maximum=when {round<3 -> 3.0;round<6 -> 2.2;round<10 -> 1.7;round<15 -> 1.4;else -> 1.15}
-        var best=candidates.take(2);var bestError=Double.POSITIVE_INFINITY
-        for(a in candidates.take(16)) {
-            val b=candidates.filter {it.key!=a.key}.minByOrNull {kotlin.math.abs(kotlin.math.ln(maxOf(it.count,a.count).toDouble()/minOf(it.count,a.count)/kotlin.math.sqrt(ratio*maximum)))} ?: continue
+        val candidates=pool.shuffled(random)
+        val target=2.4-progress*1.3
+        var best=emptyList<ResultRow>();var bestError=Double.POSITIVE_INFINITY
+        for(a in candidates.take(30)) for(b in candidates.take(60)) {
+            if(a.key==b.key) continue
+            val signature=listOf(a.key,b.key).sorted().joinToString("|")
+            if(signature==lastPair && pool.size>2) continue
             val actual=maxOf(a.count,b.count).toDouble()/minOf(a.count,b.count)
-            val error=kotlin.math.abs(kotlin.math.ln(actual/kotlin.math.sqrt(ratio*maximum)))
+            val error=kotlin.math.abs(kotlin.math.ln(actual/target))+
+                (if(a.key in recentPairs) 0.38 else 0.0)+(if(b.key in recentPairs) 0.38 else 0.0)
             if(error<bestError) {best=listOf(a,b);bestError=error}
-            if(actual>=ratio*0.85 && actual<=maximum*1.35) break
         }
+        if(best.isEmpty()) best=candidates.take(2)
+        lastPair=best.map {it.key}.sorted().joinToString("|")
         best.forEach {recentPairs.addLast(it.key)};while(recentPairs.size>12) recentPairs.removeFirst()
         return best.shuffled(random)
     }
     fun ordering(type: EntityType,round: Int): Puzzle? {
         val metrics=listOf("scrobbles","separate-days","consecutive-scrobbles","max-single-day","first-discovery","latest-play","period")+(if(type!=EntityType.TRACK) listOf("distinct-tracks","biggest-track") else emptyList())
-        val n=when { round<2 -> 3; round<7 -> 4; else -> 5 }
-        val depth=when { round<2 -> 30; round<4 -> 60; round<7 -> 120; round<11 -> 250; else -> 600 }
+        val n=when { round<3 -> 3; round<9 -> 4; else -> 5 }
+        val progress=(round.coerceAtLeast(0)/18.0).coerceAtMost(1.0)
+        val depth=(35+progress*565).toInt()
         val cap=when(type) {EntityType.ARTIST -> 200;EntityType.ALBUM -> 300;else -> 600}
         val familiarRows=analytics.analyze(Query(type=type,limit=minOf(depth,cap))).rows.filter {it.count>=5}
         val familiar=familiarRows.map { it.key }.toSet()
-        val ratio=when {round<2 -> 2.5;round<4 -> 2.0;round<7 -> 1.7;round<11 -> 1.5;else -> 1.35}
-        val dayGap=when {round<2 -> 120;round<4 -> 90;round<7 -> 60;round<11 -> 35;else -> 21}
-        for(sort in metrics.shuffled(random).sortedBy { if(it in recent) 1 else 0 }) {
+        val ratio=2.4-progress*1.05
+        val dayGap=(120-progress*99).toInt()
+        for(sort in metrics.shuffled(random).sortedBy { if(it in recentOrdering) 1 else 0 }) {
             var q=Query(type=type,sort=sort,x=5,limit=0)
             var label=Catalog.sorts.firstOrNull {it.first==sort}?.second ?: ""
             val pool=when(sort) {
@@ -71,10 +80,11 @@ class Games(private val analytics: Analytics,private val random: Random=Random.D
                     if(separated) selection.add(candidate)
                     if(selection.size==n) break
                 }
-                if(selection.size==n) {answers=selection;break}
+                if(selection.size==n && selection.map {it.key}.joinToString("|")!=lastOrdering) {answers=selection;break}
             }
             if(answers.isEmpty()) continue
-            recent.addLast(sort); while(recent.size>5) recent.removeFirst()
+            lastOrdering=answers.map {it.key}.joinToString("|")
+            recentOrdering.addLast(sort); while(recentOrdering.size>5) recentOrdering.removeFirst()
             return Puzzle("${type.title}: $label",q,answers,"Ordering")
         }
         return null
@@ -111,14 +121,18 @@ class Games(private val analytics: Analytics,private val random: Random=Random.D
                 "By artist" -> if(type!=EntityType.ARTIST) history.map { it.artist }.distinct().forEach { artist -> candidates.add("Top ${type.title.canonical()} by $artist" to q.copy(filters=mapOf("artist-name" to artist))) }
             }
         }
-        for((prompt,q) in candidates.shuffled(random).take(80)) {
-            if(prompt in recent) continue
+        for((prompt,q) in candidates.shuffled(random).filter {it.first !in recentFill}.take(200)) {
             val answers=analytics.analyze(q).rows.filter { it.count>=5 }.take(10)
-            if(answers.size==10) { recent.addLast(prompt); while(recent.size>20) recent.removeFirst(); return Puzzle(prompt,q,answers,category) }
+            if(answers.size==10) { lastFill=prompt;recentFill.addLast(prompt); while(recentFill.size>20) recentFill.removeFirst(); return Puzzle(prompt,q,answers,category) }
         }
         for(type in types.shuffled(random)) {
             val q=Query(type=type,limit=0); val answers=analytics.analyze(q).rows.filter { it.count>=5 }.take(10)
-            if(answers.size==10) return Puzzle("Your all-time top ${type.title.canonical()}",q,answers,"Overall")
+            val prompt="Your all-time top ${type.title.canonical()}"
+            if(answers.size==10 && prompt!=lastFill) {lastFill=prompt;return Puzzle(prompt,q,answers,"Overall")}
+        }
+        for((prompt,q) in candidates.shuffled(random).filter {it.first!=lastFill}.take(200)) {
+            val answers=analytics.analyze(q).rows.filter {it.count>=5}.take(10)
+            if(answers.size==10) {lastFill=prompt;recentFill.addLast(prompt);while(recentFill.size>20) recentFill.removeFirst();return Puzzle(prompt,q,answers,category)}
         }
         return null
     }

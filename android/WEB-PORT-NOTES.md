@@ -1,4 +1,24 @@
-# Android implementation handoff (0.2–0.5)
+# Android implementation handoff (0.2–0.6)
+
+## 0.6 additions (supersede conflicting behaviour below)
+
+### Metadata and startup
+
+A completed **Load details** batch unlocks metadata-dependent filters, rankings and equations for the entities it downloaded; **All details** also unlocks them when complete. Starting either batch locks those controls again until that batch succeeds. Missing entities (Last.fm 404/error 6) do not abort the batch; other errors and cancellation leave it locked. Previously downloaded metadata stays available after an incremental scrobble refresh. New entities without metadata do not acquire invented values, so metadata filters omit them until their details are downloaded.
+
+On app launch, start from default list queries and comparison off. Keep the saved list-history snapshots so the user can restore an old set of filters. If a saved account exists, show a loading indicator while its local history opens; do not show the login screen during that load. On each return to the foreground, refresh a saved Last.fm account automatically. Existing background-download consent and Wi-Fi rules still control whether that refresh can continue after leaving the app. Sample and CSV libraries remain offline only.
+
+### Entity pages
+
+The expanded Streak and Other groups show every available rank, even beyond #100 or #10. Keep milestones in their separate editable group. Highlight at most one annual rank, one streak, and one shorter time period (month or week), with an other ranking only when there is room. Within a category choose better rank, then a larger ranking pool, then more entity scrobbles. This prevents several nearby week/month variations from occupying all summary slots. Initial-letter and name-length lists remain in Other, never in the highlights.
+
+Restore links near the top of each entity page to all tracks and all albums by that artist. Album and track pages also link to all tracks on that album by that artist. These links open full lists with the corresponding artist/album filters; they do not inherit the previously selected list's filters. Put the Show all lists control before the listening graph so the extra rankings are easy to find.
+
+### Games
+
+Higher or Lower moves through a continuous difficulty curve: eligible depth grows roughly from 45 to 600 over 20 wins, while the target count ratio narrows from 2.4 to 1.1. Recently shown entities get a selection penalty, and an identical pair cannot immediately repeat when there are alternatives. Ordering grows from three to four to five entries after three and nine wins, while depth and separation thresholds change gradually. It avoids repeating the same answer order on consecutive rounds. Fill the List keeps a recent prompt queue separate from Ordering and searches more candidates before falling back; it avoids repeating the previous prompt when another playable list exists.
+
+The centered green correct confirmation now springs into place, settles, and fades out. Restart that motion on every accepted answer, including quick successive Fill guesses.
 
 ## 0.5 additions (supersede conflicting behaviour below)
 
@@ -193,7 +213,7 @@ Labels: “Tracks with at least 10 plays”; “Tracks with at least 10% of thei
 
 1. A track's displayed yearly/monthly/initial rank equals its position in the destination list.
 2. Zero periods stay visible without invented ranks. Same-name entities from different artists stay separate.
-3. Top-100 and top-10 sections enforce their cutoffs and omit unavailable metadata rankings.
+3. Expanded streak and other sections include positions beyond #100 and #10; missing metadata never counts as zero.
 4. Old equation pipelines produce the same results after visual editing/serialization.
 5. Nested arithmetic, quoted semicolons, step order and invalid intermediate input are tested.
 6. Reset clears the draft, and cancelling the editor leaves the active query unchanged.

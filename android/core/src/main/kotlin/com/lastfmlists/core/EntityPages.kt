@@ -71,18 +71,18 @@ class EntityPages(private val engine: Analytics) {
     fun rankings(row: ResultRow): Pair<List<RankedLink>,List<RankedLink>> {
         val streaks=listOf("consecutive-scrobbles","consecutive-days","consecutive-weeks","consecutive-months")
         val excluded=listOf("scrobbles","earliest-to-latest","latest-to-earliest")+streaks
-        fun ranked(sort: String,maxRank: Int): RankedLink? {
+        fun ranked(sort: String): RankedLink? {
             val target=if(sort in listOf("first-n-scrobbles","fastest-n-scrobbles")) milestoneTarget else 10
             val q=Query(type=row.type,sort=sort,limit=0,x=target)
             val rows=engine.analyze(q).rows
             val i=rows.indexOfFirst {it.key==row.key}
-            if(i<0 || i>=maxRank) return null
+            if(i<0) return null
             val match=rows[i]
             if(sort in listOf("time-spent-listening","highest-listening-percentage") && match.value<=0) return null
             val label=Catalog.sorts.first {it.first==sort}.second.replace("X","$target")
             return RankedLink(label,match.count,i+1,q,match.value,rows.size)
         }
-        return streaks.mapNotNull {ranked(it,100)} to Catalog.sorts.map {it.first}.filter {it !in excluded}.mapNotNull {ranked(it,if(it in listOf("first-n-scrobbles","fastest-n-scrobbles")) Int.MAX_VALUE else 10)}
+        return streaks.mapNotNull {ranked(it)} to Catalog.sorts.map {it.first}.filter {it !in excluded}.mapNotNull {ranked(it)}
     }
     fun milestones(row: ResultRow,target: Int): List<RankedLink> = listOf("first-n-scrobbles","fastest-n-scrobbles").mapNotNull {sort ->
         val q=Query(type=row.type,sort=sort,limit=0,x=target.coerceAtLeast(1))
