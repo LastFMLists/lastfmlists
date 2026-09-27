@@ -35,6 +35,8 @@ import java.time.Instant
     var error by remember {mutableStateOf<String?>(null)}
     var year by rememberSaveable(input.key) {mutableStateOf("")}
     var all by rememberSaveable(input.key) {mutableStateOf(false)}
+    var streakExpanded by rememberSaveable(input.key) {mutableStateOf(false)}
+    var otherExpanded by rememberSaveable(input.key) {mutableStateOf(false)}
     var months by remember(input.key) {mutableStateOf<List<RankedLink>>(emptyList())}
     var milestone by rememberSaveable(input.key) {mutableIntStateOf(pages.milestoneTarget)}
     var milestoneLinks by remember(input.key) {mutableStateOf<List<RankedLink>>(emptyList())}
@@ -111,8 +113,18 @@ import java.time.Instant
                         }
                     }
                 }
-                item {ExpandableRankingSection("Streak rankings",rankings?.first.orEmpty(),onOpen,true,"This ${i.row.type.title.lowercase().removeSuffix("s")} has no placement in the lists measured in this section.")}
-                item {ExpandableRankingSection("Other rankings",rankings?.second.orEmpty().filter {it.query.sort !in listOf("first-n-scrobbles","fastest-n-scrobbles")}+listOfNotNull(i.initial,length),onOpen,true,"This ${i.row.type.title.lowercase().removeSuffix("s")} has no placement in the lists measured in this section.")}
+                item {ExpandableHeader("Streak rankings",streakExpanded) {streakExpanded=!streakExpanded}}
+                if(streakExpanded) {
+                    val links=rankings?.first.orEmpty()
+                    if(links.isEmpty()) item {Text("This ${i.row.type.title.lowercase().removeSuffix("s")} has no placement in the lists measured in this section.",style=MaterialTheme.typography.bodySmall)}
+                    else items(links) {RankingLink(it,onOpen,true)}
+                }
+                item {ExpandableHeader("Other rankings",otherExpanded) {otherExpanded=!otherExpanded}}
+                if(otherExpanded) {
+                    val links=rankings?.second.orEmpty().filter {it.query.sort !in listOf("first-n-scrobbles","fastest-n-scrobbles")}+listOfNotNull(i.initial,length)
+                    if(links.isEmpty()) item {Text("This ${i.row.type.title.lowercase().removeSuffix("s")} has no placement in the lists measured in this section.",style=MaterialTheme.typography.bodySmall)}
+                    else items(links) {RankingLink(it,onOpen,true)}
+                }
             }
             item {Text("Based on downloaded history${if(vm.account?.pending==true) "; download is incomplete" else ""}. Tap a ranking to open its list.",style=MaterialTheme.typography.bodySmall)}
         }

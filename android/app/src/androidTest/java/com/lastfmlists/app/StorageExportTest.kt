@@ -59,6 +59,17 @@ class StorageExportTest {
         store.startDetails("listener")
         assertFalse(store.account("listener")!!.detailsComplete)
     }
+    @Test fun visualFilterEditorsKeepTheExistingQueryEncoding() {
+        assertEquals("0,2,5",toggleNumber("0,5",2))
+        assertEquals("0,5",toggleNumber("0,2,5",2))
+        val alternatives=appendTerm("rock","pop",false)
+        assertEquals("rock,pop",alternatives)
+        val required=appendTerm(alternatives,"live",true)
+        assertEquals("rock,pop;live",required)
+        assertTrue(Analytics.matches(required,"Live pop recording"))
+        assertFalse(Analytics.matches(required,"Pop recording"))
+        assertEquals("rock;live",removeTerm(required,0,1))
+    }
     @Test fun nativePngRendererCreatesReadableNonEmptyImage() {
         val engine=Analytics(listOf(Scrobble("Artist","Album","Song",1700000000000)))
         val q=Query();val result=Exporter.render("listener",listOf(q to engine.analyze(q).rows),false,false,true)

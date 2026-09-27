@@ -50,6 +50,6 @@ class ListHistory(private val prefs: SharedPreferences) {
 }
 private fun queryDescription(q: Query): String {
     val sort=Catalog.sorts.firstOrNull {it.first==q.sort}?.second?.replace("X",q.x.toString()) ?: q.sort
-    val filters=q.filters.filterValues {it.isNotBlank()}.map {(k,v)->"${Catalog.fields.firstOrNull {it.id==k}?.let {it.group+" "+it.label} ?: k}: $v"}
+    val filters=q.filters.filterValues {it.isNotBlank()}.map {(k,v)->"${Catalog.fields.firstOrNull {it.id==k}?.let {it.group+" "+it.label} ?: k}: ${filterValueLabel(k,v)}"}
     return (listOf("${q.type.title} · $sort",if(q.limit==0) "All results" else "${q.limit} results")+filters+(if(q.equations.isNotBlank()) listOf("Rules: ${q.equations}") else emptyList())).joinToString("\n")
 }

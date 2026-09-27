@@ -182,7 +182,7 @@ import kotlinx.coroutines.*
     var expanded by rememberSaveable(query) {mutableStateOf(false)}
     key(query,result) { Column(modifier) {
         val sortLabel=Catalog.sorts.firstOrNull {it.first==query.sort}?.second?.replace("X",query.x.toString()) ?: query.sort
-        val active=query.filters.filterValues {it.isNotBlank()}.map {(id,value)->Triple(id,Catalog.fields.firstOrNull {it.id==id}?.label ?: id,value)}
+        val active=query.filters.filterValues {it.isNotBlank()}.map {(id,value)->Triple(id,Catalog.fields.firstOrNull {it.id==id}?.label ?: id,filterValueLabel(id,value))}
         if(!expanded) Row(Modifier.fillMaxWidth().padding(horizontal=8.dp),verticalAlignment=Alignment.CenterVertically) {
             Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(6.dp)) {
                 AssistChip(onClick={onFilter("__display__")},label={Text("Rank by: $sortLabel")})
@@ -257,32 +257,46 @@ import kotlinx.coroutines.*
     val initialGroup=when(initialField) {"__equations__"->"Equations";null,"__display__"->"Display";else->Catalog.fields.firstOrNull {it.id==initialField}?.group ?: "Display"}
     var group by rememberSaveable(initialField) { mutableStateOf(initialGroup) }
     Column(Modifier.fillMaxSize()) {
-        Text("List settings",Modifier.padding(horizontal=24.dp),style=MaterialTheme.typography.titleLarge)
-        Text(title,Modifier.padding(horizontal=24.dp,vertical=4.dp),color=MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(title,Modifier.padding(horizontal=24.dp,vertical=8.dp),color=MaterialTheme.colorScheme.onSurfaceVariant)
         Row(Modifier.horizontalScroll(rememberScrollState()).padding(horizontal=16.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)) { listOf("Display","Artist","Album","Track","Time","Equations").forEach { name -> FilterChip(selected=group==name,onClick={group=name},label={Text(name)}) } }
-        Column(Modifier.weight(1f).verticalScroll(remember(group) { androidx.compose.foundation.ScrollState(0) }).padding(horizontal=24.dp,vertical=8.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+        Column(Modifier.weight(1f).verticalScroll(remember(group) { androidx.compose.foundation.ScrollState(0) }).padding(horizontal=24.dp,vertical=8.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) { key(resetVersion) {
             if(group=="Display") {
                 Choice("View",display,listOf("List" to "List","Chart" to "Chart"),onDisplay)
                 SettingSwitch("Show full-library counts and ranks","Show each result’s position in the complete downloaded library.",showTotals,onShowTotals)
                 Choice("List type",draft.type.name,EntityType.entries.map { it.name to it.title },{draft=draft.copy(type=EntityType.valueOf(it))})
-                Choice("Rank by",draft.sort,Catalog.sorts.filter { details || it.first !in listOf("time-spent-listening","highest-listening-percentage") },{draft=draft.copy(sort=it)})
-                IntegerField("X",draft.x) { draft=draft.copy(x=it.coerceAtLeast(1)) }
-                IntegerField("List length · 0 shows all",draft.limit) { draft=draft.copy(limit=it) }
-                IntegerField("Tracks per artist · 0 is unlimited",draft.maxPerArtist) { draft=draft.copy(maxPerArtist=it) }
+                Choice("Rank by",draft.sort,Catalog.sorts.filter { details || it.first !in listOf("time-spent-listening","highest-listening-percentage") }.map {it.first to it.second.replace("X",draft.x.toString())},{draft=draft.copy(sort=it)})
+                val threshold=when(draft.sort) {
+                    "first-n-scrobbles","fastest-n-scrobbles" -> "Play milestone" to listOf(10 to "10 plays",25 to "25 plays",50 to "50 plays",100 to "100 plays")
+                    "max-rolling-xh" -> "Rolling window" to listOf(1 to "1 hour",6 to "6 hours",12 to "12 hours",24 to "24 hours")
+                    "oldest-average-listening-time","newest-average-listening-time" -> "Minimum plays per item" to listOf(1 to "1 play",5 to "5 plays",10 to "10 plays",25 to "25 plays")
+                    else -> if(draft.equations.contains("average-listening-time")) "Minimum plays for average date rules" to listOf(1 to "1 play",5 to "5 plays",10 to "10 plays",25 to "25 plays") else null
+                }
+                threshold?.let {(label,options)->PresetIntControl(label,draft.x,options,{draft=draft.copy(x=it)},minimum=1)}
+                PresetIntControl("Results to show",draft.limit,listOf(10 to "Top 10",25 to "Top 25",50 to "Top 50",100 to "Top 100",0 to "All"),{draft=draft.copy(limit=it)},description="This changes how many rows are displayed, not which plays are counted.")
+                if(draft.type in listOf(EntityType.TRACK,EntityType.SCROBBLE)) PresetIntControl("Results per artist",draft.maxPerArtist,listOf(0 to "Unlimited",1 to "1",2 to "2",3 to "3",5 to "5"),{draft=draft.copy(maxPerArtist=it)},description="Limit how many tracks from the same artist appear in the results.")
                 Text("Counts and ranks in filters refer to your whole downloaded library.",style=MaterialTheme.typography.bodySmall)
             } else if(group=="Equations") {
-                key(resetVersion) { EquationEditor(draft.equations,{equationValid=it}) { draft=draft.copy(equations=it) } }
+                EquationEditor(draft.equations,{equationValid=it}) { draft=draft.copy(equations=it) }
             } else {
                 if(!details && group in listOf("Artist","Album","Track")) Text("Global stats, genres and duration unlock as you download details from Library.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.primary)
-                Catalog.fields.filter { it.group==group }.forEach { field ->
+                if(group=="Time") Text("Choose when the scrobbles happened. Leave a control empty to include any value.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                val fields=Catalog.fields.filter {it.group==group}
+                fields.forEach { field ->
+                    val pairId=when {
+                        field.id.endsWith("-min") -> field.id.removeSuffix("-min")+"-max"
+                        field.id=="scrobble-order-from" -> "scrobble-order-to"
+                        else -> null
+                    }
+                    if(field.id.endsWith("-max") || field.id=="scrobble-order-to") return@forEach
                     val value=draft.filters[field.id] ?: ""
                     val focusRequester=remember(field.id,initialField) {FocusRequester()}
-                    LaunchedEffect(field.id,initialField) {if(field.id==initialField) focusRequester.requestFocus()}
-                    if(field.options.isNotEmpty()) Choice(field.label,value,field.options,{draft=draft.copy(filters=draft.filters+(field.id to it))})
-                    else OutlinedTextField(value=value,onValueChange={draft=draft.copy(filters=draft.filters+(field.id to it))},label={Text(field.label)},placeholder={if(!field.id.endsWith("includes") && !field.id.endsWith("excludes")) Text(field.hint)},supportingText={if(value.isNotBlank() && (field.id.endsWith("includes") || field.id.endsWith("excludes"))) Text("Comma = OR; semicolon = AND") },enabled=!field.detailed || details,singleLine=true,modifier=Modifier.fillMaxWidth().focusRequester(focusRequester),shape=RoundedCornerShape(12.dp),keyboardOptions=KeyboardOptions(keyboardType=if(field.id.endsWith("-min") || field.id.endsWith("-max")) KeyboardType.Decimal else KeyboardType.Text))
+                    LaunchedEffect(field.id,initialField) {if(initialField==field.id || initialField==pairId) focusRequester.requestFocus()}
+                    fun setFilter(id: String,newValue: String) {draft=draft.copy(filters=draft.filters+(id to newValue))}
+                    if(pairId!=null && fields.any {it.id==pairId}) RangeFilterControl(if(field.id=="scrobble-order-from") "Play position in history" else field.label.substringBefore(" · minimum"),value,draft.filters[pairId].orEmpty(),{setFilter(field.id,it)},{setFilter(pairId,it)},!field.detailed || details,Modifier.focusRequester(focusRequester))
+                    else FilterFieldControl(field,value,!field.detailed || details,{setFilter(field.id,it)},Modifier.focusRequester(focusRequester))
                 }
             }
-        }
+        } }
         Row(Modifier.fillMaxWidth().padding(20.dp),horizontalArrangement=Arrangement.spacedBy(12.dp)) { OutlinedButton(onClick={draft=Query(type=draft.type);equationValid=true;resetVersion++},modifier=Modifier.weight(1f)) { Text("Reset") }; Button(onClick={onApply(draft)},enabled=equationValid,modifier=Modifier.weight(1f)) { Text("Apply filters") } }
     }
 }

@@ -40,7 +40,7 @@ object Catalog {
             }
             if(kind == "artist") add(FilterField("artist-tags", "Tags / genres", group, "pop, rock; british", true))
         }
-        addAll(listOf(FilterField("last-n-days","Last X days","Time"), FilterField("date-range-start","Start date","Time","YYYY-MM-DD"), FilterField("date-range-end","End date","Time","YYYY-MM-DD"), FilterField("year","Years","Time","2024, 2025"), FilterField("month","Months","Time","1–12, comma separated"), FilterField("day-of-month","Days of month","Time","1, 15, 31"), FilterField("weekday","Weekdays","Time","0 = Sunday … 6 = Saturday"), FilterField("time-of-day-start","Time from","Time","HH:mm"), FilterField("time-of-day-end","Time until","Time","HH:mm")))
+        addAll(listOf(FilterField("last-n-days","Recent activity","Time"), FilterField("date-range-start","From date","Time"), FilterField("date-range-end","Through date","Time"), FilterField("year","Years","Time"), FilterField("month","Months","Time"), FilterField("day-of-month","Days of month","Time"), FilterField("weekday","Weekdays","Time"), FilterField("time-of-day-start","From time","Time"), FilterField("time-of-day-end","Through time","Time")))
         add(FilterField("session-starter-only","Session starters","Time",options=listOf("" to "Off", "use-gap" to "After a long gap")))
         add(FilterField("day-starter-only","Day starters","Time",options=listOf("" to "Off","first-day-literal" to "First of each day","first-day-smart" to "First of day after a long gap")))
         add(FilterField("day-starter-gap-hours","Long gap (hours)","Time","6"))

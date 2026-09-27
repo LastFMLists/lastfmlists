@@ -30,7 +30,7 @@ class OfflineJourneyTest {
     @Test fun demoFiltersAndGamesWorkWithoutNetwork() {
         loadDemo()
         compose.onNodeWithContentDescription("Edit filters").performClick()
-        compose.onNodeWithText("List settings").assertIsDisplayed()
+        compose.onNodeWithText("Your list").assertIsDisplayed()
         compose.onNodeWithText("Apply filters").performClick()
         compose.onNodeWithText("Games",useUnmergedTree=false).performClick()
         compose.onNodeWithText("Higher or Lower").performClick()
@@ -84,6 +84,23 @@ class OfflineJourneyTest {
         compose.onNodeWithText("Display").performClick()
         compose.onNodeWithText("View").assertIsDisplayed()
         compose.onNodeWithText("Show full-library counts and ranks").assertIsDisplayed()
+    }
+    @Test fun weekdayAndMilestoneControlsKeepTheExistingQueryValues() {
+        loadDemo()
+        scenario.onActivity {activity ->androidx.lifecycle.ViewModelProvider(activity)[MainViewModel::class.java].updateQuery(Query(sort="first-n-scrobbles"))}
+        compose.onNodeWithContentDescription("Edit filters").performClick()
+        compose.onNodeWithText("Play milestone").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("25 plays").performScrollTo().performClick()
+        compose.onNodeWithText("Time").performClick()
+        compose.onNodeWithText("Mon").performScrollTo().performClick()
+        compose.onNodeWithText("Fri").performScrollTo().performClick()
+        compose.onNodeWithText("Apply filters").performClick()
+        scenario.onActivity {activity ->
+            val q=androidx.lifecycle.ViewModelProvider(activity)[MainViewModel::class.java].left
+            assertEquals("first-n-scrobbles",q.sort)
+            assertEquals(25,q.x)
+            assertEquals("1,5",q.filters["weekday"])
+        }
     }
     @Test fun entityInitialLinkOpensAnUnlimitedFilteredList() {
         loadDemo();compose.onNodeWithText("Hidden Place").performClick()

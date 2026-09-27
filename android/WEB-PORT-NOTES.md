@@ -1,4 +1,14 @@
-# Android implementation handoff (0.2–0.6)
+# Android implementation handoff (0.2–0.7)
+
+## 0.7 filter editor presentation (no filtering logic changes)
+
+The filter editor still writes the same `Query` fields and filter IDs. A weekday selection serializes to comma-separated `0..6` values with Sunday `0`; months serialize to `1..12`; days of month to `1..31`; date pickers write ISO `YYYY-MM-DD`; time pickers write `HH:mm`. Year chips serialize to comma-separated years. The visible chips and list-history labels show weekday and month names instead of raw numbers. Existing saved queries remain valid.
+
+In Display, show the `x` parameter only when the selected ranking uses it. Label it **Play milestone** for First/Fastest to X, **Rolling window** for Most within X hours, and **Minimum plays per item** for average-listening-time rankings or rules. Keep the existing `x` value in the query when switching ranking modes; hiding the control must not reset it. Show list length as Top 10/25/50/100/All plus Custom. Show the per-artist cap only for track and scrobble lists, where the engine applies it. All custom values still serialize to the existing `limit` and `maxPerArtist` integers.
+
+Pair each numeric minimum and maximum under one named range card with **At least**, **At most**, and Clear controls. Leave empty endpoints unrestricted. Recent activity and long-gap filters offer common presets plus Custom; their stored numeric strings are unchanged. Date and time controls use native pickers and each has a clear action. Weekdays, months and days use multi-select chips. Years use removable chips and an Add year field.
+
+Name includes/excludes and artist tags expose the existing comma/semicolon rules as term groups: terms in the same group are alternatives (OR), while groups are all required (AND). Adding an alternative appends a comma term; adding a required group appends a semicolon term. Excludes still negate the resulting match as before. The editor uses plain-language labels and shows the groups; the filter engine, parser, and matching rules are unchanged.
 
 ## 0.6 additions (supersede conflicting behaviour below)
 
