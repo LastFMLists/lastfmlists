@@ -136,8 +136,12 @@ export function getControlLabelText(control) {
     return "";
 }
 
+// How many rows a list shows. An empty box means the default of 10, and 0
+// means every row.
 export function getListLengthLimit() {
-    return Math.max(1, parseInt(document.getElementById("list-length")?.value, 10) || 10);
+    const value = parseInt(document.getElementById("list-length")?.value, 10);
+    if (value === 0) return Infinity;
+    return Math.max(1, value || 10);
 }
 
 const HTML_ESCAPES = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };

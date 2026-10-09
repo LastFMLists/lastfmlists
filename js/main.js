@@ -16,6 +16,7 @@ import { loadingDiv } from './dom.js';
 import { initGames } from './games/index.js';
 import { state } from './state.js';
 import { ensureRaceDateDefaults, updateRaceControlsVisibility } from './ui/charts.js';
+import './ui/entity-page.js';
 import './ui/export.js';
 import {
     initializeEquationControls,
@@ -54,6 +55,9 @@ document.getElementById("username-form").addEventListener("submit", async (event
 		console.error("Error retrieving saved data", err);
 		return null;
 	});
+
+	// Covers from an earlier save, so the sync below only adds new ones.
+	state.albumArt = { ...(savedData?.data?.albumArt || {}) };
 
     try {
         if (savedData) {
@@ -314,7 +318,8 @@ document.getElementById("save-data").addEventListener("click", async () => {
       allTracks: state.allTracks,
       artistsData: state.artistsData,
       albumsData: state.albumsData,
-      tracksData: state.tracksData
+      tracksData: state.tracksData,
+      albumArt: state.albumArt
     };
     try {
       await saveUserData(username, dataToSave);

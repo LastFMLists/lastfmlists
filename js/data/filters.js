@@ -24,6 +24,15 @@ import {
     isRollingWindowSortingBasis
 } from './metrics.js';
 
+// Midnight at the start of a YYYY-MM-DD day in the user's own time zone, plus
+// an optional number of days. new Date("2024-01-01") would read the date as
+// UTC midnight, which puts late-evening plays into the wrong day.
+export function parseLocalDateStart(value, addDays = 0) {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec((value || "").toString().trim());
+    if (!match) return null;
+    return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]) + addDays).getTime();
+}
+
 function normalizeText(str) {
     // Lowercase, trim, and remove hyphens for a more forgiving comparison.
     return str.trim().toLowerCase().replace(/-/g, '');
@@ -384,12 +393,13 @@ export function filterTracks(filtersOverride = null, sourceTracks = null) {
         },
 
         "date-range-start": (item, value) => {
-            const startTime = new Date(value).getTime();
-            return item.Date >= startTime;
+            const startTime = parseLocalDateStart(value);
+            return startTime === null || item.Date >= startTime;
         },
         "date-range-end": (item, value) => {
-            const endTime = new Date(value).getTime() + 86400000; // Include the whole day
-            return item.Date < endTime;
+            // The day after the chosen one, so the whole end day is included.
+            const endTime = parseLocalDateStart(value, 1);
+            return endTime === null || item.Date < endTime;
         },
 
         "scrobble-order-from": (item, value) => item.order >= parseInt(value, 10),

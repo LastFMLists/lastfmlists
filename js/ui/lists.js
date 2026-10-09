@@ -18,8 +18,9 @@ import {
     normalizeEntitySorting,
     resolveDisplayEntities
 } from '../data/filters.js';
+import { createArtworkElement } from '../data/artwork.js';
 import { computeUnfilteredStats, isRollingWindowSortingBasis } from '../data/metrics.js';
-import { escapeHTML } from '../dom.js';
+import { escapeHTML, getListLengthLimit } from '../dom.js';
 import { state } from '../state.js';
 import { formatDuration } from '../time.js';
 import {
@@ -33,11 +34,29 @@ import {
 } from './charts.js';
 import { isComparisonEnabled, updateActiveFilters } from './filters-panel.js';
 
+// A list row with a cover on the left. Clicking it opens the entity's own
+// page (see ui/entity-page.js), so the row carries the entity's identity.
+function fillEntityRow(row, type, identity, html) {
+    row.classList.add("entity-row");
+    row.tabIndex = 0;
+    row.setAttribute("role", "button");
+    row.dataset.entityType = type;
+    row.dataset.name = identity.name || "";
+    row.dataset.artist = identity.artist || "";
+    if (identity.album) row.dataset.album = identity.album;
+    row.title = `Show stats for ${identity.name}`;
+
+    const text = document.createElement("div");
+    text.className = "entity-row-text";
+    text.innerHTML = html;
+    row.append(createArtworkElement(type, identity.name, identity.artist, identity.album), text);
+}
+
 function displayTopTracks(tracks, targetDiv = null, sortingBasisOverride = null) {
     const resultsDiv = targetDiv || document.getElementById("results");
     resultsDiv.innerHTML = "";
     const sortingBasis = sortingBasisOverride || document.getElementById("sorting-basis").value;
-    const listLength = parseInt(document.getElementById("list-length").value) || 10;
+    const listLength = getListLengthLimit();
     const showUnfiltered = document.getElementById("unfiltered-stats").checked;
     let unfilteredMapping = {};
     if (showUnfiltered) {
@@ -73,11 +92,11 @@ function displayTopTracks(tracks, targetDiv = null, sortingBasisOverride = null)
             }
         }
 
-        trackDiv.innerHTML = `
+        fillEntityRow(trackDiv, "track", { name: track.Track, artist: track.Artist, album: albumDisplay || null }, `
             <strong>${index + 1}. ${escapeHTML(track.Track)}</strong> by ${escapeHTML(track.Artist)}${unfilteredInfo}
             ${albumDisplay ? `<br>Album: ${escapeHTML(albumDisplay)}` : ''}
             <br>${additionalInfo}
-        `;
+        `);
         fragment.appendChild(trackDiv);
     });
     resultsDiv.appendChild(fragment);
@@ -87,7 +106,7 @@ function displayTopAlbums(albums, targetDiv = null, sortingBasisOverride = null)
     const resultsDiv = targetDiv || document.getElementById("results");
     resultsDiv.innerHTML = "";
     const sortingBasis = sortingBasisOverride || document.getElementById("sorting-basis").value;
-    const listLength = parseInt(document.getElementById("list-length").value) || 10;
+    const listLength = getListLengthLimit();
     const showUnfiltered = document.getElementById("unfiltered-stats").checked;
     let unfilteredMapping = {};
     if (showUnfiltered) {
@@ -110,10 +129,10 @@ function displayTopAlbums(albums, targetDiv = null, sortingBasisOverride = null)
             }
         }
 
-        albumDiv.innerHTML = `
+        fillEntityRow(albumDiv, "album", { name: album.name, artist: album.artist }, `
             <strong>${index + 1}. ${escapeHTML(album.name)}</strong> by ${escapeHTML(album.artist)}${unfilteredInfo}<br>
             ${additionalInfo}
-        `;
+        `);
         fragment.appendChild(albumDiv);
     });
     resultsDiv.appendChild(fragment);
@@ -123,7 +142,7 @@ function displayTopArtists(artists, targetDiv = null, sortingBasisOverride = nul
     const resultsDiv = targetDiv || document.getElementById("results");
     resultsDiv.innerHTML = "";
     const sortingBasis = sortingBasisOverride || document.getElementById("sorting-basis").value;
-    const listLength = parseInt(document.getElementById("list-length").value) || 10;
+    const listLength = getListLengthLimit();
     const showUnfiltered = document.getElementById("unfiltered-stats").checked;
     let unfilteredMapping = {};
     if (showUnfiltered) {
@@ -146,10 +165,10 @@ function displayTopArtists(artists, targetDiv = null, sortingBasisOverride = nul
             }
         }
 
-        artistDiv.innerHTML = `
+        fillEntityRow(artistDiv, "artist", { name: artist.name, artist: artist.name }, `
             <strong>${index + 1}. ${escapeHTML(artist.name)}</strong>${unfilteredInfo}<br>
             ${additionalInfo}
-        `;
+        `);
         fragment.appendChild(artistDiv);
     });
     resultsDiv.appendChild(fragment);
@@ -489,7 +508,7 @@ export function displayEntities() {
 function displayScrobbles(scrobbles, targetDiv = null, order = "asc") {
     const resultsDiv = targetDiv || document.getElementById("results");
     const maxPerArtist = parseInt(document.getElementById("max-per-artist").value) || Infinity;
-    const listLength = parseInt(document.getElementById("list-length").value) || 10;
+    const listLength = getListLengthLimit();
     let tracks = [...scrobbles];
     resultsDiv.innerHTML = "";
     const fragment = document.createDocumentFragment();
@@ -526,13 +545,28 @@ function displayScrobbles(scrobbles, targetDiv = null, order = "asc") {
             String(date.getHours()).padStart(2, "0") + ":" + 
             String(date.getMinutes()).padStart(2, "0");
 
-        trackDiv.innerHTML = `
+        fillEntityRow(trackDiv, "track", { name: track.Track, artist, album: track.Album }, `
             <strong>${escapeHTML(track.Track)}</strong> by ${escapeHTML(artist)}
             <br>Album: ${escapeHTML(track.Album || "Unknown")}
             <br>Scrobbled on: ${formattedDate}
-        `;
+        `);
 
         fragment.appendChild(trackDiv);
     });
     resultsDiv.appendChild(fragment);
+}
+
+// Mark the row for one entity and bring it into view, so a list opened from
+// an entity page shows where that entity sits.
+export function highlightEntityRow({ type, name, artist }) {
+    const results = document.getElementById("results");
+    if (!results) return;
+    const lower = value => (value || "").toLowerCase();
+    const row = Array.from(results.querySelectorAll(".entity-row")).find(candidate =>
+        candidate.dataset.entityType === type
+        && lower(candidate.dataset.name) === lower(name)
+        && (type === "artist" || lower(candidate.dataset.artist) === lower(artist)));
+    if (!row) return;
+    row.classList.add("is-highlighted");
+    requestAnimationFrame(() => row.scrollIntoView({ block: "center", behavior: "smooth" }));
 }

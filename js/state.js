@@ -18,6 +18,10 @@ export const state = {
     topAlbums: [],
     topTracks: [],
 
+    // Album cover URLs keyed "album||artist" (lowercase). "" marks an album
+    // Last.fm has no cover for. Saved with the rest of the dataset.
+    albumArt: {},
+
     // Per-scrobble context, keyed by scrobble order (see buildHistoryContextMaps)
     previousScrobbleTimestampByOrder: {},
     isFirstScrobbleOfDayByOrder: {},

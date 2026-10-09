@@ -2,6 +2,7 @@
 // data or null; none of them touch the DOM beyond progress messages.
 
 import { API_KEY } from '../config.js';
+import { pickImageUrl, rememberAlbumArt } from '../data/artwork.js';
 import { loadingDiv, mapWithConcurrency } from '../dom.js';
 import { albumCoverCache } from '../state.js';
 import { fetchJsonWithRetry, rateLimitedFetch } from './rate-limit.js';
@@ -86,13 +87,17 @@ export async function fetchAlbumCoverUrl(albumName, artistName) {
 
   
 // Map a raw Last.fm recenttracks entry to our internal shape.
+// The album cover that comes with each scrobble is kept in a separate
+// per-album map instead of on the scrobble, so it is stored once per album.
 export function mapRecentTrack(track) {
-    return {
+    const mapped = {
         Artist: track.artist?.name || track.artist?.["#text"] || "Unknown",
         Album: track.album?.["#text"] || "Unknown",
         Track: track.name || "Unknown",
         Date: track.date?.uts ? parseInt(track.date.uts) * 1000 : null
     };
+    rememberAlbumArt(mapped.Album, mapped.Artist, pickImageUrl(track.image));
+    return mapped;
 }
 
 // Fetch the user's top artists from Last.fm

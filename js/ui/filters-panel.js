@@ -22,7 +22,12 @@ import {
     readCurrentFilterInputState
 } from '../data/filters.js';
 import { isSortingBasisUsingXValue } from '../data/metrics.js';
-import { getControlLabelText, insertAtCursor, serializeControlValue } from '../dom.js';
+import {
+    applySerializedControlValue,
+    getControlLabelText,
+    insertAtCursor,
+    serializeControlValue
+} from '../dom.js';
 import { state } from '../state.js';
 import {
     destroyVisualizationState,
@@ -30,7 +35,7 @@ import {
     hasRaceSettingsReady,
     updateRaceControlsVisibility
 } from './charts.js';
-import { displayEntities, getSelectedDisplayMode } from './lists.js';
+import { displayEntities, getSelectedDisplayMode, highlightEntityRow } from './lists.js';
 
 function getEquationInsertTargetInput() {
     const activeElement = document.activeElement;
@@ -568,6 +573,7 @@ function resetFilters() {
     updateComparisonInteractionState();
 
     updateRaceControlsVisibility();
+    notifyFilterControlsChanged();
     
     // Display the full track list and update active filters display
     filterTracks();
@@ -629,6 +635,7 @@ document.getElementById("comparison-toggle").addEventListener("click", () => {
     if (nextValue) {
         const target = getComparisonEditTarget();
         applyFilterInputState(state.comparisonFilterStates[target]);
+        notifyFilterControlsChanged();
     } else {
         state.activeFilters.length = 0;
         getManagedFilterElements().forEach(element => {
@@ -665,6 +672,7 @@ document.getElementById("comparison-edit-target").addEventListener("change", () 
 
     const currentSide = getComparisonEditTarget();
     applyFilterInputState(state.comparisonFilterStates[currentSide]);
+    notifyFilterControlsChanged();
     updateActiveFilters();
 });
 
@@ -731,3 +739,66 @@ document.addEventListener('click', function(event) {
         document.body.classList.remove('no-scroll');
     }
 });
+
+// The richer filter controls (ui/filter-controls.js) draw themselves from the
+// plain inputs. Setting an input's value from code fires no event, so every
+// place that does so calls this afterwards.
+export function notifyFilterControlsChanged() {
+    document.dispatchEvent(new CustomEvent("filters:changed"));
+}
+
+// Replace the current list with a new one, as when a ranking on an entity
+// page is clicked. Comparison is turned off and every other filter cleared,
+// so the list shows the full ranking the page described.
+//   query: { entityType, sortingBasis, xValue, filters: { id: value } }
+//   options.listLength: rows to show ("0" for all)
+//   options.highlight: { type, name, artist } of a row to scroll to
+export function openListQuery(query, options = {}) {
+    destroyVisualizationState();
+    state.raceRenderArmed = false;
+
+    const comparisonButton = document.getElementById("comparison-toggle");
+    if (comparisonButton && comparisonButton.dataset.active === "true") {
+        comparisonButton.dataset.active = "false";
+        comparisonButton.textContent = "Comparison: Off";
+    }
+    state.comparisonFilterStates = { left: {}, right: {} };
+    state.comparisonStateInitialized = false;
+    const editTarget = document.getElementById("comparison-edit-target");
+    if (editTarget) editTarget.value = "left";
+
+    getManagedFilterElements().forEach(element => applySerializedControlValue(element, ""));
+    ["equations", "equations-right"].forEach(id => {
+        const input = document.getElementById(id);
+        if (input) input.value = "";
+    });
+
+    const normalized = normalizeEntitySorting(query.entityType || "track", query.sortingBasis || "scrobbles");
+    document.getElementById("entity-type").value = normalized.entityType;
+    document.getElementById("sorting-basis").value = normalized.sortingBasis;
+    document.getElementById("x-value").value = query.xValue ? String(query.xValue) : "";
+
+    const displayMode = document.getElementById("display-mode");
+    if (displayMode && displayMode.value !== DISPLAY_MODE_LIST) displayMode.value = DISPLAY_MODE_LIST;
+    updateRaceControlsVisibility();
+
+    const listLength = document.getElementById("list-length");
+    if (listLength && options.listLength !== undefined) listLength.value = String(options.listLength);
+
+    Object.entries(query.filters || {}).forEach(([id, value]) => {
+        applySerializedControlValue(document.getElementById(id), value);
+    });
+
+    state.activeFilters.length = 0;
+    getManagedFilterElements().forEach(element => addFilter(element.id, serializeControlValue(element)));
+
+    updateComparisonInteractionState();
+    syncEntitySortingSelectors();
+    notifyFilterControlsChanged();
+
+    filterTracks();
+    displayEntities();
+    updateActiveFilters();
+
+    if (options.highlight) highlightEntityRow(options.highlight);
+}

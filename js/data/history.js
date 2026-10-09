@@ -19,7 +19,7 @@ import {
     HISTORY_PAGE_SIZE_SAFE,
     debugLogDataset
 } from '../config.js';
-import { escapeHTML, loadingDiv, mapWithConcurrency } from '../dom.js';
+import { escapeHTML, getListLengthLimit, loadingDiv, mapWithConcurrency } from '../dom.js';
 import { state } from '../state.js';
 import { getLocalDayKeyFromTimestamp } from '../time.js';
 import { displayEntities } from '../ui/lists.js';
@@ -199,7 +199,7 @@ export function renderLoadingPreview({ artistTally, trackTally, headingText, not
 
     const entityTypeEl = document.getElementById("entity-type");
     const entityType = entityTypeEl ? entityTypeEl.value : "track";
-    const listLength = parseInt(document.getElementById("list-length")?.value, 10) || 10;
+    const listLength = getListLengthLimit();
 
     const useArtists = entityType === "artist";
     const heading = document.querySelector("#results-section h2");
@@ -220,7 +220,7 @@ export function renderLoadingPreview({ artistTally, trackTally, headingText, not
     }
 
     entries.sort((a, b) => b.count - a.count);
-    const top = entries.slice(0, listLength);
+    const top = entries.slice(0, Math.min(listLength, 100));
 
     const fragment = document.createDocumentFragment();
 
@@ -380,12 +380,7 @@ export async function fetchRecentTracksSince(username, latestTimestamp) {
             const ts = parseInt(track.date.uts, 10) * 1000;
 
             if (ts > latestTimestamp) {
-                newTracks.push({
-                    Artist: track.artist?.name || track.artist?.["#text"] || "Unknown",
-                    Album: track.album?.["#text"] || "Unknown",
-                    Track: track.name || "Unknown",
-                    Date: ts
-                });
+                newTracks.push(mapRecentTrack(track));
             } else {
                 keepFetching = false;
                 break;
