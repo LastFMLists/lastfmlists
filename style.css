@@ -264,11 +264,21 @@ body.app-loaded #input-section {
     }
 }
 
+/* One line: the card is wide enough on larger screens, and the text gets
+   slightly smaller on phones so it still fits. Below 380px it would get too
+   small to read, so it wraps into two even lines there instead. */
 .welcome-tagline {
     margin: 0 auto 1.7rem;
-    max-width: 42ch;
     color: var(--secondary-text-color);
-    font-size: 1.02rem;
+    font-size: clamp(0.8rem, 3.25vw, 1.02rem);
+    white-space: nowrap;
+}
+
+@media (max-width: 379px) {
+    .welcome-tagline {
+        white-space: normal;
+        text-wrap: balance;
+    }
 }
 
 .username-container {

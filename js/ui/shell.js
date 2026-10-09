@@ -81,6 +81,9 @@ export function updateExtendedDataUI() {
             sortingSelect.value = "scrobbles";
         }
     }
+
+    // Lets the filter controls re-apply which sorts fit the list type.
+    document.dispatchEvent(new CustomEvent("filters:changed"));
 }
 
 // Detect whether an already-loaded dataset (e.g. restored from the browser)

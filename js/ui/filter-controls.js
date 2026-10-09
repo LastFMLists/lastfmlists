@@ -400,6 +400,29 @@ function enhanceXValue() {
     sync();
 }
 
+// Scrobble lists can only be ordered by date, and the two date orders mean
+// nothing for tracks, albums or artists, so the sort menu offers only what
+// fits the list type. Hidden options are disabled too, because Safari shows
+// hidden options anyway.
+const SCROBBLE_ORDER_SORTS = new Set(["earliest-to-latest", "latest-to-earliest"]);
+const METADATA_SORTS = new Set(["time-spent-listening", "highest-listening-percentage"]);
+
+function syncSortOptions() {
+    const select = document.getElementById("sorting-basis");
+    if (!select) return;
+    const scrobbleList = (document.getElementById("entity-type")?.value || "track") === "scrobble";
+    Array.from(select.children).forEach(child => {
+        if (child.tagName === "HR") {
+            child.hidden = scrobbleList;
+            return;
+        }
+        if (child.tagName !== "OPTION") return;
+        const fits = scrobbleList === SCROBBLE_ORDER_SORTS.has(child.value);
+        child.hidden = !fits;
+        child.disabled = !fits || (METADATA_SORTS.has(child.value) && !state.extendedDataLoaded);
+    });
+}
+
 // The per-artist cap only applies to track and scrobble lists.
 function syncPerArtistVisibility() {
     const type = document.getElementById("entity-type")?.value || "track";
@@ -476,6 +499,7 @@ function wireActiveFilterChips() {
 export function refreshFilterControls() {
     refreshers.forEach(refresh => refresh());
     syncPerArtistVisibility();
+    syncSortOptions();
 }
 
 export function initFilterControls() {
@@ -532,10 +556,14 @@ export function initFilterControls() {
     wireActiveFilterChips();
 
     document.addEventListener("filters:changed", refreshFilterControls);
-    document.getElementById("entity-type")?.addEventListener("change", syncPerArtistVisibility);
+    document.getElementById("entity-type")?.addEventListener("change", () => {
+        syncPerArtistVisibility();
+        syncSortOptions();
+    });
     // Year chips depend on the loaded history, so redraw when a panel opens.
     document.querySelectorAll("#filters-section .dropdown-button").forEach(button => {
         button.addEventListener("click", refreshFilterControls);
     });
     syncPerArtistVisibility();
+    syncSortOptions();
 }
