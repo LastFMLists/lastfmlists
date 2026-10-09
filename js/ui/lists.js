@@ -19,7 +19,7 @@ import {
     resolveDisplayEntities
 } from '../data/filters.js';
 import { createArtworkElement } from '../data/artwork.js';
-import { computeUnfilteredStats, isRollingWindowSortingBasis } from '../data/metrics.js';
+import { computeUnfilteredStats, getDefaultXValue, isRollingWindowSortingBasis } from '../data/metrics.js';
 import { escapeHTML, getListLengthLimit } from '../dom.js';
 import { state } from '../state.js';
 import { formatDuration } from '../time.js';
@@ -339,7 +339,7 @@ export function displayEntities() {
     }
 
     const maxPerArtist = parseInt(document.getElementById("max-per-artist").value) || Infinity;
-    const xValue = parseInt(document.getElementById("x-value").value) || 1;
+    const xValue = parseInt(document.getElementById("x-value").value) || getDefaultXValue(sortingBasis);
     const comparisonButtonActive = isComparisonEnabled();
 
     const baseTracks = filterTracks(state.activeFilters, state.allTracks);
@@ -358,8 +358,8 @@ export function displayEntities() {
         ? ((document.getElementById("equations-right")?.value || rightState.equations || "").trim())
         : "";
 
-    const leftXValue = parseInt(leftState["x-value"], 10) || xValue;
-    const rightXValue = parseInt(rightState["x-value"], 10) || xValue;
+    const leftXValue = parseInt(leftState["x-value"], 10) || getDefaultXValue(leftState["sorting-basis"] || sortingBasis);
+    const rightXValue = parseInt(rightState["x-value"], 10) || getDefaultXValue(rightState["sorting-basis"] || sortingBasis);
     const leftPipeline = applyEquationPipeline(leftTracksBase, equationsLeft, { xValue: leftXValue });
     const comparisonRequested = comparisonButtonActive || equationsRight !== "";
 

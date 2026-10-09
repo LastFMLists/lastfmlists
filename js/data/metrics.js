@@ -723,6 +723,15 @@ export function getRollingWindowHoursForSortingBasis(sortingBasis, xValue) {
     return null;
 }
 
+// The X a sort uses when none is given. With X = 1, First and Fastest to X
+// would rank every item by its very first play, which says nothing.
+export function getDefaultXValue(sortingBasis) {
+    if (sortingBasis === "first-n-scrobbles" || sortingBasis === "fastest-n-scrobbles") return 50;
+    if (sortingBasis === "max-rolling-xh") return 24;
+    if (sortingBasis === "oldest-average-listening-time" || sortingBasis === "newest-average-listening-time") return 10;
+    return 1;
+}
+
 export function isSortingBasisUsingXValue(sortingBasis) {
     return [
         "first-n-scrobbles",

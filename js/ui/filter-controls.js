@@ -9,7 +9,7 @@
 // sets an input directly, filters-panel.js fires "filters:changed" and
 // every control here redraws from its input.
 
-import { isSortingBasisUsingXValue } from '../data/metrics.js';
+import { getDefaultXValue, isSortingBasisUsingXValue } from '../data/metrics.js';
 import { state } from '../state.js';
 
 const refreshers = [];
@@ -339,17 +339,20 @@ function enhancePresets(input, { title, presets, unit = "", note = "" }) {
         if (unit) input.placeholder = `Number of ${unit}`;
     };
     card._paint = paint;
+    card._clearCustom = () => { custom = false; };
     refreshers.push(paint);
     paint();
     return card;
 }
 
+// `kind` groups sorts whose X means the same thing, so a value carries over
+// between First and Fastest to X but not from a milestone to a time window.
 const X_SETTINGS = {
-    "first-n-scrobbles": { title: "Play milestone", unit: "plays", values: [10, 25, 50, 100] },
-    "fastest-n-scrobbles": { title: "Play milestone", unit: "plays", values: [10, 25, 50, 100] },
-    "max-rolling-xh": { title: "Time window", unit: "hours", values: [1, 6, 12, 24] },
-    "oldest-average-listening-time": { title: "Minimum plays per item", unit: "plays", values: [1, 5, 10, 25] },
-    "newest-average-listening-time": { title: "Minimum plays per item", unit: "plays", values: [1, 5, 10, 25] }
+    "first-n-scrobbles": { kind: "milestone", title: "Play milestone", unit: "plays", values: [10, 25, 50, 100] },
+    "fastest-n-scrobbles": { kind: "milestone", title: "Play milestone", unit: "plays", values: [10, 25, 50, 100] },
+    "max-rolling-xh": { kind: "window", title: "Time window", unit: "hours", values: [1, 6, 12, 24] },
+    "oldest-average-listening-time": { kind: "minimum", title: "Minimum plays per item", unit: "plays", values: [1, 5, 10, 25] },
+    "newest-average-listening-time": { kind: "minimum", title: "Minimum plays per item", unit: "plays", values: [1, 5, 10, 25] }
 };
 
 function currentXSetting() {
@@ -370,14 +373,29 @@ function enhanceXValue() {
             return setting.values.map(value => ({ value: String(value), label: `${value} ${setting.unit}` }));
         }
     });
+    let previousKind = null;
     const sync = () => {
         const sort = document.getElementById("sorting-basis")?.value;
+        // Kept current here too, because switching comparison sides changes
+        // the sort without a change event.
+        previousKind = X_SETTINGS[sort]?.kind || null;
         card.hidden = !isSortingBasisUsingXValue(sort);
         if (label) label.hidden = true;
         card._paint();
         input.placeholder = `Number of ${currentXSetting().unit}`;
     };
-    document.getElementById("sorting-basis")?.addEventListener("change", sync);
+    // Choosing a sort that uses X fills in a sensible X, unless the box
+    // already holds a value meant for the same kind of sort.
+    const onSortChange = () => {
+        const sort = document.getElementById("sorting-basis")?.value;
+        const setting = X_SETTINGS[sort];
+        if (setting && (!input.value.trim() || setting.kind !== previousKind)) {
+            card._clearCustom();
+            setValue(input, String(getDefaultXValue(sort)));
+        }
+        sync();
+    };
+    document.getElementById("sorting-basis")?.addEventListener("change", onSortChange);
     refreshers.push(sync);
     sync();
 }

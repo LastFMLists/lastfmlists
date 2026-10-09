@@ -8,7 +8,7 @@ import {
     SCROBBLE_SORT_DESC
 } from '../config.js';
 import { applyTracksPerEntityFilter, buildEntitiesFromTracks } from '../data/filters.js';
-import { isRollingWindowSortingBasis } from '../data/metrics.js';
+import { getDefaultXValue, isRollingWindowSortingBasis } from '../data/metrics.js';
 import { getListLengthLimit } from '../dom.js';
 import { state } from '../state.js';
 import { formatDateInputValue, formatDuration, getWeekNumber } from '../time.js';
@@ -781,7 +781,7 @@ function mountRaceChart(targetDiv, titleText, initialFrame, sortingBasis) {
 
 export function renderBarRaceSingle(tracks, entityType, targetDiv, sortingBasis) {
     const frequency = (document.getElementById("race-frequency")?.value || "day").toLowerCase();
-    const xValue = parseInt(document.getElementById("x-value")?.value, 10) || 1;
+    const xValue = parseInt(document.getElementById("x-value")?.value, 10) || getDefaultXValue(sortingBasis);
     const maxPerArtist = parseInt(document.getElementById("max-per-artist")?.value, 10) || Infinity;
     const bounds = resolveRaceTimeBounds([tracks]);
     const timeline = buildRaceTimeline(bounds.start, bounds.end, frequency);
