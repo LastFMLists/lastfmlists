@@ -532,7 +532,7 @@ function getRaceEntityKeyAndLabel(track, entityType) {
     if (entityType === "album") {
         return {
             key: `${(track.Album || "").toLowerCase()}||${(track.Artist || "").toLowerCase()}`,
-            label: `${track.Album || "Unknown Album"} – ${track.Artist || "Unknown Artist"}`
+            label: `${track.Album || "Unknown Album"} by ${track.Artist || "Unknown Artist"}`
         };
     }
     if (entityType === "artist") {
@@ -543,7 +543,7 @@ function getRaceEntityKeyAndLabel(track, entityType) {
     }
     return {
         key: `${(track.Track || "").toLowerCase()}||${(track.Artist || "").toLowerCase()}`,
-        label: `${track.Track || "Unknown Track"} – ${track.Artist || "Unknown Artist"}`
+        label: `${track.Track || "Unknown Track"} by ${track.Artist || "Unknown Artist"}`
     };
 }
 

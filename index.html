@@ -3,8 +3,8 @@
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-	<title>lastfmlists: advanced lists &amp; metrics for Last.fm</title>
-	<meta name="description" content="Generate advanced lists, charts, and statistics from your Last.fm scrobbles.">
+	<title>lastfmlists: lists and statistics for Last.fm</title>
+	<meta name="description" content="Make lists, charts and statistics from your Last.fm scrobbles.">
 	<meta name="theme-color" content="#FFFCF8">
 	<script>
 		// Runs before the stylesheet paints, so a saved dark theme doesn't flash light.
@@ -35,7 +35,7 @@
             <div class="welcome-card">
                 <img src="logo.png" alt="" class="welcome-logo">
                 <h1>lastfmlists</h1>
-                <p class="welcome-tagline">Advanced lists, charts, and metrics for your Last.fm scrobbles</p>
+                <p class="welcome-tagline">Lists, charts and statistics from your Last.fm scrobbles</p>
 
                 <form id="username-form" class="username-container">
                     <div class="input-shell">
@@ -66,8 +66,8 @@
                 </div>
             </div>
             <div class="session-actions">
-                <button type="button" id="load-detailed-data" disabled aria-label="Load details" title="Load extended data for your top artists, albums and tracks. That means Last.fm metadata like track length, genre/country tags, and global listeners/playcount. It unlocks the duration, tags and global-stats filters plus the “Time spent listening” and “Percentage of global scrobbles” sorts. Enough for most stats and much faster than “Load All Details”. (Load and save your data first to enable this.)"><i class="fas fa-circle-down" aria-hidden="true"></i><span class="btn-label">Load Details</span></button>
-                <button type="button" id="load-all-details" disabled aria-label="Load all details" title="Same extended metadata (track length, tags, global listeners/playcount) but for EVERY song you've ever scrobbled, not just your top ones. Unlocks the duration, tags and global-stats filters and the “Time spent listening” / “Percentage of global scrobbles” sorts for your whole library. This makes thousands of requests and can take a very long time. (Load and save your data first to enable this.)"><i class="fas fa-cloud-arrow-down" aria-hidden="true"></i><span class="btn-label">Load All Details</span></button>
+                <button type="button" id="load-detailed-data" disabled aria-label="Load details" title="Downloads Last.fm metadata for your top artists, albums and tracks: track length, genre and country tags, and global listener and play counts. This unlocks the duration, tag and global-stats filters and the “Time spent listening” and “Percentage of global scrobbles” sorts. It covers most uses and takes less time than “Load All Details”. Load your data first to use this."><i class="fas fa-circle-down" aria-hidden="true"></i><span class="btn-label">Load Details</span></button>
+                <button type="button" id="load-all-details" disabled aria-label="Load all details" title="Downloads the same metadata for every track you have scrobbled, including tracks outside your top lists. This makes thousands of requests and can take hours. Load your data first to use this."><i class="fas fa-cloud-arrow-down" aria-hidden="true"></i><span class="btn-label">Load All Details</span></button>
                 <button type="button" id="save-data" aria-label="Save data" title="Save your loaded data to this browser"><i class="fas fa-floppy-disk" aria-hidden="true"></i><span class="btn-label">Save Data</span></button>
                 <button type="button" id="open-export-options" aria-label="Export as image" title="Export the current list as a PNG image"><i class="fas fa-image" aria-hidden="true"></i><span class="btn-label">Export Image</span></button>
                 <button type="button" id="open-grid-export" aria-label="Export as grid" title="Export album artwork as a collage grid"><i class="fas fa-table-cells" aria-hidden="true"></i><span class="btn-label">Export Grid</span></button>

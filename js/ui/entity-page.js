@@ -369,7 +369,7 @@ function paint() {
 
         ${page.showAll ? renderAllLists() : ""}
 
-        <p class="entity-footnote">Based on the ${state.allTracks.length.toLocaleString()} scrobbles loaded in this browser, not only the list you came from. Click a ranking to open its list.</p>
+        <p class="entity-footnote">These numbers use all ${state.allTracks.length.toLocaleString()} scrobbles loaded in this browser, whatever filters the list had. Click a ranking to open its list.</p>
     </div>`;
 
     const artHolder = section.querySelector(".entity-header-art");

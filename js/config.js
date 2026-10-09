@@ -38,8 +38,8 @@ export const RATE_REFILL_PER_SECOND = 5;
 export const RATE_BURST_CAPACITY = 1000;
 
 // Tooltips for the two metadata-loading buttons, kept in sync with index.html.
-export const LOAD_DETAILS_TOOLTIP = "Load extended data for your top artists, albums and tracks. That means Last.fm metadata like track length, genre/country tags, and global listeners/playcount. It unlocks the duration, tags and global-stats filters plus the “Time spent listening” and “Percentage of global scrobbles” sorts. Enough for most stats and much faster than “Load All Details”.";
-export const LOAD_ALL_DETAILS_TOOLTIP = "Same extended metadata (track length, tags, global listeners/playcount) but for EVERY song you've ever scrobbled, not just your top ones. Unlocks the duration, tags and global-stats filters and the “Time spent listening” / “Percentage of global scrobbles” sorts for your whole library. This makes thousands of requests and can take a very long time.";
+export const LOAD_DETAILS_TOOLTIP = "Downloads Last.fm metadata for your top artists, albums and tracks: track length, genre and country tags, and global listener and play counts. This unlocks the duration, tag and global-stats filters and the “Time spent listening” and “Percentage of global scrobbles” sorts. It covers most uses and takes less time than “Load All Details”.";
+export const LOAD_ALL_DETAILS_TOOLTIP = "Downloads the same metadata for every track you have scrobbled, including tracks outside your top lists. This makes thousands of requests and can take hours.";
 
 // Dumping allTracks / artistsData to the console keeps every object alive in
 // devtools and stalls the tab on big libraries. Set localStorage
@@ -72,6 +72,6 @@ export const GLOBAL_BASE_SETTING_IDS = new Set([
 ]);
 
 // Message shown when hovering a control that needs extended metadata.
-export const EXTENDED_LOCKED_MSG = "🔒 Needs extended data. Click “Load Details” (or “Load All Details”) at the top first. It uses Last.fm metadata (track length, tags, global listeners/playcount) that isn't downloaded with your basic history.";
+export const EXTENDED_LOCKED_MSG = "🔒 This needs Last.fm metadata (track length, tags, global listener and play counts), which is not part of your listening history. Click “Load Details” or “Load All Details” at the top to download it.";
 
 export const EXPORT_MAX_ROWS_PER_COLUMN = 100;

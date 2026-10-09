@@ -325,10 +325,10 @@ document.getElementById("save-data").addEventListener("click", async () => {
     };
     try {
       await saveUserData(username, dataToSave);
-      alert("Data saved to browser successfully!");
+      alert("Your data is saved in this browser.");
     } catch (err) {
       console.error("Error saving data", err);
-      alert("Failed to save data.");
+      alert("Your data could not be saved in this browser.");
     }
   });
 

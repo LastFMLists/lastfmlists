@@ -78,9 +78,10 @@ async function loadDetailedMetadata(loadAll = false) {
 
     const { selectedArtists, selectedAlbums, selectedTracks } = selectCandidates(loadAll);
 
+    const counts = `${selectedArtists.length} artists, ${selectedAlbums.length} albums and ${selectedTracks.length} tracks`;
     const confirmMsg = loadAll
-        ? `Load ALL details downloads metadata for every single song you've ever listened to. This WILL take hours.\n\nThis run will request ${selectedArtists.length} artist metadata entries, ${selectedAlbums.length} album metadata entries, and ${selectedTracks.length} track metadata entries.\n\nDo you want to continue?`
-        : `Load Details will download ${selectedArtists.length} artist metadata entries, ${selectedAlbums.length} album metadata entries, and ${selectedTracks.length} track metadata entries.\n\nThis is enough for most stats. Use \"Load ALL Details\" if you want metadata for everything you've ever listened to.\n\nDo you want to continue?`;
+        ? `Load All Details downloads metadata for every artist, album and track you have scrobbled: ${counts}. This can take hours.\n\nContinue?`
+        : `Load Details downloads metadata for ${counts}. This is enough for most statistics. Use "Load All Details" for metadata on everything you have scrobbled.\n\nContinue?`;
     if (!confirm(confirmMsg)) return;
 
     const username = document.getElementById("username").value.trim();
