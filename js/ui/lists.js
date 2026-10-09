@@ -453,6 +453,7 @@ export function displayEntities() {
 
         state.filteredData = leftEntities;
         updateActiveFilters();
+        announceRenderedList(leftEntities.length + rightEntities.length);
         return;
     }
 
@@ -503,6 +504,13 @@ export function displayEntities() {
     }
 
     updateActiveFilters();
+    announceRenderedList(singleEntities.length);
+}
+
+// Lets other parts of the page react to a new list, such as the support
+// banner counting how many different lists were viewed.
+function announceRenderedList(count) {
+    document.dispatchEvent(new CustomEvent("lists:rendered", { detail: { count } }));
 }
 
 function displayScrobbles(scrobbles, targetDiv = null, order = "asc") {

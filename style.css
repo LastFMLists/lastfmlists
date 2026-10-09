@@ -2236,6 +2236,133 @@ button.entity-stat:hover {
 }
 
 /* ==========================================================================
+   Support banner
+   ========================================================================== */
+
+.support-banner {
+    position: fixed;
+    right: 1.2rem;
+    bottom: calc(1.2rem + env(safe-area-inset-bottom));
+    z-index: 1500;
+    display: none;
+    flex-direction: column;
+    gap: 0.75rem;
+    width: min(360px, calc(100vw - 2rem));
+    padding: 1rem 1rem 0.8rem;
+    background: var(--background-color);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    color: var(--primary-text-color);
+}
+
+.support-banner.is-visible {
+    display: flex;
+    animation: pop-up 0.25s ease;
+}
+
+.support-close {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    width: 2rem;
+    height: 2rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    background: none;
+    border: none;
+    border-radius: 50%;
+    color: var(--secondary-text-color);
+    cursor: pointer;
+}
+
+.support-close:hover {
+    background: var(--accent-soft);
+    color: var(--primary-text-color);
+}
+
+.support-body {
+    display: flex;
+    gap: 0.75rem;
+    padding-right: 1.6rem;
+}
+
+.support-icon {
+    flex-shrink: 0;
+    width: 2.6rem;
+    height: 2.6rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--accent-soft);
+    border-radius: 12px;
+    color: var(--primary-accent-color);
+    font-size: 1.15rem;
+}
+
+.support-text strong {
+    font-size: 1rem;
+}
+
+.support-text p {
+    margin: 0.2rem 0 0;
+    color: var(--secondary-text-color);
+    font-size: 0.86rem;
+    line-height: 1.45;
+}
+
+.support-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.6rem 0.9rem;
+    background: var(--primary-accent-color);
+    color: var(--on-accent);
+    border-radius: var(--radius-sm);
+    font-weight: 700;
+    text-decoration: none;
+    transition: background-color 0.15s ease;
+}
+
+.support-primary:hover {
+    background: var(--accent-strong);
+}
+
+.support-secondary {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 0.2rem;
+}
+
+.support-secondary button {
+    padding: 0.35rem 0.4rem;
+    background: none;
+    border: none;
+    border-radius: var(--radius-sm);
+    color: var(--secondary-text-color);
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.support-secondary button:hover {
+    background: var(--accent-soft);
+    color: var(--primary-text-color);
+}
+
+@media (max-width: 520px) {
+    .support-banner {
+        right: 1rem;
+        left: 1rem;
+        width: auto;
+    }
+}
+
+/* ==========================================================================
    Footer
    ========================================================================== */
 

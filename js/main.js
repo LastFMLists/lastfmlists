@@ -19,6 +19,7 @@ import { ensureRaceDateDefaults, updateRaceControlsVisibility } from './ui/chart
 import './ui/entity-page.js';
 import './ui/export.js';
 import { initFilterControls } from './ui/filter-controls.js';
+import './ui/support-banner.js';
 import {
     initializeEquationControls,
     updateActiveFilters,
