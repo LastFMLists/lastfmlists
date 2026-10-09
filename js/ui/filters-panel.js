@@ -234,6 +234,14 @@ document.querySelectorAll(".filters").forEach(filter => {
     filter.addEventListener("change", handleFilterInputEvent);
 });
 
+// What X means for the selected sort, for the active-filter chip.
+function xValueLabel(sortingBasis) {
+    if (sortingBasis === "first-n-scrobbles" || sortingBasis === "fastest-n-scrobbles") return "Play milestone";
+    if (sortingBasis === "max-rolling-xh") return "Time window (hours)";
+    if (sortingBasis === "oldest-average-listening-time" || sortingBasis === "newest-average-listening-time") return "Minimum plays per item";
+    return "X";
+}
+
 // Function to update the active filters display
 export function updateActiveFilters() {
     const activeFiltersDiv = document.getElementById("active-filters");
@@ -251,8 +259,8 @@ export function updateActiveFilters() {
         { id: "race-frequency", label: "Race update frequency", isSelect: true },
         { id: "race-speed-ms", label: "Race speed (ms/frame)" },
 
-        { id: "sorting-basis", label: "Sorting basis", isSelect: true },
-        { id: "x-value", label: "X" },
+        { id: "sorting-basis", label: "Ranked by", isSelect: true },
+        { id: "x-value", label: xValueLabel(document.getElementById("sorting-basis")?.value) },
 
         { id: "max-per-artist", label: "Displayed tracks per artist" },
 
@@ -350,7 +358,7 @@ export function updateActiveFilters() {
         { id: "day-starter-gap-hours", label: "Session/day starter long gap (hours)" },
         { id: "date-range-start", label: "Date range start" },
         { id: "date-range-end", label: "Date range end" },
-        { id: "last-n-days", label: "Last X days" },
+        { id: "last-n-days", label: "Played in the last (days)" },
         { id: "scrobble-order-from", label: "Scrobble order (min)" },
         { id: "scrobble-order-to", label: "Scrobble order (max)" },
 
@@ -392,10 +400,16 @@ export function updateActiveFilters() {
         return value;
     };
 
-    const appendFilterLabel = (text) => {
-        const filterLabel = document.createElement("div");
+    // Each chip is a button that opens its filter (see ui/filter-controls.js).
+    const appendFilterLabel = (text, id) => {
+        const filterLabel = document.createElement("button");
+        filterLabel.type = "button";
         filterLabel.classList.add("filter-label");
         filterLabel.textContent = text;
+        if (id) {
+            filterLabel.dataset.filterId = id;
+            filterLabel.title = "Change this filter";
+        }
         activeFiltersDiv.appendChild(filterLabel);
     };
 
@@ -406,11 +420,11 @@ export function updateActiveFilters() {
         const rightEquationValue = (document.getElementById("equations-right")?.value || rightState.equations || rightState["equations-right"] || "").toString().trim();
 
         if (leftEquationValue) {
-            appendFilterLabel(`Equations (left): ${leftEquationValue}`);
+            appendFilterLabel(`Equations (left): ${leftEquationValue}`, "equations");
         }
 
         if (rightEquationValue) {
-            appendFilterLabel(`Equations (right): ${rightEquationValue}`);
+            appendFilterLabel(`Equations (right): ${rightEquationValue}`, "equations-right");
         }
 
         const ids = new Set([...Object.keys(leftState), ...Object.keys(rightState)]);
@@ -437,32 +451,32 @@ export function updateActiveFilters() {
                 // Default value for right is "scrobbles"
                 const rightDefault = "scrobbles";
                 if (leftValue === rightValue) {
-                    appendFilterLabel(`${labelById[canonicalId]}: ${formatTagValue(canonicalId, leftValue)}`);
+                    appendFilterLabel(`${labelById[canonicalId]}: ${formatTagValue(canonicalId, leftValue)}`, canonicalId);
                 } else if (rightValue === rightDefault || !rightValue) {
                     // Only left is set or right is default, don't specify (Left)
-                    appendFilterLabel(`${labelById[canonicalId]}: ${formatTagValue(canonicalId, leftValue)}`);
+                    appendFilterLabel(`${labelById[canonicalId]}: ${formatTagValue(canonicalId, leftValue)}`, canonicalId);
                 } else if (leftValue && rightValue) {
-                    appendFilterLabel(`${labelById[canonicalId]}: ${formatTagValue(canonicalId, leftValue)} (Left)`);
-                    appendFilterLabel(`${labelById[canonicalId]}: ${formatTagValue(canonicalId, rightValue)} (Right)`);
+                    appendFilterLabel(`${labelById[canonicalId]}: ${formatTagValue(canonicalId, leftValue)} (Left)`, canonicalId);
+                    appendFilterLabel(`${labelById[canonicalId]}: ${formatTagValue(canonicalId, rightValue)} (Right)`, canonicalId);
                 } else if (leftValue) {
-                    appendFilterLabel(`${labelById[canonicalId]}: ${formatTagValue(canonicalId, leftValue)} (Left)`);
+                    appendFilterLabel(`${labelById[canonicalId]}: ${formatTagValue(canonicalId, leftValue)} (Left)`, canonicalId);
                 } else if (rightValue) {
-                    appendFilterLabel(`${labelById[canonicalId]}: ${formatTagValue(canonicalId, rightValue)} (Right)`);
+                    appendFilterLabel(`${labelById[canonicalId]}: ${formatTagValue(canonicalId, rightValue)} (Right)`, canonicalId);
                 }
                 return;
             }
 
             if (leftValue === rightValue) {
-                appendFilterLabel(`${labelById[canonicalId]}: ${formatTagValue(canonicalId, leftValue)}`);
+                appendFilterLabel(`${labelById[canonicalId]}: ${formatTagValue(canonicalId, leftValue)}`, canonicalId);
                 return;
             }
 
             if (leftValue) {
-                appendFilterLabel(`${labelById[canonicalId]}: ${formatTagValue(canonicalId, leftValue)} (Left)`);
+                appendFilterLabel(`${labelById[canonicalId]}: ${formatTagValue(canonicalId, leftValue)} (Left)`, canonicalId);
             }
 
             if (rightValue) {
-                appendFilterLabel(`${labelById[canonicalId]}: ${formatTagValue(canonicalId, rightValue)} (Right)`);
+                appendFilterLabel(`${labelById[canonicalId]}: ${formatTagValue(canonicalId, rightValue)} (Right)`, canonicalId);
             }
         });
 
@@ -513,7 +527,7 @@ export function updateActiveFilters() {
         }
 
         if (shouldShow) {
-            appendFilterLabel(`${filter.label}: ${displayValue}`);
+            appendFilterLabel(`${filter.label}: ${displayValue}`, filter.id);
         }
     });
 }

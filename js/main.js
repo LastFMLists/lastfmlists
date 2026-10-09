@@ -18,6 +18,7 @@ import { state } from './state.js';
 import { ensureRaceDateDefaults, updateRaceControlsVisibility } from './ui/charts.js';
 import './ui/entity-page.js';
 import './ui/export.js';
+import { initFilterControls } from './ui/filter-controls.js';
 import {
     initializeEquationControls,
     updateActiveFilters,
@@ -331,6 +332,7 @@ document.getElementById("save-data").addEventListener("click", async () => {
   });
 
 document.addEventListener("DOMContentLoaded", () => {
+    initFilterControls();
     initializeEquationControls();
     ensureRaceDateDefaults();
     updateRaceControlsVisibility();

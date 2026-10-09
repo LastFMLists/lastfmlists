@@ -115,7 +115,9 @@ export function openEntityPage(identity, { push = true } = {}) {
     document.body.classList.add("view-entity");
     section.hidden = false;
     const restored = push ? null : savedViews.get(entity.key);
+    section.classList.add("is-entering");
     renderPage(entity, restored);
+    setTimeout(() => section.classList.remove("is-entering"), 250);
     window.scrollTo({ top: restored ? restored.scrollY : 0 });
 }
 

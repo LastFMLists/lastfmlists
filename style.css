@@ -852,6 +852,242 @@ label.inline-checkbox {
     background-color: var(--background-color);
 }
 
+/* ---- Richer filter controls (ui/filter-controls.js) ---- */
+
+/* The panel styles labels and inputs as blocks; hidden ones stay hidden. */
+#filters-section [hidden] {
+    display: none !important;
+}
+
+.range-card,
+.fc-card {
+    margin: 0.85rem 0 0.25rem;
+    padding: 0.65rem 0.7rem 0.7rem;
+    background-color: var(--background-color);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.fc-card[hidden],
+.range-card[hidden] {
+    display: none;
+}
+
+.range-card-header,
+.fc-card-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 1.6rem;
+    margin-bottom: 0.45rem;
+}
+
+.range-card-header label,
+.dropdown-content .range-card-header label {
+    flex: 1;
+    margin: 0;
+    color: var(--primary-text-color);
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+
+.fc-card-title {
+    flex: 1;
+    color: var(--primary-text-color);
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+
+.fc-card-summary {
+    color: var(--secondary-text-color);
+    font-size: 0.78rem;
+}
+
+.fc-clear {
+    flex-shrink: 0;
+    padding: 0.15rem 0.5rem;
+    background: none;
+    border: none;
+    border-radius: 999px;
+    color: var(--primary-accent-color);
+    font-size: 0.78rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.fc-clear:hover {
+    background-color: var(--accent-soft);
+}
+
+.fc-clear[hidden] {
+    display: none;
+}
+
+.range-card .input-pair {
+    gap: 0.5rem;
+}
+
+.dropdown-content label.range-end {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    margin: 0;
+    min-width: 0;
+}
+
+.range-caption {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--secondary-text-color);
+}
+
+.fc-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+}
+
+.fc-chips[hidden] {
+    display: none;
+}
+
+.dropdown-content .fc-chip,
+.fc-chip {
+    width: auto;
+    min-height: 0;
+    margin: 0;
+    padding: 0.28rem 0.7rem;
+    background-color: var(--sidebar-color);
+    border: 1px solid var(--border-color);
+    border-radius: 999px;
+    color: var(--primary-text-color);
+    font-size: 0.8rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.3;
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.fc-chip:hover:not(:disabled) {
+    border-color: var(--primary-accent-color);
+}
+
+.fc-chip[aria-pressed="true"] {
+    background-color: var(--primary-accent-color);
+    border-color: var(--primary-accent-color);
+    color: var(--on-accent);
+}
+
+.fc-chip:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.fc-chip.fc-removable::after {
+    content: "\00d7";
+    margin-left: 0.4rem;
+    font-weight: 700;
+}
+
+.fc-help {
+    margin: 0.1rem 0 0.5rem;
+    color: var(--secondary-text-color);
+    font-size: 0.76rem;
+    line-height: 1.4;
+}
+
+.fc-card > .fc-help:last-child {
+    margin: 0.5rem 0 0;
+}
+
+.fc-term-groups {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    margin-bottom: 0.45rem;
+}
+
+.fc-term-groups:empty {
+    display: none;
+}
+
+.fc-term-group {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.fc-term-joiner {
+    font-size: 0.74rem;
+    font-weight: 600;
+    color: var(--secondary-text-color);
+}
+
+.fc-term-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin-top: 0.4rem;
+}
+
+.fc-term-actions .fc-chip[hidden] {
+    display: none;
+}
+
+.fc-card .fc-custom-input {
+    margin-top: 0.5rem;
+}
+
+.fc-clearable {
+    position: relative;
+    display: block;
+}
+
+.fc-clearable input {
+    padding-right: 2rem;
+}
+
+.fc-input-clear {
+    position: absolute;
+    top: 50%;
+    right: 0.3rem;
+    transform: translateY(-50%);
+    width: 1.6rem;
+    height: 1.6rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    background: var(--background-color);
+    border: none;
+    border-radius: 50%;
+    color: var(--secondary-text-color);
+    font-size: 0.8rem;
+    cursor: pointer;
+}
+
+.fc-input-clear:hover {
+    color: var(--primary-accent-color);
+}
+
+.fc-input-clear[hidden] {
+    display: none;
+}
+
+.fc-flash {
+    border-color: var(--primary-accent-color);
+    box-shadow: var(--ring);
+}
+
+.requires-extended.locked .fc-card,
+.requires-extended.locked .fc-chip,
+.requires-extended.locked .fc-clear {
+    pointer-events: none;
+}
+
 /* ---- Equation editor ---- */
 
 .equation-dropdown-content {
@@ -1065,6 +1301,9 @@ label.inline-checkbox {
 }
 
 .active-filters .filter-label {
+    font: inherit;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background-color 0.15s ease;
     margin: 0;
     padding: 0.3rem 0.75rem;
     font-size: 0.8rem;
@@ -1074,6 +1313,10 @@ label.inline-checkbox {
     border: 1px solid var(--border-color);
     border-radius: 999px;
     font-variant-numeric: tabular-nums;
+}
+
+.active-filters button.filter-label:hover {
+    border-color: var(--primary-accent-color);
 }
 
 /* ==========================================================================
@@ -1454,6 +1697,10 @@ label.inline-checkbox {
     display: flex;
     flex-direction: column;
     gap: 1.1rem;
+}
+
+/* Only when a page opens, not when it repaints with new numbers */
+#entity-section.is-entering .entity-page {
     animation: fade-in 0.2s ease;
 }
 
