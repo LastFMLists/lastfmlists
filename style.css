@@ -13,6 +13,8 @@
     --secondary-accent-color: #FFF4E3;
     --border-color: #E5CEB4;
     --even-list-color: #F1E1CC;
+    /* Hovered or highlighted row: far enough from both row colours to stand out */
+    --row-hover-color: #EBC9B4;
 
     --accent-strong: #C9794F;
     --accent-soft: rgba(216, 144, 109, 0.14);
@@ -45,6 +47,7 @@
     --secondary-accent-color: #1f122e;
     --border-color: #3d5166;
     --even-list-color: #3d5166;
+    --row-hover-color: #31507B;
 
     --accent-strong: #85BBFB;
     --accent-soft: rgba(96, 165, 250, 0.16);
@@ -1375,7 +1378,8 @@ label.inline-checkbox {
 .track:hover,
 .album:hover,
 .artist:hover {
-    background-color: var(--accent-soft);
+    background-color: var(--row-hover-color);
+    box-shadow: inset 3px 0 0 var(--primary-accent-color);
 }
 
 .track strong,
@@ -1422,13 +1426,13 @@ label.inline-checkbox {
 }
 
 .entity-row.is-highlighted {
-    background-color: var(--accent-soft);
+    background-color: var(--row-hover-color);
     box-shadow: inset 3px 0 0 var(--primary-accent-color);
     animation: row-highlight 1.6s ease;
 }
 
 @keyframes row-highlight {
-    0%, 30% { background-color: var(--accent-soft); box-shadow: inset 3px 0 0 var(--primary-accent-color), 0 0 0 2px var(--primary-accent-color); }
+    0%, 30% { background-color: var(--row-hover-color); box-shadow: inset 3px 0 0 var(--primary-accent-color), 0 0 0 2px var(--primary-accent-color); }
 }
 
 .entity-art {
@@ -1923,7 +1927,8 @@ button.entity-stat:hover {
 }
 
 .rank-link:hover {
-    background-color: var(--accent-soft);
+    background-color: var(--row-hover-color);
+    box-shadow: inset 3px 0 0 var(--primary-accent-color);
 }
 
 .rank-label {

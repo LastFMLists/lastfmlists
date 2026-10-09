@@ -362,12 +362,12 @@ function paint() {
             <i class="fas ${page.showAll ? "fa-chevron-up" : "fa-list"}" aria-hidden="true"></i>${page.showAll ? "Show fewer lists" : "Show all lists"}
         </button>
 
+        ${page.showAll ? renderAllLists() : ""}
+
         <section class="entity-block">
             <h3>Listening history</h3>
             ${renderTimeline()}
         </section>
-
-        ${page.showAll ? renderAllLists() : ""}
 
         <p class="entity-footnote">These numbers use all ${state.allTracks.length.toLocaleString()} scrobbles loaded in this browser, whatever filters the list had. Click a ranking to open its list.</p>
     </div>`;
