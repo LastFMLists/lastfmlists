@@ -90,23 +90,59 @@
         <section id="filters-section">
             <h3><i class="fas fa-filter" aria-hidden="true"></i>Filters</h3>
             <div class="filters">
+                <!-- What to list, how to rank it, and how to show it -->
                 <div class="dropdown">
-                    <button class="dropdown-button"><i class="fas fa-sliders" aria-hidden="true"></i><span>Display</span></button>
+                    <button class="dropdown-button"><i class="fas fa-sliders" aria-hidden="true"></i><span>List settings</span></button>
                     <div class="dropdown-content">
+                        <label for="entity-type">Generate lists of</label>
+                        <select id="entity-type">
+                            <option value="track">Tracks</option>
+                            <option value="album">Albums</option>
+                            <option value="artist">Artists</option>
+                            <option value="scrobble">Scrobbles</option>
+                        </select>
+
+                        <hr class="separator">
+
+                        <label for="sorting-basis">Sort lists by</label>
+                        <select id="sorting-basis">
+                            <option value="scrobbles">Scrobble count</option>
+                            <option value="separate-days">Scrobbled on different days</option>
+                            <option value="separate-weeks">Scrobbled on different weeks</option>
+                            <option value="separate-months">Scrobbled on different months</option>
+                            <option value="consecutive-scrobbles">Max consecutive scrobbles</option>
+                            <option value="consecutive-days">Max listening streak (days)</option>
+                            <option value="consecutive-weeks">Max listening streak (weeks)</option>
+                            <option value="consecutive-months">Max listening streak (months)</option>
+                            <option value="first-n-scrobbles">First to X scrobbles</option>
+                            <option value="fastest-n-scrobbles">Fastest to X scrobbles</option>
+                            <option value="oldest-average-listening-time">Oldest average listening time (X+ scrobbles)</option>
+                            <option value="newest-average-listening-time">Newest average listening time (X+ scrobbles)</option>
+                            <option value="max-single-day">Most scrobbles in a single day</option>
+                            <option value="max-single-week">Most scrobbles in a single week</option>
+                            <option value="max-single-month">Most scrobbles in a single month</option>
+                            <option value="max-rolling-xh">Most scrobbles within X hours</option>
+                            <option value="max-rolling-24h">Most scrobbles within 24 hours</option>
+                            <option value="max-rolling-168h">Most scrobbles within 168 hours</option>
+                            <option value="earliest-to-latest">Earliest to latest (scrobbles only)</option>
+                            <option value="latest-to-earliest">Latest to earliest (scrobbles only)</option>
+                            <hr class="separator">
+                            <option value="time-spent-listening">Time spent listening</option>
+                            <option value="highest-listening-percentage">Percentage of global scrobbles</option>
+                        </select>
+
+                        <!-- Shown only for the sorts that use X; ui/filter-controls.js names it -->
+                        <label for="x-value" id="x-value-label" hidden>X</label>
+                        <input type="number" id="x-value" placeholder="Enter X" min="1" style="display: none;">
+
+                        <hr class="separator">
+
                         <label for="display-mode">Display mode</label>
                         <select id="display-mode" title="How to render the results">
                             <option value="list">List</option>
                             <option value="bar-chart">Bar Chart</option>
                             <option value="bar-race">Bar Chart Race</option>
                         </select>
-
-                        <label for="list-length">List length</label>
-                        <input type="number" id="list-length" placeholder="e.g., 10" min="1">
-
-                        <label for="unfiltered-stats" class="inline-checkbox">
-                            Show unfiltered stats in parentheses
-                            <input type="checkbox" id="unfiltered-stats">
-                        </label>
 
                         <div id="chart-controls" class="mode-controls" aria-hidden="true">
                             <label for="chart-axis">Chart orientation</label>
@@ -139,57 +175,15 @@
                             <label for="race-speed-ms">Race speed (ms/frame)</label>
                             <input type="number" id="race-speed-ms" min="50" step="10" value="260">
                         </div>
-                    </div>
-                </div>
 
-                <!-- Sorting Basis -->
-                <div class="dropdown">
-                    <button class="dropdown-button"><i class="fas fa-arrow-down-wide-short" aria-hidden="true"></i><span>Sorting</span></button>
-                    <div class="dropdown-content">
-                        <label for="sorting-basis">Sort lists by</label>
-                        <select id="sorting-basis">
-                            <option value="scrobbles">Scrobble count</option>
-                            <option value="separate-days">Scrobbled on different days</option>
-                            <option value="separate-weeks">Scrobbled on different weeks</option>
-                            <option value="separate-months">Scrobbled on different months</option>
-                            <option value="consecutive-scrobbles">Max consecutive scrobbles</option>
-                            <option value="consecutive-days">Max listening streak (days)</option>
-                            <option value="consecutive-weeks">Max listening streak (weeks)</option>
-                            <option value="consecutive-months">Max listening streak (months)</option>
-                            <option value="first-n-scrobbles">First to X scrobbles</option>
-                            <option value="fastest-n-scrobbles">Fastest to X scrobbles</option>
-                            <option value="oldest-average-listening-time">Oldest average listening time (X+ scrobbles)</option>
-                            <option value="newest-average-listening-time">Newest average listening time (X+ scrobbles)</option>
-                            <option value="max-single-day">Most scrobbles in a single day</option>
-                            <option value="max-single-week">Most scrobbles in a single week</option>
-                            <option value="max-single-month">Most scrobbles in a single month</option>
-                            <option value="max-rolling-xh">Most scrobbles within X hours</option>
-                            <option value="max-rolling-24h">Most scrobbles within 24 hours</option>
-                            <option value="max-rolling-168h">Most scrobbles within 168 hours</option>
-                            <option value="earliest-to-latest">Earliest to latest (scrobbles only)</option>
-                            <option value="latest-to-earliest">Latest to earliest (scrobbles only)</option>
-                            <hr class="separator">
-                            <option value="time-spent-listening">Time spent listening</option>
-                            <option value="highest-listening-percentage">Percentage of global scrobbles</option>
-                        </select>
+                        <label for="list-length">List length</label>
+                        <input type="number" id="list-length" placeholder="e.g., 10" min="1">
 
-                        <!-- Shown only for the sorts that use X; ui/filter-controls.js names it -->
-                        <label for="x-value" id="x-value-label" hidden>X</label>
-                        <input type="number" id="x-value" placeholder="Enter X" min="1" style="display: none;">
-                    </div>
-                </div>
+                        <label for="unfiltered-stats" class="inline-checkbox">
+                            Show unfiltered stats in parentheses
+                            <input type="checkbox" id="unfiltered-stats">
+                        </label>
 
-                <!-- Entity Type -->
-                <div class="dropdown">
-                    <button class="dropdown-button"><i class="fas fa-layer-group" aria-hidden="true"></i><span>List Type</span></button>
-                    <div class="dropdown-content">
-                        <label for="entity-type">Generate lists of</label>
-                        <select id="entity-type">
-                            <option value="track">Tracks</option>
-                            <option value="album">Albums</option>
-                            <option value="artist">Artists</option>
-                            <option value="scrobble">Scrobbles</option>
-                        </select>
                     </div>
                 </div>
 
