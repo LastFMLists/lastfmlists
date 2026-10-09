@@ -7,6 +7,7 @@ import {
     ftlNextPuzzle,
     ftlOnInput,
     ftlOpenGame,
+    ftlShowSetup,
     ftlStartGame
 } from './fill-the-list.js';
 import {
@@ -77,6 +78,9 @@ export function initGames() {
 
     const ftlReveal = document.getElementById("ftl-reveal");
     if (ftlReveal) ftlReveal.addEventListener("click", () => ftlFinish(false));
+
+    const ftlOptions = document.getElementById("ftl-options");
+    if (ftlOptions) ftlOptions.addEventListener("click", () => ftlShowSetup(false));
 
     const ftlNext = document.getElementById("ftl-next");
     if (ftlNext) ftlNext.addEventListener("click", ftlNextPuzzle);

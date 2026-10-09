@@ -624,22 +624,22 @@
         <section id="games-section" class="content-block">
             <div id="games-home" class="games-home">
                 <h2>Games</h2>
-                <p class="games-intro">Games built from your own scrobbles. Nothing new to download, they just use the data you already loaded.</p>
+                <p class="games-intro">These games use the scrobbles you have already loaded, so nothing extra is downloaded.</p>
                 <div class="games-grid">
                     <button type="button" class="game-card" id="open-higherlower">
                         <span class="game-card-icon"><i class="fas fa-arrow-up-wide-short" aria-hidden="true"></i></span>
                         <span class="game-card-title">Higher or Lower</span>
-                        <span class="game-card-desc">Two picks from your library. Guess which one you've scrobbled more, and keep the streak going.</span>
+                        <span class="game-card-desc">Choose which of two artists, albums or tracks you have scrobbled more. Each right answer adds to your streak.</span>
                     </button>
                     <button type="button" class="game-card" id="open-filllist">
                         <span class="game-card-icon"><i class="fas fa-list-ol" aria-hidden="true"></i></span>
                         <span class="game-card-title">Fill the List</span>
-                        <span class="game-card-desc">We pick a random slice of your library, like a year, a letter, or one artist. You name as many of its top 10 as you can.</span>
+                        <span class="game-card-desc">Name as many entries as you can from a top 10 of your history, such as your top tracks of one year.</span>
                     </button>
                     <button type="button" class="game-card" id="open-ordering">
                         <span class="game-card-icon"><i class="fas fa-arrow-down-1-9" aria-hidden="true"></i></span>
                         <span class="game-card-title">Put Them In Order</span>
-                        <span class="game-card-desc">Five picks from your library and one thing to rank them by. Drag them into the right order.</span>
+                        <span class="game-card-desc">Put three to five artists, albums or tracks in order by one statistic, such as total plays or first listen.</span>
                     </button>
                 </div>
             </div>
@@ -647,13 +647,13 @@
             <div id="hl-game" class="hl-game" hidden>
                 <button type="button" class="hl-back" id="hl-back"><i class="fas fa-arrow-left" aria-hidden="true"></i> All games</button>
 
-                <div id="hl-setup" class="hl-setup">
+                <div id="hl-setup" class="hl-setup game-options">
                     <h2>Higher or Lower</h2>
-                    <p>Which have you scrobbled more? Pick what you want to play with:</p>
+                    <p class="game-options-intro">You see two items and choose the one you have scrobbled more. The pairs get closer as your streak grows. Choose what to compare.</p>
                     <div class="hl-type-choice">
-                        <button type="button" class="hl-type" data-type="artist"><i class="fas fa-microphone" aria-hidden="true"></i>Artists</button>
-                        <button type="button" class="hl-type" data-type="album"><i class="fas fa-compact-disc" aria-hidden="true"></i>Albums</button>
-                        <button type="button" class="hl-type" data-type="track"><i class="fas fa-music" aria-hidden="true"></i>Tracks</button>
+                        <button type="button" class="hl-type" data-type="artist"><i class="fas fa-microphone" aria-hidden="true"></i><span>Artists</span></button>
+                        <button type="button" class="hl-type" data-type="album"><i class="fas fa-compact-disc" aria-hidden="true"></i><span>Albums</span></button>
+                        <button type="button" class="hl-type" data-type="track"><i class="fas fa-music" aria-hidden="true"></i><span>Tracks</span></button>
                     </div>
                     <p id="hl-setup-note" class="hl-setup-note" hidden></p>
                 </div>
@@ -676,7 +676,7 @@
                             <span class="hl-option-count"></span>
                         </button>
                     </div>
-                    <p class="hl-prompt">Tap the one with more scrobbles</p>
+                    <p class="hl-prompt">Choose the one with more scrobbles</p>
                     <div id="hl-feedback" class="hl-feedback" aria-live="polite"></div>
                 </div>
 
@@ -693,41 +693,49 @@
             <div id="ftl-game" class="ftl-game" hidden>
                 <button type="button" class="hl-back" id="ftl-back"><i class="fas fa-arrow-left" aria-hidden="true"></i> All games</button>
 
-                <div id="ftl-setup" class="ftl-setup">
+                <div id="ftl-setup" class="ftl-setup game-options">
                     <h2>Fill the List</h2>
-                    <p>We pick a random slice of your library and you name its top 10.</p>
+                    <p class="game-options-intro">Each round picks a top 10 from your history, such as your top tracks of one year. Name as many of the ten as you can.</p>
 
-                    <fieldset class="ftl-group">
-                        <legend>Play with</legend>
-                        <label class="ftl-check"><input type="checkbox" class="ftl-type" value="track" checked> Tracks</label>
-                        <label class="ftl-check"><input type="checkbox" class="ftl-type" value="album" checked> Albums</label>
-                        <label class="ftl-check"><input type="checkbox" class="ftl-type" value="artist" checked> Artists</label>
+                    <fieldset class="option-group">
+                        <legend>Answer types</legend>
+                        <p class="option-hint">Pick at least one.</p>
+                        <div class="option-chips">
+                            <label class="option-chip"><input type="checkbox" class="ftl-type" value="artist" checked><span><i class="fas fa-microphone" aria-hidden="true"></i>Artists</span></label>
+                            <label class="option-chip"><input type="checkbox" class="ftl-type" value="album" checked><span><i class="fas fa-compact-disc" aria-hidden="true"></i>Albums</span></label>
+                            <label class="option-chip"><input type="checkbox" class="ftl-type" value="track" checked><span><i class="fas fa-music" aria-hidden="true"></i>Tracks</span></label>
+                        </div>
                     </fieldset>
 
-                    <fieldset class="ftl-group">
-                        <legend>Puzzle types</legend>
-                        <label class="ftl-check"><input type="checkbox" class="ftl-cat" value="time" checked> Time (years, months, recent)</label>
-                        <label class="ftl-check"><input type="checkbox" class="ftl-cat" value="names" checked> Names &amp; words</label>
-                        <label class="ftl-check"><input type="checkbox" class="ftl-cat" value="deep" checked> Deep cuts</label>
-                        <label class="ftl-check"><input type="checkbox" class="ftl-cat" value="sorting" checked> Streaks &amp; sequences</label>
-                        <label class="ftl-check"><input type="checkbox" class="ftl-cat" value="byartist" checked> By artist</label>
+                    <fieldset class="option-group">
+                        <legend>List categories</legend>
+                        <p class="option-hint">Pick the kinds of lists you want to play.</p>
+                        <div class="option-cards">
+                            <label class="option-card"><input type="checkbox" class="ftl-cat" value="time" checked><span><strong>Time</strong><small>A year, a month, or the last few weeks</small></span></label>
+                            <label class="option-card"><input type="checkbox" class="ftl-cat" value="names" checked><span><strong>Names and words</strong><small>A first letter, a word in the title, a name length</small></span></label>
+                            <label class="option-card"><input type="checkbox" class="ftl-cat" value="deep" checked><span><strong>Deep cuts</strong><small>First played in a given year, or not played for a while</small></span></label>
+                            <label class="option-card"><input type="checkbox" class="ftl-cat" value="sorting" checked><span><strong>Streaks and milestones</strong><small>Biggest single day, first or fastest to a play count</small></span></label>
+                            <label class="option-card"><input type="checkbox" class="ftl-cat" value="byartist" checked><span><strong>By artist</strong><small>The top tracks or albums of one artist</small></span></label>
+                        </div>
                     </fieldset>
 
-                    <fieldset class="ftl-group">
-                        <legend>Options</legend>
-                        <label class="ftl-check"><input type="checkbox" id="ftl-hard"> Hard mode (hide the artist on track &amp; album lists)</label>
-                        <label class="ftl-inline">Time limit
-                            <select id="ftl-timer">
-                                <option value="0">None</option>
-                                <option value="60">1 minute</option>
-                                <option value="120">2 minutes</option>
-                                <option value="300">5 minutes</option>
-                            </select>
+                    <fieldset class="option-group">
+                        <legend>Difficulty</legend>
+                        <label class="option-switch">
+                            <span><strong>Hard mode</strong><small>Hide the artist on track and album answers</small></span>
+                            <input type="checkbox" id="ftl-hard" role="switch">
                         </label>
+                        <p class="option-label" id="ftl-timer-label">Time limit</p>
+                        <div class="option-chips" role="radiogroup" aria-labelledby="ftl-timer-label">
+                            <label class="option-chip"><input type="radio" name="ftl-timer" value="0" checked><span>No limit</span></label>
+                            <label class="option-chip"><input type="radio" name="ftl-timer" value="60"><span>1 minute</span></label>
+                            <label class="option-chip"><input type="radio" name="ftl-timer" value="120"><span>2 minutes</span></label>
+                            <label class="option-chip"><input type="radio" name="ftl-timer" value="300"><span>5 minutes</span></label>
+                        </div>
                     </fieldset>
 
                     <p id="ftl-setup-note" class="hl-setup-note" hidden></p>
-                    <button type="button" id="ftl-start" class="hl-primary">Start</button>
+                    <button type="button" id="ftl-start" class="hl-primary game-start">Start game</button>
                 </div>
 
                 <div id="ftl-play" class="ftl-play" hidden>
@@ -740,7 +748,8 @@
                     </form>
                     <ol id="ftl-slots" class="ftl-slots"></ol>
                     <div class="ftl-actions">
-                        <button type="button" id="ftl-reveal" class="hl-secondary">Give up &amp; reveal</button>
+                        <button type="button" id="ftl-options" class="hl-secondary"><i class="fas fa-sliders" aria-hidden="true"></i> Options</button>
+                        <button type="button" id="ftl-reveal" class="hl-secondary">Show the answers</button>
                         <button type="button" id="ftl-next" class="hl-primary">New list</button>
                     </div>
                 </div>
@@ -749,13 +758,13 @@
             <div id="ord-game" class="ord-game" hidden>
                 <button type="button" class="hl-back" id="ord-back"><i class="fas fa-arrow-left" aria-hidden="true"></i> All games</button>
 
-                <div id="ord-setup" class="hl-setup">
+                <div id="ord-setup" class="hl-setup game-options">
                     <h2>Put Them In Order</h2>
-                    <p>Five picks from your library and one thing to rank them by. Pick what you want to play with:</p>
+                    <p class="game-options-intro">Each round gives you a few items and one statistic to sort them by. Rounds start with three items and grow to five as your streak grows. Choose what to put in order.</p>
                     <div class="hl-type-choice">
-                        <button type="button" class="ord-type" data-type="artist"><i class="fas fa-microphone" aria-hidden="true"></i>Artists</button>
-                        <button type="button" class="ord-type" data-type="album"><i class="fas fa-compact-disc" aria-hidden="true"></i>Albums</button>
-                        <button type="button" class="ord-type" data-type="track"><i class="fas fa-music" aria-hidden="true"></i>Tracks</button>
+                        <button type="button" class="ord-type" data-type="artist"><i class="fas fa-microphone" aria-hidden="true"></i><span>Artists</span></button>
+                        <button type="button" class="ord-type" data-type="album"><i class="fas fa-compact-disc" aria-hidden="true"></i><span>Albums</span></button>
+                        <button type="button" class="ord-type" data-type="track"><i class="fas fa-music" aria-hidden="true"></i><span>Tracks</span></button>
                     </div>
                     <p id="ord-setup-note" class="hl-setup-note" hidden></p>
                 </div>

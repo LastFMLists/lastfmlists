@@ -4,6 +4,7 @@ import { escapeHTML } from '../dom.js';
 import { state } from '../state.js';
 import { getLocalDayKeyFromTimestamp } from '../time.js';
 import { FTL_MONTHS, ftlFormatDay, ftlRandom, ftlShuffle } from './fill-the-list.js';
+import { showCelebration } from './celebration.js';
 import { gamesRecords, saveGamesRecords } from './records.js';
 import {
     getScrobbleIndex,
@@ -16,24 +17,23 @@ import {
 const ORD_POOL_LIMIT = { artist: 200, album: 300, track: 600 };
 const ORD_MIN_SCROBBLES = 5;
 
-// Difficulty ramp. Early rounds are short lists of very familiar items whose
-// values are far apart; later rounds get longer, dig deeper into the library,
-// and allow values that sit much closer together.
-const ORD_TIERS = [
-    { maxRound: 2, items: 3, depth: 30, minRatio: 2.5, minDays: 120 },
-    { maxRound: 4, items: 4, depth: 60, minRatio: 2.0, minDays: 90 },
-    { maxRound: 7, items: 4, depth: 120, minRatio: 1.7, minDays: 60 },
-    { maxRound: 11, items: 5, depth: 250, minRatio: 1.5, minDays: 35 },
-    { maxRound: Infinity, items: 5, depth: Infinity, minRatio: 1.35, minDays: 21 }
-];
+// Difficulty ramp. The first three rounds have three items, then four
+// until the ninth win, then five. Over 18 wins the pool widens from the top
+// 35 to the top 600 and the gap needed between neighbouring values shrinks:
+// a ratio of 2.4x down to 1.35x, or 120 days down to 21 for dates.
+function ordDifficulty(wins) {
+    const progress = Math.min(wins / 18, 1);
+    return {
+        items: wins < 3 ? 3 : (wins < 9 ? 4 : 5),
+        depth: Math.round(35 + progress * 565),
+        minRatio: 2.4 - progress * 1.05,
+        minDays: Math.round(120 - progress * 99)
+    };
+}
 
 // How many rounds a criterion is pushed to the back of the queue after use, so
 // you don't get the same question every other round.
 const ORD_CRITERION_COOLDOWN = 5;
-
-function ordTierForRound(round) {
-    return ORD_TIERS.find(t => round <= t.maxRound) || ORD_TIERS[ORD_TIERS.length - 1];
-}
 
 let ordState = null;
 let ordConsecutiveCache = {};
@@ -146,7 +146,7 @@ const ORD_CRITERIA = [
     {
         id: "first", types: ["artist", "album", "track"],
         build: (type, pool) => ({
-            title: "First ever scrobble", instruction: "Whatever you discovered first at the top", desc: false, isDate: true,
+            title: "First ever scrobble", instruction: "Earliest first play at the top", desc: false, isDate: true,
             items: pool.filter(e => e.first).map(e => ({ ...e, value: e.first })),
             format: v => `first played ${ftlFormatDay(v)}`
         })
@@ -200,7 +200,7 @@ const ORD_CRITERIA = [
         build: (type, pool) => {
             const stats = ordTrackStats(type);
             return {
-                title: "Biggest single track", instruction: "Whoever has the most-played single track at the top", desc: true, isDate: false,
+                title: "Biggest single track", instruction: "Biggest single track at the top", desc: true, isDate: false,
                 items: pool.map(e => ({ ...e, value: stats.get(e.key)?.maxTrack || 0 })).filter(e => e.value >= 5),
                 format: v => `top track played ${v.toLocaleString()} times`
             };
@@ -265,7 +265,7 @@ function ordSeparated(a, b, isDate, minRatio, minDays) {
     return (hi / lo) >= minRatio && (hi - lo) >= 2;
 }
 
-function ordPickSpread(items, n, isDate, minRatio, minDays) {
+function ordPickSpread(items, n, isDate, minRatio, minDays, avoidSignature = "") {
     const valid = items.filter(i => typeof i.value === "number" && isFinite(i.value));
     if (valid.length < n) return null;
     valid.sort((a, b) => b.value - a.value);
@@ -279,7 +279,8 @@ function ordPickSpread(items, n, isDate, minRatio, minDays) {
         for (let i = start + 1; i < valid.length && picked.length < n; i++) {
             if (ordSeparated(valid[i].value, picked[picked.length - 1].value, isDate, minRatio, minDays)) picked.push(valid[i]);
         }
-        if (picked.length === n) return picked;
+        // The same items as last round would be a repeat.
+        if (picked.length === n && picked.map(p => p.key).sort().join("\n") !== avoidSignature) return picked;
     }
     return null; // let the round builder try a different criterion
 }
@@ -302,7 +303,7 @@ function ordQueuedCriteria(type, round) {
 
 function ordBuildRound(type) {
     const round = ordState.rounds + 1;
-    const tier = ordTierForRound(round);
+    const tier = ordDifficulty(ordState.rounds);
     const pool = ordBasePool(type, tier.depth);
     if (pool.length < tier.items) return null;
 
@@ -311,9 +312,10 @@ function ordBuildRound(type) {
         for (let attempt = 0; attempt < 3; attempt++) {
             const spec = crit.build(type, pool);
             if (!spec || !spec.items || spec.items.length < tier.items) continue;
-            const picked = ordPickSpread(spec.items, tier.items, spec.isDate, tier.minRatio, tier.minDays);
+            const picked = ordPickSpread(spec.items, tier.items, spec.isDate, tier.minRatio, tier.minDays, ordState.lastAnswer);
             if (!picked) continue;
             const correct = [...picked].sort((a, b) => spec.desc ? b.value - a.value : a.value - b.value);
+            ordState.lastAnswer = correct.map(item => item.key).sort().join("\n");
             let display = ftlShuffle([...correct]);
             // Don't hand them an already-solved board.
             if (display.every((d, i) => d.key === correct[i].key)) display = ftlShuffle([...correct].reverse());
@@ -410,6 +412,7 @@ export function ordCheck() {
     document.getElementById("ord-check").hidden = true;
 
     if (perfect) {
+        showCelebration("Correct!");
         document.getElementById("ord-score").textContent =
             `${right} of ${correct.length} in the right place · perfect streak ${ordState.streak} · best ${best}`;
         document.getElementById("ord-next").hidden = false;
@@ -443,8 +446,8 @@ export function ordStart(type) {
     ordConsecutiveCache = {};
     ordTrackStatsCache = {};
     ordDayStatsCache = {};
-    if (ordBasePool(type, Infinity).length < ORD_TIERS[0].items) {
-        ordState = { type, round: null, checked: false, rounds: 0, streak: 0, criterionLastUsed: new Map() };
+    if (ordBasePool(type, Infinity).length < ordDifficulty(0).items) {
+        ordState = { type, round: null, checked: false, rounds: 0, streak: 0, criterionLastUsed: new Map(), lastAnswer: "" };
         ordShowSetup(true);
         return;
     }
@@ -459,7 +462,7 @@ export function ordRestartCurrent() {
 }
 
 function beginRun(type) {
-    ordState = { type, round: null, checked: false, rounds: 0, streak: 0, criterionLastUsed: new Map() };
+    ordState = { type, round: null, checked: false, rounds: 0, streak: 0, criterionLastUsed: new Map(), lastAnswer: "" };
     document.getElementById("ord-setup").hidden = true;
     document.getElementById("ord-play").hidden = false;
     ordNextRound();

@@ -3,6 +3,7 @@
 import { escapeHTML } from '../dom.js';
 import { state } from '../state.js';
 import { getLocalDayKeyFromTimestamp } from '../time.js';
+import { showCelebration } from './celebration.js';
 import { gamesRecords, saveGamesRecords } from './records.js';
 import {
     FTL_MIN_SCROBBLES,
@@ -98,11 +99,23 @@ function ftlRankScrobbles(pred, type) {
 }
 
 export function ftlRandom(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
-function ftlSeen(key) { return !!(ftlState && ftlState.seen && ftlState.seen.has(key)); }
+// A prompt played in the last FTL_RECENT_PROMPTS rounds is skipped. When
+// nothing else is left, only the previous round's prompt is skipped.
+const FTL_RECENT_PROMPTS = 20;
+function ftlSeen(key) {
+    if (!ftlState) return false;
+    if (ftlState.relaxed) return key === ftlState.lastKey;
+    return ftlState.recent.includes(key);
+}
+function ftlRememberPrompt(key) {
+    ftlState.lastKey = key;
+    ftlState.recent.push(key);
+    while (ftlState.recent.length > FTL_RECENT_PROMPTS) ftlState.recent.shift();
+}
 
 // ---- Facet generators: each returns { prompt, answers, key } or null.
-// The `key` is the per-session signature; a generator returns null if that exact
-// puzzle was already served this session (so nothing repeats until reload).
+// The `key` identifies the exact puzzle; a generator returns null when that
+// puzzle was played recently (see ftlSeen).
 function ftlGenYear(type) {
     const { years } = getScrobbleIndex();
     if (!years.length) return null;
@@ -337,13 +350,12 @@ function ftlPickFacet(category) {
     return weighted[weighted.length - 1].f;
 }
 
-function ftlGeneratePuzzle() {
-    ftlState.puzzleNum += 1;
+function ftlTryCategories(attemptsPerCategory) {
     const catCount = ftlEligibleCategories().length;
     for (let c = 0; c < catCount + 1; c++) {
         const category = ftlDrawCategory();
         if (!category) break;
-        for (let t = 0; t < 8; t++) {
+        for (let t = 0; t < attemptsPerCategory; t++) {
             const facet = ftlPickFacet(category);
             if (!facet) break;
             const okTypes = facet.types.filter(ty => ftlState.options.types.has(ty));
@@ -352,23 +364,37 @@ function ftlGeneratePuzzle() {
             const result = facet.gen(entityType);
             if (result) {
                 ftlState.facetLastUsed.set(facet.id, ftlState.puzzleNum);
-                ftlState.seen.add(result.key);
                 return { ...result, entityType, facetId: facet.id };
             }
         }
     }
-    // Fallback so the game rarely stalls: overall top list of an enabled type,
-    // itself only served once per session.
-    for (const type of ftlState.options.types) {
-        const key = `overall:${type}`;
-        if (ftlSeen(key)) continue;
-        const answers = ftlFinalize(indexEntities(type));
-        if (answers) {
-            ftlState.seen.add(key);
-            return { prompt: `Your top ${FTL_ENTITY_NOUN[type]}`, answers, entityType: type, facetId: "overall", key };
+    return null;
+}
+
+function ftlGeneratePuzzle() {
+    ftlState.puzzleNum += 1;
+    let puzzle = ftlTryCategories(25);
+    // Fallback so the game rarely stalls: the overall top list of a type.
+    if (!puzzle) {
+        for (const type of ftlState.options.types) {
+            const key = `overall:${type}`;
+            if (ftlSeen(key)) continue;
+            const answers = ftlFinalize(indexEntities(type));
+            if (answers) {
+                puzzle = { prompt: `Your top ${FTL_ENTITY_NOUN[type]}`, answers, entityType: type, facetId: "overall", key };
+                break;
+            }
         }
     }
-    return null; // everything reachable has been played this session
+    // Every playable list was played recently: allow repeats, but never the
+    // list from the round just played.
+    if (!puzzle) {
+        ftlState.relaxed = true;
+        puzzle = ftlTryCategories(40);
+        ftlState.relaxed = false;
+    }
+    if (puzzle) ftlRememberPrompt(puzzle.key);
+    return puzzle;
 }
 
 // Sporcle-style normalization: case-insensitive, punctuation/diacritics ignored,
@@ -464,6 +490,7 @@ function ftlMatchIndex(typed) {
 // Accept an answer: fill its slot, clear the box, and finish if all are found.
 function ftlAcceptAnswer(idx) {
     ftlState.found.add(idx);
+    showCelebration(ftlState.found.size === ftlState.puzzle.answers.length ? "All answers found!" : "Correct!");
     const input = document.getElementById("ftl-guess");
     input.value = "";
     ftlSetInputProgress(0);
@@ -621,14 +648,14 @@ export function ftlOpenGame() {
     ftlShowSetup(false);
 }
 
-function ftlShowSetup(showNote) {
+export function ftlShowSetup(showNote) {
     ftlStopTimer();
     document.getElementById("ftl-setup").hidden = false;
     document.getElementById("ftl-play").hidden = true;
     const note = document.getElementById("ftl-setup-note");
     if (showNote) {
         note.hidden = false;
-        note.textContent = "No lists match those options. Turn on more types or puzzle categories.";
+        note.textContent = "No lists match these choices. Pick more answer types or list categories.";
     } else {
         note.hidden = true;
     }
@@ -644,11 +671,15 @@ export function ftlStartGame() {
             types,
             cats,
             hard: document.getElementById("ftl-hard").checked,
-            timer: parseInt(document.getElementById("ftl-timer").value, 10) || 0
+            timer: parseInt(document.querySelector('input[name="ftl-timer"]:checked')?.value, 10) || 0
         },
         categoryDeck: [],
         facetLastUsed: new Map(),
-        seen: new Set(),
+        // Carried over from the previous game, so changing options and
+        // starting again does not bring back the lists just played.
+        recent: ftlState ? ftlState.recent : [],
+        lastKey: ftlState ? ftlState.lastKey : null,
+        relaxed: false,
         puzzleNum: 0,
         puzzle: null,
         found: new Set(),

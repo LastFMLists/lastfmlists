@@ -1,7 +1,9 @@
 // Higher or Lower: two entities, guess which you played more.
 
+import { createArtworkElement } from '../data/artwork.js';
 import { state } from '../state.js';
 import { ftlStopTimer } from './fill-the-list.js';
+import { showCelebration } from './celebration.js';
 import { gamesRecords, saveGamesRecords } from './records.js';
 
 // Fair-play pools: an item qualifies by rank OR by raw scrobble count, so
@@ -12,19 +14,19 @@ const HL_POOL_RULES = {
     track: { rankMax: 1000, minScrobbles: 10 }
 };
 
-// Difficulty ramp by round: start with familiar items at wide ratios, then
-// widen the pool and tighten the ratio. Difficulty is the ratio between the
-// two counts, not the absolute gap.
-const HL_TIERS = [
-    { maxRound: 3, depth: 50, ratioMin: 2.0, ratioMax: 3.0 },
-    { maxRound: 6, depth: 100, ratioMin: 1.6, ratioMax: 2.2 },
-    { maxRound: 10, depth: 250, ratioMin: 1.35, ratioMax: 1.7 },
-    { maxRound: 15, depth: 500, ratioMin: 1.15, ratioMax: 1.4 },
-    { maxRound: Infinity, depth: Infinity, ratioMin: 1.01, ratioMax: 1.15 }
-];
+// Difficulty grows smoothly with the streak. Over the first 20 wins the
+// pool widens from the top 45 to the top 600, and the ratio the pair is
+// aimed at narrows from 2.4x to 1.1x. Difficulty is the ratio between the
+// two counts, not the gap: 50 vs 100 is as easy as 500 vs 1,000.
+const HL_RAMP_WINS = 20;
+const HL_DEPTH_START = 45;
+const HL_DEPTH_END = 600;
+const HL_RATIO_START = 2.4;
+const HL_RATIO_END = 1.1;
 
-const HL_RECENT_MEMORY = 12; // items excluded from reuse across recent rounds
-const HL_REVEAL_MS = 1500;   // pause on the reveal before advancing
+const HL_RECENT_MEMORY = 12;    // items shown recently are less likely to come back
+const HL_RECENT_PENALTY = 0.38; // added to a pair's score per recently shown item
+const HL_REVEAL_MS = 1500;      // pause on the reveal before advancing
 
 let hlState = null;
 
@@ -57,76 +59,47 @@ function hlBuildPool(type) {
         .filter(e => e.poolRank <= rule.rankMax || e.count >= rule.minScrobbles);
 }
 
-function hlTierForRound(round) {
-    return HL_TIERS.find(t => round <= t.maxRound) || HL_TIERS[HL_TIERS.length - 1];
+function hlShuffled(items) {
+    const copy = items.slice();
+    for (let i = copy.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [copy[i], copy[j]] = [copy[j], copy[i]];
+    }
+    return copy;
 }
 
-// One attempt at a pair for the given tier. Returns { anchor, partner, ratio }
-// or null. Direction (partner higher/lower) is steered by where the anchor
-// sits in the tier pool so the target count actually exists in range.
-function hlAttemptPair(tier, tierPool) {
-    const { pool, recent } = hlState;
-
-    let anchorPool = tierPool.filter(e => !recent.has(e.key));
-    if (anchorPool.length < 1) anchorPool = tierPool;
-    const anchor = anchorPool[Math.floor(Math.random() * anchorPool.length)];
-
-    const ratioTarget = tier.ratioMin + Math.random() * (tier.ratioMax - tier.ratioMin);
-
-    // tierPool is sorted by count desc; anchor near the top should look down,
-    // near the bottom should look up, so the target stays inside the pool.
-    const hi = tierPool[0].count;
-    const lo = tierPool[tierPool.length - 1].count;
-    const frac = hi > lo ? (anchor.count - lo) / (hi - lo) : 0.5;
-    let goUp;
-    if (frac < 0.25) goUp = true;
-    else if (frac > 0.75) goUp = false;
-    else goUp = Math.random() < 0.5;
-    const target = goUp ? anchor.count * ratioTarget : anchor.count / ratioTarget;
-
-    let candidates = tierPool.filter(e => e.key !== anchor.key && !recent.has(e.key));
-    if (candidates.length < 3) candidates = pool.filter(e => e.key !== anchor.key && !recent.has(e.key));
-    if (candidates.length < 1) candidates = pool.filter(e => e.key !== anchor.key);
-    if (candidates.length < 1) return null;
-
-    candidates.sort((a, b) =>
-        Math.abs(Math.log(a.count / target)) - Math.abs(Math.log(b.count / target)));
-    const nearest = candidates.slice(0, Math.min(5, candidates.length));
-    const partner = nearest[Math.floor(Math.random() * nearest.length)];
-    if (!partner) return null;
-
-    const ratio = Math.max(anchor.count, partner.count) / Math.min(anchor.count, partner.count);
-    return { anchor, partner, ratio };
-}
-
+// Score many random pairs from the current depth and keep the one whose
+// count ratio is closest to the target, preferring items not seen lately.
+// The exact pair from the previous round is never offered twice in a row.
 function hlPickPair() {
-    const { pool } = hlState;
+    const { pool, recent } = hlState;
     if (pool.length < 2) return null;
 
-    const tier = hlTierForRound(hlState.round);
-    const depth = Math.min(tier.depth, pool.length);
-    const tierPool = pool.slice(0, depth);
+    const progress = Math.min(hlState.streak / HL_RAMP_WINS, 1);
+    const depth = Math.min(pool.length, Math.round(HL_DEPTH_START + progress * (HL_DEPTH_END - HL_DEPTH_START)));
+    const target = HL_RATIO_START - progress * (HL_RATIO_START - HL_RATIO_END);
+    const candidates = hlShuffled(pool.slice(0, Math.max(2, depth)));
 
-    // Retry until the ACTUAL ratio lands near the tier band, so a bottom-of-pool
-    // anchor can't hand us a 76-vs-77 coin flip. Keep the closest fallback for
-    // small or tightly clustered libraries where the band can't be hit.
-    const loOK = tier.ratioMin * 0.85;
-    const hiOK = tier.ratioMax * 1.35;
-    const mid = Math.sqrt(tier.ratioMin * tier.ratioMax);
     let best = null;
     let bestScore = Infinity;
-    for (let attempt = 0; attempt < 16; attempt++) {
-        const candidate = hlAttemptPair(tier, tierPool);
-        if (!candidate) continue;
-        if (candidate.ratio >= loOK && candidate.ratio <= hiOK) { best = candidate; break; }
-        const score = Math.abs(Math.log(candidate.ratio / mid));
-        if (score < bestScore) { bestScore = score; best = candidate; }
+    for (const a of candidates.slice(0, 30)) {
+        for (const b of candidates.slice(0, 60)) {
+            if (a.key === b.key) continue;
+            const signature = [a.key, b.key].sort().join("\n");
+            if (signature === hlState.lastPair && candidates.length > 2) continue;
+            const ratio = Math.max(a.count, b.count) / Math.min(a.count, b.count);
+            const score = Math.abs(Math.log(ratio / target))
+                + (recent.has(a.key) ? HL_RECENT_PENALTY : 0)
+                + (recent.has(b.key) ? HL_RECENT_PENALTY : 0);
+            if (score < bestScore) { bestScore = score; best = [a, b]; }
+        }
     }
-    if (!best) return null;
+    if (!best) best = candidates.slice(0, 2);
+    hlState.lastPair = [best[0].key, best[1].key].sort().join("\n");
 
     return Math.random() < 0.5
-        ? { left: best.anchor, right: best.partner }
-        : { left: best.partner, right: best.anchor };
+        ? { left: best[0], right: best[1] }
+        : { left: best[1], right: best[0] };
 }
 
 function hlOptionEls() {
@@ -138,6 +111,8 @@ function hlOptionEls() {
 
 function hlFillOption(el, entry, type) {
     el.classList.remove("revealed", "correct", "wrong");
+    el.querySelector(".entity-art")?.remove();
+    el.prepend(createArtworkElement(type, entry.name, entry.artist || entry.name, null, "hl-option-art"));
     el.querySelector(".hl-option-name").textContent = entry.name;
     const sub = el.querySelector(".hl-option-sub");
     const subText = (type !== "artist" && entry.artist) ? entry.artist : "";
@@ -203,12 +178,12 @@ export function hlGuess(side) {
         }
         document.getElementById("hl-streak").textContent = hlState.streak;
         document.getElementById("hl-best").textContent = hlBest(hlState.type);
-        fb.textContent = tie ? "Dead heat, that counts!" : "Correct!";
+        fb.textContent = tie ? "Same count, so either answer is right." : "Correct";
         fb.className = "hl-feedback good";
-        hlState.round += 1;
+        showCelebration("Correct!");
         hlState.pending = "next";
     } else {
-        fb.textContent = "Nope.";
+        fb.textContent = "Wrong. The other one has more scrobbles.";
         fb.className = "hl-feedback bad";
         hlState.pending = "end";
     }
@@ -270,8 +245,8 @@ export function hlStart(type) {
     hlState = {
         type,
         pool,
-        round: 1,
         streak: 0,
+        lastPair: "",
         recent: new Set(),
         recentQueue: [],
         current: null,
