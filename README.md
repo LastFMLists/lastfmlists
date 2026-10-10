@@ -2,11 +2,14 @@
 
 Lists, charts, statistics and games made from your Last.fm scrobbles. The site runs in your browser, and your data stays there.
 
+The site counts anonymous visits with [GoatCounter](https://www.goatcounter.com/), which sets no cookies. It records which features are used (list types, filters, games, exports), the size range of loaded libraries and the visitor's country, but never usernames, filter values, artist, album or track names, or scrobbles. See `js/analytics.js`.
+
 ## Project layout
 
 The site is plain HTML, CSS and JavaScript with no build step. `index.html`
 loads `js/main.js` as an ES module; the browser resolves the rest.
 
+    js/analytics.js       anonymous usage counts sent to GoatCounter
     js/config.js          tuning constants, API key, UI copy shared with index.html
     js/state.js           the mutable state every module reads and writes
     js/dom.js             long-lived element handles, HTML escaping, modals, control values
@@ -24,6 +27,7 @@ work. Serve the folder over HTTP instead (`python3 -m http.server`).
 
 Unreleased:
 
+- Anonymous usage counts through GoatCounter: visits, list types, filters, games, entity pages, exports and library size ranges. No usernames, names or scrobbles are sent.
 - Album covers in lists. Last.fm sends a cover with every scrobble, so most covers need no extra requests. Covers are saved with the rest of your data, and any that are missing are looked up when their row scrolls into view. Tracks use the cover of the album you played them from most, and artists use the cover of their most-played album.
 - Every artist, album and track has its own page. Click a row in a list to open it. The page shows your scrobbles, your library rank, the rank among that artist's tracks or albums, your first and last play, a link to the Last.fm page, and up to three high placements. It also has a graph of your plays over time, and, behind "Show all lists", your rank in every year, month and week, the last 7 to 365 days, the play milestones, the streak rankings and the other rankings. Clicking any ranking opens that list with the entity's row highlighted, so the position on the page always matches the list. The browser's Back button returns to the page as you left it.
 - The filter panel is easier to use. Minimum and maximum boxes sit together in one card with a Clear button. Months, weekdays, days of the month and years are toggle chips. Name filters and tags show their word groups as chips. List length, recent days, the long-gap setting and tracks per artist have common choices plus Custom. X is named after what it means for the chosen sort and only shows when that sort uses it. Clicking a filter chip above the list opens that filter.

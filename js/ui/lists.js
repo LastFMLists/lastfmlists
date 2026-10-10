@@ -453,7 +453,11 @@ export function displayEntities() {
 
         state.filteredData = leftEntities;
         updateActiveFilters();
-        announceRenderedList(leftEntities.length + rightEntities.length);
+        announceRenderedList(leftEntities.length + rightEntities.length, {
+            comparison: true,
+            entityType: leftEntityType,
+            renderMode: raceCanRender ? renderMode : DISPLAY_MODE_BAR_CHART
+        });
         return;
     }
 
@@ -504,13 +508,19 @@ export function displayEntities() {
     }
 
     updateActiveFilters();
-    announceRenderedList(singleEntities.length);
+    announceRenderedList(singleEntities.length, {
+        comparison: false,
+        entityType,
+        sortingBasis,
+        renderMode: raceCanRender ? renderMode : DISPLAY_MODE_BAR_CHART
+    });
 }
 
 // Lets other parts of the page react to a new list, such as the support
-// banner counting how many different lists were viewed.
-function announceRenderedList(count) {
-    document.dispatchEvent(new CustomEvent("lists:rendered", { detail: { count } }));
+// banner counting how many different lists were viewed and the usage counts
+// in analytics.js.
+function announceRenderedList(count, listInfo) {
+    document.dispatchEvent(new CustomEvent("lists:rendered", { detail: { count, ...listInfo } }));
 }
 
 function displayScrobbles(scrobbles, targetDiv = null, order = "asc") {

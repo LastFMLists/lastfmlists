@@ -2,9 +2,10 @@
 // found the site useful: five different lists viewed, or ten minutes spent
 // with a library loaded. It can be put off for 30 days or hidden for good,
 // and it never returns for anyone who says they already donated or who
-// follows a Ko-fi link. Everything is kept in this browser; nothing is sent
-// anywhere.
+// follows a Ko-fi link. Its counters stay in this browser; analytics.js only
+// counts that the banner was shown and which button was pressed.
 
+import { trackEvent, trackEventOnce } from '../analytics.js';
 import { readCurrentFilterInputState } from '../data/filters.js';
 import { state } from '../state.js';
 
@@ -110,6 +111,7 @@ function buildBanner() {
     banner.addEventListener("click", (event) => {
         const action = event.target.closest("[data-support]")?.dataset.support;
         if (!action) return;
+        trackEvent(`support/${action}`, `Donation banner: ${action}`);
         if (action === "later") {
             record.snoozedUntil = Date.now() + SNOOZE_DAYS * 86400000;
             save();
@@ -130,6 +132,7 @@ function buildBanner() {
 
 function showBanner() {
     if (!banner) buildBanner();
+    if (!banner.classList.contains("is-visible")) trackEventOnce("support/shown", "Donation banner shown");
     banner.classList.add("is-visible");
 }
 
