@@ -2,6 +2,7 @@
 // list. It shows where the entity ranks across the whole loaded history, and
 // every ranking on it opens the list that ranking came from.
 
+import { trackEvent } from '../analytics.js';
 import { createArtworkElement } from '../data/artwork.js';
 import {
     ENTITY_NOUNS,
@@ -109,6 +110,7 @@ export function openEntityPage(identity, { push = true } = {}) {
     const entity = normalizeEntity(identity);
     saveView();
     if (push) {
+        trackEvent(`entity/${entity.type}`, `Entity page: ${entity.type}`);
         const depth = (history.state && history.state.lfmEntity ? history.state.depth || 0 : 0) + 1;
         history.pushState({ lfmEntity: { ...entity }, depth }, "");
     }

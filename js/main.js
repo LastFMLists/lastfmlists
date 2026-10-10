@@ -1,6 +1,7 @@
 // Entry point. Imports every module for its side effects and owns the
 // top-level flows that span them.
 
+import { libraryBucket, trackEvent } from './analytics.js';
 import { fetchTopAlbums, fetchTopArtists, fetchTopTracks } from './api/lastfm.js';
 import { LOAD_ALL_DETAILS_TOOLTIP, LOAD_DETAILS_TOOLTIP, debugLogDataset } from './config.js';
 import { filterTracks } from './data/filters.js';
@@ -105,6 +106,7 @@ document.getElementById("username-form").addEventListener("submit", async (event
         // an empty app with the failure only in the console.
         console.error("Load failed:", loadError);
         clearAppLoadedState();
+        trackEvent("load/error", "Load failed");
         showLoadError(loadError && loadError.message ? loadError.message : "Something went wrong while loading your data.");
         if (submitButton) submitButton.disabled = false;
         return;
@@ -306,6 +308,10 @@ document.getElementById("username-form").addEventListener("submit", async (event
 
     setAppLoadedState(username);
     enableGamesTab();
+    trackEvent(syncedFromStorage ? "load/saved" : "load/fresh",
+        syncedFromStorage ? "Loaded from saved data" : "Loaded from Last.fm");
+    const bucket = libraryBucket(state.allTracks.length);
+    trackEvent(`library/${bucket}`, `Library size: ${bucket} scrobbles`);
 
 	// ✅ Update UI
 	filterTracks();
