@@ -49,6 +49,13 @@ document.getElementById("username-form").addEventListener("submit", async (event
 	// while their history is loading.
 	const loadStartedAt = performance.now();
 	trackEvent("load/start", "Load started");
+	// Browsers slow down hidden tabs, so loads that were left in the
+	// background are counted apart from the ones someone watched.
+	let switchedAway = document.visibilityState === "hidden";
+	const noteSwitchedAway = () => {
+		if (document.visibilityState === "hidden") switchedAway = true;
+	};
+	document.addEventListener("visibilitychange", noteSwitchedAway);
 
 	if (submitButton) submitButton.disabled = true;
 	setAppLoadedState(username);
@@ -111,6 +118,7 @@ document.getElementById("username-form").addEventListener("submit", async (event
         console.error("Load failed:", loadError);
         clearAppLoadedState();
         trackEvent("load/error", "Load failed");
+        document.removeEventListener("visibilitychange", noteSwitchedAway);
         showLoadError(loadError && loadError.message ? loadError.message : "Something went wrong while loading your data.");
         if (submitButton) submitButton.disabled = false;
         return;
@@ -317,7 +325,8 @@ document.getElementById("username-form").addEventListener("submit", async (event
     const bucket = libraryBucket(state.allTracks.length);
     trackEvent(`library/${bucket}`, `Library size: ${bucket} scrobbles`);
     // Load time depends mostly on library size, so the two go in one path.
-    const loadKind = syncedFromStorage ? "saved" : "fresh";
+    document.removeEventListener("visibilitychange", noteSwitchedAway);
+    const loadKind = (syncedFromStorage ? "saved" : "fresh") + (switchedAway ? "-away" : "");
     const loadTime = durationBucket((performance.now() - loadStartedAt) / 1000);
     trackEvent(`load-time/${loadKind}/${bucket}/${loadTime}`,
         `Load time (${loadKind}, ${bucket} scrobbles): ${loadTime}`);
