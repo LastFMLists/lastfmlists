@@ -532,13 +532,20 @@ export function updateActiveFilters() {
     });
 }
 
-function resetFilters() {
-    destroyVisualizationState();
+// Puts every control back to its default and empties the filter state,
+// without drawing a list. The page also calls this on startup: browsers
+// restore typed values after a refresh without firing any events, which used
+// to leave old filters on screen while the list ignored them.
+export function resetFilterControls() {
     state.raceRenderArmed = false;
 
     // Reset all input and select elements within #filters-section
     document.querySelectorAll("#filters-section input, #filters-section select, #filters-section textarea").forEach(element => {
-        element.value = "";
+        if (element.type === "checkbox") {
+            element.checked = false;
+        } else {
+            element.value = "";
+        }
     });
     
     // Clear the activeFilters array (using splice or reassigning an empty array)
@@ -588,7 +595,12 @@ function resetFilters() {
 
     updateRaceControlsVisibility();
     notifyFilterControlsChanged();
-    
+}
+
+function resetFilters() {
+    destroyVisualizationState();
+    resetFilterControls();
+
     // Display the full track list and update active filters display
     filterTracks();
     displayEntities();
@@ -754,6 +766,13 @@ document.addEventListener('click', function(event) {
     }
 });
 
+// Rebuild the filter state from what the controls show, so the list can
+// never use different filters than the ones on screen.
+export function syncActiveFiltersFromControls() {
+    state.activeFilters.length = 0;
+    getManagedFilterElements().forEach(element => addFilter(element.id, serializeControlValue(element)));
+}
+
 // The richer filter controls (ui/filter-controls.js) draw themselves from the
 // plain inputs. Setting an input's value from code fires no event, so every
 // place that does so calls this afterwards.
@@ -803,8 +822,7 @@ export function openListQuery(query, options = {}) {
         applySerializedControlValue(document.getElementById(id), value);
     });
 
-    state.activeFilters.length = 0;
-    getManagedFilterElements().forEach(element => addFilter(element.id, serializeControlValue(element)));
+    syncActiveFiltersFromControls();
 
     updateComparisonInteractionState();
     syncEntitySortingSelectors();

@@ -27,6 +27,7 @@ work. Serve the folder over HTTP instead (`python3 -m http.server`).
 
 Unreleased:
 
+- Refreshing the page resets the filters. Browsers used to put the old filter values back after a refresh, so the filter boxes and chips showed them while the list ignored them.
 - Long loads can run in another tab. The tab title shows the loading progress and "✓ Ready" when your lists are done, and after 10 seconds a "Notify me when it's done" button can send a browser notification when loading finishes or fails. The browser asks for permission only when you click it.
 - Anonymous usage counts through GoatCounter: visits, list types, filters, games, entity pages, exports, library size ranges, and page and data load times as ranges. No usernames, names or scrobbles are sent.
 - Album covers in lists. Last.fm sends a cover with every scrobble, so most covers need no extra requests. Covers are saved with the rest of your data, and any that are missing are looked up when their row scrolls into view. Tracks use the cover of the album you played them from most, and artists use the cover of their most-played album.

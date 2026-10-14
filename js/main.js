@@ -24,6 +24,8 @@ import { failLoadNotice, finishLoadNotice, startLoadNotice } from './ui/load-not
 import './ui/support-banner.js';
 import {
     initializeEquationControls,
+    resetFilterControls,
+    syncActiveFiltersFromControls,
     updateActiveFilters,
     updateComparisonInteractionState
 } from './ui/filters-panel.js';
@@ -336,6 +338,7 @@ document.getElementById("username-form").addEventListener("submit", async (event
         `Load time (${loadKind}, ${bucket} scrobbles): ${loadTime}`);
 
 	// ✅ Update UI
+	syncActiveFiltersFromControls();
 	filterTracks();
     displayEntities();
 	updateActiveFilters();
@@ -362,6 +365,8 @@ document.getElementById("save-data").addEventListener("click", async () => {
   });
 
 document.addEventListener("DOMContentLoaded", () => {
+    // A refresh starts with clean filters, whatever the browser restored.
+    resetFilterControls();
     initFilterControls();
     initializeEquationControls();
     ensureRaceDateDefaults();
