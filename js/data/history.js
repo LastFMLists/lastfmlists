@@ -23,6 +23,7 @@ import { escapeHTML, getListLengthLimit, loadingDiv, mapWithConcurrency } from '
 import { state } from '../state.js';
 import { getLocalDayKeyFromTimestamp } from '../time.js';
 import { displayEntities } from '../ui/lists.js';
+import { setLoadProgress } from '../ui/load-notice.js';
 import { updateExtendedDataUI } from '../ui/shell.js';
 import { filterTracks } from './filters.js';
 import { mergeData } from './storage.js';
@@ -319,6 +320,7 @@ export async function fetchListeningHistory(username, onPreview = null) {
     };
 
     loadingDiv.innerHTML = `<p>Loading data... Page 1 of ${totalPages}</p>`;
+    setLoadProgress(1 / totalPages);
     emitPreview(true);
 
     if (totalPages > 1) {
@@ -334,11 +336,15 @@ export async function fetchListeningHistory(username, onPreview = null) {
             }
             pagesLoaded += 1;
             loadingDiv.innerHTML = `<p>Loading data... Page ${pagesLoaded} of ${totalPages} (${lastfmData.length.toLocaleString()} scrobbles)</p>`;
+            setLoadProgress(pagesLoaded / totalPages);
             emitPreview();
         }, getFetchConcurrency());
     }
 
     emitPreview(true);
+    // The top lists and rankings still have to be built, so drop the percentage
+    // rather than sit at 100% while that runs.
+    setLoadProgress(null);
     console.log(`Fetch complete. Total tracks: ${lastfmData.length}`);
     return lastfmData;
 }

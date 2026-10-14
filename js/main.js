@@ -20,6 +20,7 @@ import { ensureRaceDateDefaults, updateRaceControlsVisibility } from './ui/chart
 import './ui/entity-page.js';
 import './ui/export.js';
 import { initFilterControls } from './ui/filter-controls.js';
+import { failLoadNotice, finishLoadNotice, startLoadNotice } from './ui/load-notice.js';
 import './ui/support-banner.js';
 import {
     initializeEquationControls,
@@ -49,6 +50,7 @@ document.getElementById("username-form").addEventListener("submit", async (event
 	// while their history is loading.
 	const loadStartedAt = performance.now();
 	trackEvent("load/start", "Load started");
+	startLoadNotice();
 	// Browsers slow down hidden tabs, so loads that were left in the
 	// background are counted apart from the ones someone watched.
 	let switchedAway = document.visibilityState === "hidden";
@@ -119,7 +121,9 @@ document.getElementById("username-form").addEventListener("submit", async (event
         clearAppLoadedState();
         trackEvent("load/error", "Load failed");
         document.removeEventListener("visibilitychange", noteSwitchedAway);
-        showLoadError(loadError && loadError.message ? loadError.message : "Something went wrong while loading your data.");
+        const loadErrorMessage = loadError && loadError.message ? loadError.message : "Something went wrong while loading your data.";
+        failLoadNotice(loadErrorMessage);
+        showLoadError(loadErrorMessage);
         if (submitButton) submitButton.disabled = false;
         return;
     }
@@ -335,6 +339,7 @@ document.getElementById("username-form").addEventListener("submit", async (event
 	filterTracks();
     displayEntities();
 	updateActiveFilters();
+	finishLoadNotice();
 
 });
 

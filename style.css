@@ -3645,3 +3645,33 @@ button.game-card:hover {
         scroll-behavior: auto !important;
     }
 }
+
+/* "Notify me when it's done", offered under the loading status during long loads (ui/load-notice.js) */
+.load-notify {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin: -0.4rem auto 1rem;
+    padding: 0.4rem 0.9rem;
+    background: none;
+    border: 1px solid var(--border-color);
+    border-radius: 999px;
+    color: var(--secondary-text-color);
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.load-notify:hover:not(:disabled) {
+    background: var(--accent-soft);
+    color: var(--primary-text-color);
+}
+
+.load-notify:disabled {
+    cursor: default;
+    border-style: dashed;
+}
+
+.load-notify[hidden] {
+    display: none;
+}
