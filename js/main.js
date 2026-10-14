@@ -1,7 +1,7 @@
 // Entry point. Imports every module for its side effects and owns the
 // top-level flows that span them.
 
-import { libraryBucket, trackEvent } from './analytics.js';
+import { durationBucket, libraryBucket, trackEvent } from './analytics.js';
 import { fetchTopAlbums, fetchTopArtists, fetchTopTracks } from './api/lastfm.js';
 import { LOAD_ALL_DETAILS_TOOLTIP, LOAD_DETAILS_TOOLTIP, debugLogDataset } from './config.js';
 import { filterTracks } from './data/filters.js';
@@ -45,6 +45,10 @@ document.getElementById("username-form").addEventListener("submit", async (event
 
 	clearLoadError();
 	if (!username) return;
+	// Starts minus finished loads and errors shows how many people give up
+	// while their history is loading.
+	const loadStartedAt = performance.now();
+	trackEvent("load/start", "Load started");
 
 	if (submitButton) submitButton.disabled = true;
 	setAppLoadedState(username);
@@ -312,6 +316,11 @@ document.getElementById("username-form").addEventListener("submit", async (event
         syncedFromStorage ? "Loaded from saved data" : "Loaded from Last.fm");
     const bucket = libraryBucket(state.allTracks.length);
     trackEvent(`library/${bucket}`, `Library size: ${bucket} scrobbles`);
+    // Load time depends mostly on library size, so the two go in one path.
+    const loadKind = syncedFromStorage ? "saved" : "fresh";
+    const loadTime = durationBucket((performance.now() - loadStartedAt) / 1000);
+    trackEvent(`load-time/${loadKind}/${bucket}/${loadTime}`,
+        `Load time (${loadKind}, ${bucket} scrobbles): ${loadTime}`);
 
 	// ✅ Update UI
 	filterTracks();

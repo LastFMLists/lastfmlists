@@ -59,6 +59,28 @@ export function libraryBucket(count) {
     return "500k-plus";
 }
 
+// GoatCounter only counts, so durations are sent as ranges in the path.
+const DURATION_BUCKETS = [
+    [10, "under-10s"], [30, "10-30s"], [60, "30s-1m"], [120, "1-2m"],
+    [300, "2-5m"], [600, "5-10m"], [1800, "10-30m"], [Infinity, "30m-plus"]
+];
+
+export function durationBucket(seconds) {
+    return DURATION_BUCKETS.find(([limit]) => seconds < limit)[1];
+}
+
+// How long the page itself took to load, once per visit.
+window.addEventListener("load", () => {
+    // loadEventEnd is still 0 inside the load handler, so read it a tick later.
+    setTimeout(() => {
+        const nav = performance.getEntriesByType?.("navigation")?.[0];
+        if (!nav || !nav.loadEventEnd) return;
+        const seconds = nav.loadEventEnd / 1000;
+        const bucket = seconds < 1 ? "under-1s" : seconds < 2 ? "1-2s" : seconds < 4 ? "2-4s" : seconds < 8 ? "4-8s" : "8s-plus";
+        trackEvent(`page-load/${bucket}`, `Page load: ${bucket}`);
+    }, 0);
+});
+
 // ---- Lists ----
 
 const MODE_PREFIX = { "list": "list", "bar-chart": "chart", "bar-race": "race" };
