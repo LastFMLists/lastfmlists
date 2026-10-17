@@ -2,7 +2,7 @@
 // artwork as a collage grid.
 
 import { fetchAlbumCoverUrl } from '../api/lastfm.js';
-import { DISPLAY_MODE_BAR_RACE, EXPORT_MAX_ROWS_PER_COLUMN } from '../config.js';
+import { EXPORT_MAX_ROWS_PER_COLUMN } from '../config.js';
 import {
     closeExportModalButton,
     closeGridExportModalButton,
@@ -22,11 +22,9 @@ import { state } from '../state.js';
 import {
     applyColorsToChartInstances,
     getChartThemeColors,
-    hasRaceSettingsReady,
     stopRacePlayback
 } from './charts.js';
 import { getComparisonEditTarget } from './filters-panel.js';
-import { getSelectedDisplayMode } from './lists.js';
 
 let gifWorkerBlobUrl = null;
 
@@ -69,7 +67,13 @@ function copyCanvasBitmaps(sourceRoot, clonedRoot) {
 }
 
 async function exportCurrentListAsImage() {
-    if (getSelectedDisplayMode() === DISPLAY_MODE_BAR_RACE && hasRaceSettingsReady()) {
+    // A race on screen exports as a GIF; anything else (a list, or the bar
+    // chart shown until a race is applied) as a PNG.
+    if (state.raceBuilding) {
+        alert('The race is still being built. Try again in a moment.');
+        return;
+    }
+    if (state.activeRaceState) {
         await exportCurrentRaceAsGif();
         return;
     }

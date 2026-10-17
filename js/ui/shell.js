@@ -121,10 +121,11 @@ if (themeToggleButton) {
     themeToggleButton.addEventListener("click", () => {
         setTimeout(() => {
             const mode = getSelectedDisplayMode();
-            if (mode === DISPLAY_MODE_BAR_RACE && state.activeRaceState) {
+            if (mode === DISPLAY_MODE_BAR_RACE && (state.activeRaceState || state.raceBuilding)) {
                 // The race reads its colors on every draw, so a repaint is
-                // enough and it keeps its place.
-                state.activeRaceState.redraw();
+                // enough and it keeps its place. One still being built picks
+                // up the theme when it appears.
+                state.activeRaceState?.redraw();
             } else if (mode === DISPLAY_MODE_BAR_CHART || mode === DISPLAY_MODE_BAR_RACE) {
                 displayEntities();
             }

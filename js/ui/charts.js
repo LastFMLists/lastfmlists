@@ -220,6 +220,7 @@ export function insertRacePlaybackToolbar(targetDiv) {
 export function destroyVisualizationState() {
     stopRacePlayback();
     raceBuild += 1;
+    state.raceBuilding = false;
     state.chartInstances.forEach(chart => {
         try {
             chart.destroy();
@@ -513,9 +514,10 @@ function createBarChartInCanvas(canvas, labels, values, sortingBasis, chartTitle
                 },
                 [labelAxisKey]: {
                     ticks: {
-                        // Every bar keeps its label; the chart is made tall
-                        // enough for them instead.
-                        autoSkip: false,
+                        // Every bar keeps its label on horizontal charts,
+                        // which are made tall enough for them. Vertical ones
+                        // don't grow sideways, so there labels may thin out.
+                        autoSkip: orientation === "vertical",
                         color: chartColors.text,
                         callback: function (_tickValue, tickIndex) {
                             const fullLabel = this?.chart?.data?.labels?.[tickIndex];
@@ -804,7 +806,10 @@ async function buildRaceFrames(tracks, entityType, sortingBasis, xValue, caps, t
 
     // Play counts only ever go up, so the top of the race can be kept up to
     // date play by play instead of re-ranking the whole library every step.
-    const incremental = sortingBasis === "scrobbles" && caps.perArtist === Infinity && caps.perAlbum === Infinity;
+    // Only caps that apply to this list type rule out the quick path:
+    // artist lists ignore both, album lists ignore the album cap.
+    const capped = entityType !== "artist" && (caps.perArtist !== Infinity || (entityType === "track" && caps.perAlbum !== Infinity));
+    const incremental = sortingBasis === "scrobbles" && !capped;
     const entries = new Map();
     let top = [];
     const ahead = (a, b) => b.count - a.count || a.order - b.order;
@@ -846,10 +851,17 @@ async function buildRaceFrames(tracks, entityType, sortingBasis, xValue, caps, t
             rows = frames[step - 1].rows;
         } else {
             const entities = applyEntityCaps(buildEntitiesFromTracks(sortedTracks.slice(0, pointer), entityType, sortingBasis, xValue), entityType, caps);
-            rows = entities.slice(0, rowCount).map(entity => ({
-                ...getRaceRow(entity, entityType),
-                value: getEntityMetricValue(entity, sortingBasis)
-            }));
+            // Some sorts keep "Song" and "song" apart while the race matches
+            // names regardless of case; the first (higher) one wins.
+            const seen = new Set();
+            rows = [];
+            for (const entity of entities) {
+                const row = getRaceRow(entity, entityType);
+                if (seen.has(row.key)) continue;
+                seen.add(row.key);
+                rows.push({ ...row, value: getEntityMetricValue(entity, sortingBasis) });
+                if (rows.length >= rowCount) break;
+            }
         }
         frames.push({ label: formatRacePeriodLabel(periodStart, frequency), total: pointer, rows });
 
@@ -927,8 +939,13 @@ function setActiveRace(mode, charts, totalFrames) {
 // Each new race cancels one still being built.
 let raceBuild = 0;
 
+function raceBuilt(run) {
+    if (run === raceBuild) state.raceBuilding = false;
+}
+
 export async function renderBarRaceSingle(tracks, entityType, targetDiv, sortingBasis) {
     const run = ++raceBuild;
+    state.raceBuilding = true;
     const frequency = (document.getElementById("race-frequency")?.value || "day").toLowerCase();
     const xValue = parseInt(document.getElementById("x-value")?.value, 10) || getDefaultXValue(sortingBasis);
     const caps = currentEntityCaps();
@@ -940,6 +957,7 @@ export async function renderBarRaceSingle(tracks, entityType, targetDiv, sorting
         cancelled: () => run !== raceBuild
     });
     if (!frames || run !== raceBuild) return;
+    raceBuilt(run);
     if (frames.error) {
         showRaceNote(targetDiv, frames.error);
         return;
@@ -950,6 +968,7 @@ export async function renderBarRaceSingle(tracks, entityType, targetDiv, sorting
 
 export async function renderBarRaceComparison(leftTracks, rightTracks, leftEntityType, rightEntityType, leftSortingBasis, rightSortingBasis, leftXValue, rightXValue, leftCaps, rightCaps, leftTargetDiv, rightTargetDiv) {
     const run = ++raceBuild;
+    state.raceBuilding = true;
     const frequency = (document.getElementById("race-frequency")?.value || "day").toLowerCase();
     const bounds = resolveRaceTimeBounds([leftTracks, rightTracks]);
     const timeline = buildRaceTimeline(bounds.start, bounds.end, frequency);
@@ -964,6 +983,7 @@ export async function renderBarRaceComparison(leftTracks, rightTracks, leftEntit
     if (!leftFrames || cancelled()) return;
     const rightFrames = leftFrames.error ? leftFrames : await buildRaceFrames(rightTracks, rightEntityType, rightSortingBasis, rightXValue, rightCaps, timeline, frequency, bounds.end, { onProgress: progress(1), cancelled });
     if (!rightFrames || cancelled()) return;
+    raceBuilt(run);
     if (leftFrames.error || rightFrames.error) {
         showRaceNote(leftTargetDiv, leftFrames.error || rightFrames.error);
         rightTargetDiv.innerHTML = "";
@@ -1010,6 +1030,11 @@ if (displayModeSelect) {
 
 // A picked or reset color repaints the race where it is, playing or paused,
 // and recolors bar charts, without rebuilding either.
+// A race playing on a tab you left keeps nothing moving you can see.
+document.addEventListener("view:changed", (event) => {
+    if (event.detail.view !== "lists") stopRacePlayback();
+});
+
 document.addEventListener("artist-colors:changed", () => {
     state.activeRaceState?.redraw();
     state.chartInstances.forEach(chart => chart.$recolor?.());

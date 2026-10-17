@@ -133,6 +133,25 @@ export function currentEntityCaps() {
     });
 }
 
+// Track -> the album it was played from most, for rows that some sorts
+// (days played, streaks, first to X...) build without album details.
+let albumIndex = { source: null, albums: new Map() };
+function mostPlayedAlbum(artist, track) {
+    if (albumIndex.source !== state.allTracks) {
+        const counts = new Map();
+        (state.allTracks || []).forEach(play => {
+            const key = `${(play.Artist || "").toLowerCase()}||${(play.Track || "").toLowerCase()}`;
+            if (!counts.has(key)) counts.set(key, new Map());
+            const albums = counts.get(key);
+            albums.set(play.Album || "", (albums.get(play.Album || "") || 0) + 1);
+        });
+        const albums = new Map();
+        counts.forEach((byAlbum, key) => albums.set(key, [...byAlbum.entries()].sort((a, b) => b[1] - a[1])[0][0]));
+        albumIndex = { source: state.allTracks, albums };
+    }
+    return albumIndex.albums.get(`${(artist || "").toLowerCase()}||${(track || "").toLowerCase()}`) || "";
+}
+
 // The album a track row counts towards: the one it was played from most.
 function mainAlbum(item) {
     if (item.albumCounts) {
@@ -142,7 +161,7 @@ function mainAlbum(item) {
         });
         if (best) return best[0];
     }
-    return item.Album || "";
+    return item.Album || mostPlayedAlbum(item.Artist, item.Track);
 }
 
 // Returns admit(item): true while the item's artist and album are under

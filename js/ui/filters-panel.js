@@ -674,6 +674,11 @@ document.getElementById("comparison-toggle").addEventListener("click", () => {
         applyFilterInputState(state.comparisonFilterStates[target]);
         notifyFilterControlsChanged();
     } else {
+        // Back to one list: the left one, whichever side was being edited.
+        applyFilterInputState(state.comparisonFilterStates.left);
+        const editTarget = document.getElementById("comparison-edit-target");
+        if (editTarget) editTarget.value = "left";
+        notifyFilterControlsChanged();
         state.activeFilters.length = 0;
         getManagedFilterElements().forEach(element => {
             const value = element.type === "checkbox"

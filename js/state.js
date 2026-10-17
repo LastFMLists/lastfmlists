@@ -67,6 +67,7 @@ export const state = {
     raceSpeedReadoutElement: null,
     raceToolbar: null,
     graphableList: null,
+    raceBuilding: false,
 };
 export const unfilteredStatsCache = {
     track: { source: null, length: 0, mapping: null },

@@ -269,7 +269,7 @@ function getAdditionalInfo(sortingBasis, entity) {
 	}
 }
 
-function renderEntitiesToContainer(entities, entityType, targetDiv, sortingBasis) {
+function renderEntitiesToContainer(entities, entityType, targetDiv, sortingBasis, caps) {
     if (entityType === "track") {
         displayTopTracks(entities, targetDiv, sortingBasis);
     } else if (entityType === "album") {
@@ -277,7 +277,7 @@ function renderEntitiesToContainer(entities, entityType, targetDiv, sortingBasis
     } else if (entityType === "artist") {
         displayTopArtists(entities, targetDiv, sortingBasis);
     } else if (entityType === "scrobble") {
-        displayScrobbles(entities, targetDiv, sortingBasis === SCROBBLE_SORT_DESC ? "desc" : "asc");
+        displayScrobbles(entities, targetDiv, sortingBasis === SCROBBLE_SORT_DESC ? "desc" : "asc", caps);
     }
 }
 
@@ -412,10 +412,14 @@ export function displayEntities() {
         comparisonLayout.appendChild(rightColumn);
         resultsDiv.appendChild(comparisonLayout);
 
-        if (renderMode === DISPLAY_MODE_BAR_CHART) {
+        // A scrobble list can't be charted, so a side with one keeps both
+        // sides as lists, whichever side the panel is editing.
+        const sidesChartable = leftEntityType !== "scrobble" && rightEntityType !== "scrobble";
+        const comparisonMode = sidesChartable ? renderMode : DISPLAY_MODE_LIST;
+        if (comparisonMode === DISPLAY_MODE_BAR_CHART) {
             renderBarChartEntities(leftEntities, leftEntityType, leftSortingBasis, leftList);
             renderBarChartEntities(rightEntities, rightEntityType, rightSortingBasis, rightList);
-        } else if (renderMode === DISPLAY_MODE_BAR_RACE) {
+        } else if (comparisonMode === DISPLAY_MODE_BAR_RACE) {
             if (raceCanRender) {
                 insertRacePlaybackToolbar(resultsDiv);
                 renderBarRaceComparison(
@@ -437,8 +441,8 @@ export function displayEntities() {
                 renderBarChartEntities(rightEntities, rightEntityType, rightSortingBasis, rightList);
             }
         } else {
-            renderEntitiesToContainer(leftEntities, leftEntityType, leftList, leftSortingBasis);
-            renderEntitiesToContainer(rightEntities, rightEntityType, rightList, rightSortingBasis);
+            renderEntitiesToContainer(leftEntities, leftEntityType, leftList, leftSortingBasis, leftCaps);
+            renderEntitiesToContainer(rightEntities, rightEntityType, rightList, rightSortingBasis, rightCaps);
             equalizeComparisonRowHeights(leftList, rightList);
         }
 
@@ -450,9 +454,9 @@ export function displayEntities() {
         };
 
         const resultsHeader = document.querySelector("#results-section h2");
-        if (renderMode === DISPLAY_MODE_BAR_CHART) {
+        if (comparisonMode === DISPLAY_MODE_BAR_CHART) {
             resultsHeader.textContent = "Comparison Bar Charts";
-        } else if (renderMode === DISPLAY_MODE_BAR_RACE) {
+        } else if (comparisonMode === DISPLAY_MODE_BAR_RACE) {
             resultsHeader.textContent = raceCanRender
                 ? "Comparison Bar Chart Race"
                 : "Comparison Bar Charts (Race settings pending or Apply Filters required)";
@@ -465,7 +469,7 @@ export function displayEntities() {
         announceRenderedList(leftEntities.length + rightEntities.length, {
             comparison: true,
             entityType: leftEntityType,
-            renderMode: raceCanRender ? renderMode : DISPLAY_MODE_BAR_CHART
+            renderMode: raceCanRender ? comparisonMode : DISPLAY_MODE_BAR_CHART
         });
         return;
     }
@@ -488,7 +492,7 @@ export function displayEntities() {
             renderBarChartEntities(singleEntities, entityType, sortingBasis, resultsTarget);
         }
     } else {
-        renderEntitiesToContainer(singleEntities, entityType, resultsTarget, sortingBasis);
+        renderEntitiesToContainer(singleEntities, entityType, resultsTarget, sortingBasis, caps);
     }
 
     state.lastRenderedListState = {
@@ -546,9 +550,9 @@ function offerGraph(entityType, sortingBasis, xValue, tracks, entities) {
     if (button) button.hidden = !graphable;
 }
 
-function displayScrobbles(scrobbles, targetDiv = null, order = "asc") {
+function displayScrobbles(scrobbles, targetDiv = null, order = "asc", caps = currentEntityCaps()) {
     const resultsDiv = targetDiv || document.getElementById("results");
-    const admit = makeCapCounter("scrobble", currentEntityCaps());
+    const admit = makeCapCounter("scrobble", caps);
     const listLength = getListLengthLimit();
     let tracks = [...scrobbles];
     resultsDiv.innerHTML = "";

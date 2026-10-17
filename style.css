@@ -4812,6 +4812,10 @@ button.game-card:hover {
 }
 
 @media (max-width: 768px) {
+    .race-wrapper {
+        padding: 10px 8px 8px;
+    }
+
     .graph-series-chip {
         border-radius: var(--radius-md);
     }

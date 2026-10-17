@@ -356,7 +356,7 @@ export function createRaceChart(container, frames, { slots, sortingBasis, entity
 
     function draw(at = position) {
         position = at;
-        const nextWidth = Math.max(280, Math.floor(stage.clientWidth || 640));
+        const nextWidth = Math.max(200, Math.floor(stage.clientWidth || 640));
         const ratio = window.devicePixelRatio || 1;
         readTheme();
         colors = assignColors(artistOrder, artistNames, theme);
