@@ -1161,6 +1161,242 @@ label.inline-checkbox {
     border-radius: var(--radius-md);
 }
 
+/* ---- Step editor (js/ui/equation-editor.js) ---- */
+
+/* The step editor shows steps; the advanced editor shows the text and the
+   token helpers. The text box is the stored value either way. */
+.equation-editor-layout.is-visual textarea,
+.equation-editor-layout.is-visual .equation-helper-pane,
+.equation-editor-layout.is-advanced .eq-steps,
+.equation-editor-layout.is-advanced .eq-add {
+    display: none;
+}
+
+.equation-editor-layout.is-visual .equation-editor-pane {
+    flex: 1;
+}
+
+.equation-editor-layout:not(.is-comparison) .eq-side-title {
+    display: none;
+}
+
+.eq-intro {
+    margin: 0 0 0.4rem;
+    color: var(--secondary-text-color);
+    font-size: 0.82rem;
+    line-height: 1.4;
+}
+
+.eq-link {
+    padding: 0.2rem 0;
+    border: 0;
+    background: none;
+    color: var(--accent-strong);
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.eq-link:hover:not(:disabled) {
+    text-decoration: underline;
+}
+
+.eq-link:disabled {
+    color: var(--secondary-text-color);
+    cursor: not-allowed;
+}
+
+.eq-guide-body {
+    margin: 0.4rem 0 0.6rem;
+    padding: 0.7rem 0.85rem;
+    border-radius: var(--radius-md);
+    background-color: var(--sidebar-color);
+    border: 1px solid var(--border-color);
+    font-size: 0.84rem;
+    line-height: 1.45;
+}
+
+.eq-guide-body ol {
+    margin: 0 0 0.5rem;
+    padding-left: 1.2rem;
+}
+
+.eq-guide-body p {
+    margin: 0 0 0.5rem;
+}
+
+.eq-examples-title {
+    font-weight: 700;
+}
+
+.eq-examples {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.2rem;
+}
+
+.eq-example {
+    padding: 0.15rem 0;
+    border: 0;
+    background: none;
+    color: var(--accent-strong);
+    font-size: 0.84rem;
+    text-align: left;
+    cursor: pointer;
+}
+
+.eq-example:hover {
+    text-decoration: underline;
+}
+
+.eq-side + .eq-side {
+    margin-top: 0.9rem;
+}
+
+.dropdown-content .eq-side-title {
+    margin: 0.6rem 0 0.4rem;
+    font-size: 0.9rem;
+    color: var(--primary-text-color);
+}
+
+.eq-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+}
+
+.eq-empty {
+    margin: 0.3rem 0;
+    color: var(--secondary-text-color);
+    font-size: 0.85rem;
+}
+
+.eq-step {
+    padding: 0.65rem 0.75rem 0.75rem;
+    border-radius: var(--radius-md);
+    background-color: var(--sidebar-color);
+    border: 1px solid var(--border-color);
+}
+
+.eq-step-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.2rem;
+    font-size: 0.9rem;
+}
+
+.eq-step-tools {
+    display: inline-flex;
+    gap: 0.2rem;
+}
+
+.eq-step-tools button {
+    width: 28px;
+    height: 28px;
+    border: 1px solid var(--border-color);
+    border-radius: 50%;
+    background-color: var(--background-color);
+    color: var(--secondary-text-color);
+    font-size: 0.75rem;
+    cursor: pointer;
+}
+
+.eq-step-tools button:hover:not(:disabled) {
+    color: var(--primary-accent-color);
+    border-color: var(--primary-accent-color);
+}
+
+.eq-step-tools button:disabled {
+    opacity: 0.35;
+    cursor: default;
+}
+
+.dropdown-content .eq-field,
+.eq-operand {
+    display: block;
+    margin: 0.5rem 0 0;
+}
+
+.dropdown-content .eq-field > span,
+.eq-label {
+    display: block;
+    margin-bottom: 0.25rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--secondary-text-color);
+}
+
+.dropdown-content .eq-step input,
+.dropdown-content .eq-step select {
+    margin: 0;
+    background-color: var(--background-color);
+}
+
+.eq-operand-row {
+    display: grid;
+    grid-template-columns: minmax(7.5rem, 0.6fr) minmax(0, 1fr);
+    gap: 0.4rem;
+}
+
+.eq-operand-row > :only-child {
+    grid-column: 1 / -1;
+    max-width: 50%;
+}
+
+/* A calculation's values sit inside a bordered group, one level per nesting */
+.eq-calc {
+    margin-top: 0.4rem;
+    padding: 0.1rem 0 0.5rem 0.7rem;
+    border-left: 2px solid var(--primary-accent-color);
+}
+
+.eq-add {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    width: 100%;
+    margin-top: 0.6rem;
+    padding: 0.5rem;
+    border: 1px dashed var(--primary-accent-color);
+    border-radius: var(--radius-md);
+    background: none;
+    color: var(--accent-strong);
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.eq-add:hover {
+    background-color: var(--accent-soft);
+}
+
+.eq-problem {
+    margin: 0.4rem 0 0;
+    color: #c0392b;
+    font-size: 0.82rem;
+}
+
+[data-theme="dark"] .eq-problem {
+    color: #f19a8f;
+}
+
+.eq-mode {
+    display: block;
+    margin-top: 0.7rem;
+}
+
+@media (max-width: 520px) {
+    .eq-operand-row {
+        grid-template-columns: 1fr;
+    }
+
+    .eq-operand-row > :only-child {
+        max-width: none;
+    }
+}
+
 .equation-helper-pane label:first-child {
     margin-top: 0;
 }
@@ -2521,8 +2757,9 @@ footer a:hover {
         padding: 0.9rem 0.9rem 2.2rem;
     }
 
+    /* Too tall to keep on screen on a phone, so it scrolls away */
     #session-panel {
-        top: 0.5rem;
+        position: static;
         padding: 0.55rem 0.6rem;
     }
 
@@ -2803,7 +3040,7 @@ footer a:hover {
 
 .explore-group {
     padding-top: 1.2rem;
-    scroll-margin-top: calc(var(--explore-offset, 4rem) + 0.25rem);
+    scroll-margin-top: calc(var(--explore-offset, 0px) + 0.75rem);
 }
 
 .explore-group-head {
@@ -2934,7 +3171,22 @@ footer a:hover {
     line-height: 1.25;
 }
 
-.explore-pending,
+.explore-row.is-placeholder {
+    cursor: default;
+}
+
+.explore-row.is-placeholder .explore-name strong,
+.explore-row.is-placeholder .explore-name small {
+    width: 70%;
+    border-radius: 4px;
+    background-color: var(--accent-soft);
+}
+
+.explore-row.is-placeholder .explore-name small {
+    width: 45%;
+    margin-top: 3px;
+}
+
 .explore-empty {
     margin: 0.4rem 0;
     color: var(--secondary-text-color);

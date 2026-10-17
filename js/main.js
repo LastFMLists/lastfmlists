@@ -16,6 +16,7 @@ import { initGames } from './games/index.js';
 import { state } from './state.js';
 import { ensureRaceDateDefaults, updateRaceControlsVisibility } from './ui/charts.js';
 import './ui/entity-page.js';
+import './ui/equation-editor.js';
 import './ui/explore.js';
 import './ui/export.js';
 import { initFilterControls } from './ui/filter-controls.js';

@@ -605,13 +605,18 @@
                 <div class="dropdown">
                     <button class="dropdown-button"><i class="fas fa-square-root-variable" aria-hidden="true"></i><span>Equations</span></button>
                     <div class="dropdown-content equation-dropdown-content">
-                        <div class="equation-editor-layout">
+                        <!-- js/ui/equation-editor.js builds the step editor; the text boxes hold the result -->
+                        <div class="equation-editor-layout is-visual">
                             <div class="equation-editor-pane">
-                                <label for="equations">Left list pipeline</label>
-                                <textarea id="equations" rows="5" placeholder="e.g., artist-name-length = track-name-length; sort track-scrobble-count desc; unique track-name-length 1; sort track-name-length asc"></textarea>
-
-                                <label for="equations-right">Right list pipeline</label>
-                                <textarea id="equations-right" rows="5" placeholder="e.g., artist-name-length = track-name-length; sort track-scrobble-count desc; unique track-name-length 1; sort track-name-length asc"></textarea>
+                                <p class="eq-intro">Steps run from top to bottom on the plays that pass your filters, before the list is grouped and ranked. Play counts and ranks always count your whole history.</p>
+                                <div class="eq-side" data-side="left">
+                                    <label for="equations" class="eq-side-title">Left list</label>
+                                    <textarea id="equations" rows="5" spellcheck="false" placeholder="e.g., artist-name-length = track-name-length; sort track-scrobble-count desc; unique track-name-length 1; sort track-name-length asc"></textarea>
+                                </div>
+                                <div class="eq-side" data-side="right">
+                                    <label for="equations-right" class="eq-side-title">Right list</label>
+                                    <textarea id="equations-right" rows="5" spellcheck="false" placeholder="e.g., artist-name-length = track-name-length; sort track-scrobble-count desc; unique track-name-length 1; sort track-name-length asc"></textarea>
+                                </div>
                             </div>
 
                             <div class="equation-helper-pane">

@@ -183,7 +183,9 @@ function resultKey(boxDef) {
 
 function rowsHTML(boxDef) {
     const rows = results.get(resultKey(boxDef));
-    if (!rows) return `<p class="explore-pending">Working it out…</p>`;
+    // Placeholder rows as tall as the real ones, so the page doesn't shift
+    // (and section jumps don't miss) while the boxes above fill in.
+    if (!rows) return `<ol class="explore-rows explore-pending" aria-label="Working it out">${'<li class="explore-row is-placeholder" aria-hidden="true"><span></span><span class="entity-art explore-art"></span><span class="explore-name"><strong>&nbsp;</strong><small>&nbsp;</small></span><span></span></li>'.repeat(ROWS_SHOWN)}</ol>`;
     if (!rows.length) return `<p class="explore-empty">Nothing here yet.</p>`;
     const shown = rows.slice(0, expanded.has(boxDef.id) ? ROWS_EXPANDED : ROWS_SHOWN);
     return `<ol class="explore-rows">${shown.map((row, index) => {
@@ -280,19 +282,16 @@ export function showExplore() {
 
 // ---- Events ----
 
-// The session panel sticks to the top of the screen, so section jumps stop
-// just below it. Its height changes with the screen width.
-function trackStickyPanel() {
+// On wider screens the session panel sticks to the top, so a section jump
+// stops just below it. On phones it scrolls away and needs no room.
+function updateJumpOffset() {
     const panel = document.getElementById("session-panel");
-    if (!panel || typeof ResizeObserver === "undefined") return;
-    new ResizeObserver(() => {
-        const top = parseFloat(getComputedStyle(panel).top) || 0;
-        sectionElement.style.setProperty("--explore-offset", `${panel.offsetHeight + top}px`);
-    }).observe(panel);
+    const style = panel ? getComputedStyle(panel) : null;
+    const offset = style && style.position === "sticky" ? panel.offsetHeight + (parseFloat(style.top) || 0) : 0;
+    sectionElement.style.setProperty("--explore-offset", `${offset}px`);
 }
 
 if (sectionElement) {
-    trackStickyPanel();
 
     document.addEventListener("view:changed", (event) => {
         if (event.detail.view === "explore") showExplore();
@@ -316,6 +315,7 @@ if (sectionElement) {
     sectionElement.addEventListener("click", (event) => {
         const chip = event.target.closest("[data-jump]");
         if (chip) {
+            updateJumpOffset();
             document.getElementById(`explore-${chip.dataset.jump}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
             return;
         }

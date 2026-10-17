@@ -27,6 +27,9 @@ work. Serve the folder over HTTP instead (`python3 -m http.server`).
 
 Unreleased:
 
+- The Equations menu is a step editor, ported from the Android app. Each step is picked from a list (Keep matching plays, Order plays, Keep first per value, Show value), fields have readable names, either side of a condition can be a field, number, text or a calculation, and steps can be moved and removed. A short guide has one-click examples. The text form is still there as the Advanced text editor, which points out mistakes and switches back to steps once the text is valid.
+- On phones the session panel scrolls away with the page instead of covering a third of the screen.
+- Explore boxes keep their height while they are worked out, so the page doesn't shift and section jumps land where they should.
 - An Explore tab with ready-made lists in six themes: highlights, a year of your choice, streaks, records and milestones, when you listen, and rediscover. Each box shows the top 5 (or 15), names open their own page, and Open in Lists opens the full list with its settings filled in. Finished loads land on Explore. Three columns on wide screens, one on phones.
 - The time-of-day range and the long-gap setting are read from the filters being applied, not from the panel on screen, so both sides of a comparison keep their own values.
 - Load Details now covers what it was meant to: every artist with over 100 plays, album with over 10 and track with over 5, and at least your top 250 artists, 500 albums and 1,000 tracks. It used to stop at the top 250, 500 and 1,000 every time.
