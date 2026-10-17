@@ -121,7 +121,11 @@ if (themeToggleButton) {
     themeToggleButton.addEventListener("click", () => {
         setTimeout(() => {
             const mode = getSelectedDisplayMode();
-            if (mode === DISPLAY_MODE_BAR_CHART || mode === DISPLAY_MODE_BAR_RACE) {
+            if (mode === DISPLAY_MODE_BAR_RACE && state.activeRaceState) {
+                // The race reads its colors on every draw, so a repaint is
+                // enough and it keeps its place.
+                state.activeRaceState.redraw();
+            } else if (mode === DISPLAY_MODE_BAR_CHART || mode === DISPLAY_MODE_BAR_RACE) {
                 displayEntities();
             }
         }, 0);

@@ -327,7 +327,8 @@ export function displayEntities() {
     const selectedDisplayMode = getSelectedDisplayMode();
     const supportsVisualization = entityType !== "scrobble";
     const effectiveDisplayMode = supportsVisualization ? selectedDisplayMode : DISPLAY_MODE_LIST;
-    const renderMode = (effectiveDisplayMode !== DISPLAY_MODE_LIST && typeof Chart === "undefined")
+    // Only the plain bar chart needs Chart.js; the race draws its own canvas.
+    const renderMode = (effectiveDisplayMode === DISPLAY_MODE_BAR_CHART && typeof Chart === "undefined")
         ? DISPLAY_MODE_LIST
         : effectiveDisplayMode;
     const raceReady = renderMode !== DISPLAY_MODE_BAR_RACE || hasRaceSettingsReady();

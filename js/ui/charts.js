@@ -11,7 +11,8 @@ import { applyTracksPerEntityFilter, buildEntitiesFromTracks } from '../data/fil
 import { getDefaultXValue, isRollingWindowSortingBasis } from '../data/metrics.js';
 import { getListLengthLimit } from '../dom.js';
 import { state } from '../state.js';
-import { formatDateInputValue, formatDuration, getWeekNumber } from '../time.js';
+import { formatDateInputValue, formatDuration } from '../time.js';
+import { createRaceChart } from './bar-race.js';
 import { displayEntities, getSelectedDisplayMode } from './lists.js';
 
 export function applyColorsToChartInstances(colors) {
@@ -35,6 +36,7 @@ export function applyColorsToChartInstances(colors) {
         
         chart.update("none");
     });
+    state.activeRaceState?.redraw?.();
 }
 
 export function updateRaceControlsVisibility() {
@@ -55,86 +57,110 @@ export function updateRaceControlsVisibility() {
     }
 }
 
-function stopRacePlayback() {
+// Playback moves a fractional position through the steps on every animation
+// frame, so bars glide between steps instead of jumping once per step.
+export function stopRacePlayback() {
     if (state.racePlaybackTimerId !== null) {
-        clearInterval(state.racePlaybackTimerId);
+        cancelAnimationFrame(state.racePlaybackTimerId);
         state.racePlaybackTimerId = null;
     }
+    syncRaceToolbar();
 }
 
 function getRacePlaybackSpeedFromInput() {
     return Math.max(50, parseInt(document.getElementById("race-speed-ms")?.value, 10) || state.racePlaybackSpeedMs || 260);
 }
 
+function raceStepName() {
+    const frequency = (document.getElementById("race-frequency")?.value || "day").toLowerCase();
+    return frequency === "month" ? "month" : frequency === "week" ? "week" : "day";
+}
+
 function syncRacePlaybackSpeedFromInput() {
     state.racePlaybackSpeedMs = getRacePlaybackSpeedFromInput();
     if (state.raceSpeedReadoutElement) {
-        state.raceSpeedReadoutElement.textContent = `${state.racePlaybackSpeedMs}ms/frame`;
+        const seconds = state.racePlaybackSpeedMs / 1000;
+        state.raceSpeedReadoutElement.textContent = `${+seconds.toFixed(2)}s per ${raceStepName()}`;
+    }
+}
+
+function syncRaceToolbar() {
+    const toolbar = state.raceToolbar;
+    const race = state.activeRaceState;
+    if (!toolbar) return;
+    const playing = state.racePlaybackTimerId !== null;
+    toolbar.play.innerHTML = playing ? '<i class="fas fa-pause" aria-hidden="true"></i>' : '<i class="fas fa-play" aria-hidden="true"></i>';
+    toolbar.play.setAttribute("aria-label", playing ? "Pause" : "Play");
+    toolbar.play.title = playing ? "Pause" : "Play";
+    if (race) {
+        toolbar.scrubber.max = String(Math.max(0, race.totalFrames - 1));
+        toolbar.scrubber.value = String(race.position);
+        toolbar.scrubber.disabled = race.totalFrames <= 1;
     }
 }
 
 function startRacePlayback() {
-    if (!state.activeRaceState || state.activeRaceState.totalFrames <= 1 || typeof state.activeRaceState.updateFrame !== "function") {
-        return;
-    }
+    const race = state.activeRaceState;
+    if (!race || race.totalFrames <= 1 || typeof race.drawAt !== "function") return;
 
     stopRacePlayback();
     syncRacePlaybackSpeedFromInput();
-    state.racePlaybackTimerId = setInterval(() => {
-        if (!state.activeRaceState || typeof state.activeRaceState.updateFrame !== "function") {
-            stopRacePlayback();
+    if (race.position >= race.totalFrames - 1) race.drawAt(0);
+
+    let last = null;
+    const tick = (now) => {
+        const current = state.activeRaceState;
+        if (!current || current !== race) {
+            state.racePlaybackTimerId = null;
             return;
         }
-
-        const nextIndex = state.activeRaceState.frameIndex + 1;
-        if (nextIndex >= state.activeRaceState.totalFrames) {
-            stopRacePlayback();
+        // Cap the step after a hidden tab or a slow frame, so the race
+        // picks up where it was instead of skipping ahead.
+        const elapsed = last === null ? 0 : Math.min(100, now - last);
+        last = now;
+        const next = Math.min(race.totalFrames - 1, race.position + elapsed / state.racePlaybackSpeedMs);
+        race.drawAt(next);
+        if (next >= race.totalFrames - 1) {
+            state.racePlaybackTimerId = null;
+            syncRaceToolbar();
             return;
         }
+        state.racePlaybackTimerId = requestAnimationFrame(tick);
+    };
+    state.racePlaybackTimerId = requestAnimationFrame(tick);
+    syncRaceToolbar();
+}
 
-        state.activeRaceState.updateFrame(nextIndex);
-    }, state.racePlaybackSpeedMs);
+function toggleRacePlayback() {
+    if (state.racePlaybackTimerId !== null) stopRacePlayback();
+    else startRacePlayback();
 }
 
 function jumpToRaceFrame(target) {
-    if (!state.activeRaceState || typeof state.activeRaceState.updateFrame !== "function") return;
-    if (target === "first") {
-        state.activeRaceState.updateFrame(0);
-        return;
-    }
-    if (target === "last") {
-        state.activeRaceState.updateFrame(Math.max(0, state.activeRaceState.totalFrames - 1));
-    }
+    const race = state.activeRaceState;
+    if (!race || typeof race.drawAt !== "function") return;
+    stopRacePlayback();
+    race.drawAt(target === "first" ? 0 : Math.max(0, race.totalFrames - 1));
 }
 
 function adjustRacePlaybackSpeed(multiplier) {
     const current = getRacePlaybackSpeedFromInput();
-    const next = Math.max(50, Math.min(5000, Math.round(current * multiplier)));
+    const next = Math.max(50, Math.min(5000, Math.round(current * multiplier / 10) * 10));
     const speedInput = document.getElementById("race-speed-ms");
     if (speedInput) {
         speedInput.value = String(next);
     }
     syncRacePlaybackSpeedFromInput();
+}
 
-    if (state.racePlaybackTimerId !== null) {
-        const currentFrame = state.activeRaceState?.frameIndex || 0;
-        stopRacePlayback();
-        if (state.activeRaceState) {
-            state.activeRaceState.updateFrame(currentFrame);
-            state.racePlaybackTimerId = setInterval(() => {
-                if (!state.activeRaceState || typeof state.activeRaceState.updateFrame !== "function") {
-                    stopRacePlayback();
-                    return;
-                }
-                const nextIndex = state.activeRaceState.frameIndex + 1;
-                if (nextIndex >= state.activeRaceState.totalFrames) {
-                    stopRacePlayback();
-                    return;
-                }
-                state.activeRaceState.updateFrame(nextIndex);
-            }, state.racePlaybackSpeedMs);
-        }
-    }
+function toolbarButton(icon, label, onClick) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.innerHTML = `<i class="fas ${icon}" aria-hidden="true"></i>`;
+    button.title = label;
+    button.setAttribute("aria-label", label);
+    button.addEventListener("click", onClick);
+    return button;
 }
 
 export function insertRacePlaybackToolbar(targetDiv) {
@@ -142,34 +168,49 @@ export function insertRacePlaybackToolbar(targetDiv) {
 
     const toolbar = document.createElement("div");
     toolbar.className = "race-playback-toolbar";
-    state.raceSpeedReadoutElement = null;
 
-    const buttonConfigs = [
-        { label: "⏮", title: "First frame", onClick: () => jumpToRaceFrame("first") },
-        { label: "▶", title: "Play", onClick: () => startRacePlayback() },
-        { label: "⏸", title: "Pause", onClick: () => stopRacePlayback() },
-        { label: "⏭", title: "Last frame", onClick: () => jumpToRaceFrame("last") },
-        { label: "⏪", title: "Slower", onClick: () => adjustRacePlaybackSpeed(1.25) },
-        { label: "⏩", title: "Faster", onClick: () => adjustRacePlaybackSpeed(0.8) }
-    ];
+    const transport = document.createElement("div");
+    transport.className = "race-transport";
+    const play = toolbarButton("fa-play", "Play", toggleRacePlayback);
+    play.classList.add("race-play");
+    transport.append(
+        toolbarButton("fa-backward-step", "Back to the start", () => jumpToRaceFrame("first")),
+        play,
+        toolbarButton("fa-forward-step", "Skip to the end", () => jumpToRaceFrame("last"))
+    );
 
-    buttonConfigs.forEach(config => {
-        const button = document.createElement("button");
-        button.type = "button";
-        button.textContent = config.label;
-        button.title = config.title;
-        button.setAttribute("aria-label", config.title);
-        button.addEventListener("click", config.onClick);
-        toolbar.appendChild(button);
+    const scrubber = document.createElement("input");
+    scrubber.type = "range";
+    scrubber.className = "race-scrubber";
+    scrubber.min = "0";
+    scrubber.max = "0";
+    scrubber.step = "any";
+    scrubber.value = "0";
+    scrubber.setAttribute("aria-label", "Race position");
+    scrubber.addEventListener("input", () => {
+        const race = state.activeRaceState;
+        if (!race) return;
+        if (state.racePlaybackTimerId !== null) stopRacePlayback();
+        race.drawAt(parseFloat(scrubber.value) || 0);
     });
 
-    const speedReadout = document.createElement("span");
-    speedReadout.className = "race-speed-readout";
-    speedReadout.textContent = `${getRacePlaybackSpeedFromInput()}ms/frame`;
-    toolbar.appendChild(speedReadout);
-    state.raceSpeedReadoutElement = speedReadout;
+    const speed = document.createElement("div");
+    speed.className = "race-speed";
+    const readout = document.createElement("span");
+    readout.className = "race-speed-readout";
+    speed.append(
+        toolbarButton("fa-minus", "Slower", () => adjustRacePlaybackSpeed(1.25)),
+        readout,
+        toolbarButton("fa-plus", "Faster", () => adjustRacePlaybackSpeed(0.8))
+    );
 
-    targetDiv.appendChild(toolbar);
+    toolbar.append(transport, scrubber, speed);
+    targetDiv.prepend(toolbar);
+
+    state.raceSpeedReadoutElement = readout;
+    state.raceToolbar = { play, scrubber };
+    syncRacePlaybackSpeedFromInput();
+    syncRaceToolbar();
 }
 
 export function destroyVisualizationState() {
@@ -182,7 +223,9 @@ export function destroyVisualizationState() {
         }
     });
     state.chartInstances = [];
+    (state.activeRaceState?.charts || []).forEach(chart => chart.destroy());
     state.activeRaceState = null;
+    state.raceToolbar = null;
 }
 
 function getSelectedChartOrientation() {
@@ -516,35 +559,10 @@ function getRacePeriodStartTimestamp(timestamp, frequency) {
 function formatRacePeriodLabel(periodStart, frequency) {
     const date = new Date(periodStart);
     if (frequency === "month") {
-        const month = String(date.getMonth() + 1).padStart(2, "0");
-        return `${date.getFullYear()}-${month}`;
+        return date.toLocaleDateString(undefined, { month: "long", year: "numeric" });
     }
-    if (frequency === "week") {
-        const week = String(getWeekNumber(date)).padStart(2, "0");
-        return `${date.getFullYear()}-W${week}`;
-    }
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-    return `${date.getFullYear()}-${month}-${day}`;
-}
-
-function getRaceEntityKeyAndLabel(track, entityType) {
-    if (entityType === "album") {
-        return {
-            key: `${(track.Album || "").toLowerCase()}||${(track.Artist || "").toLowerCase()}`,
-            label: `${track.Album || "Unknown Album"} by ${track.Artist || "Unknown Artist"}`
-        };
-    }
-    if (entityType === "artist") {
-        return {
-            key: (track.Artist || "").toLowerCase(),
-            label: track.Artist || "Unknown Artist"
-        };
-    }
-    return {
-        key: `${(track.Track || "").toLowerCase()}||${(track.Artist || "").toLowerCase()}`,
-        label: `${track.Track || "Unknown Track"} by ${track.Artist || "Unknown Artist"}`
-    };
+    const day = date.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+    return frequency === "week" ? `Week of ${day}` : day;
 }
 
 function parseRaceBoundaryDate(dateValue, isEndBoundary) {
@@ -653,8 +671,40 @@ function buildRaceTimeline(startTimestamp, endTimestamp, frequency) {
     return timeline;
 }
 
+// How many bars a race shows: the list length, up to 20, since a race with
+// more bars than that is too small to read.
+const RACE_MAX_BARS = 20;
+// Rows kept below the visible bars, so a bar that climbs into view slides
+// up from under the chart instead of appearing out of nowhere.
+const RACE_SPARE_ROWS = 3;
+
+function getRaceSlots() {
+    return Math.max(1, Math.min(getListLengthLimit(), RACE_MAX_BARS));
+}
+
+function getRaceRow(entity, entityType) {
+    if (entityType === "track") {
+        const name = entity.Track || "Unknown track";
+        const artist = entity.Artist || "Unknown artist";
+        return { key: `${name.toLowerCase()}||${artist.toLowerCase()}`, name, artist };
+    }
+    if (entityType === "album") {
+        const name = entity.name || "Unknown album";
+        const artist = entity.artist || "Unknown artist";
+        return { key: `${name.toLowerCase()}||${artist.toLowerCase()}`, name, artist };
+    }
+    const name = entity.name || "Unknown artist";
+    return { key: name.toLowerCase(), name, artist: "" };
+}
+
+function getRaceTitle(entityType, sortingBasis) {
+    const option = document.querySelector(`#sorting-basis option[value="${sortingBasis}"]`);
+    const plural = { track: "Tracks", album: "Albums", artist: "Artists" }[entityType] || "Results";
+    return option ? `${plural} by ${option.textContent.trim().toLowerCase()}` : plural;
+}
+
 function buildBarRaceFramesFromTracks(tracks, entityType, sortingBasis, xValue, maxPerArtist, timeline, frequency, endTimestamp) {
-    const listLength = Math.min(getListLengthLimit(), 100);
+    const rowCount = getRaceSlots() + RACE_SPARE_ROWS;
     const frames = [];
     const sortedTracks = [...(tracks || [])]
         .filter(track => {
@@ -681,102 +731,67 @@ function buildBarRaceFramesFromTracks(tracks, entityType, sortingBasis, xValue, 
             entities = applyTracksPerEntityFilter(entities, maxPerArtist);
         }
 
-        const chartRows = entities.slice(0, listLength);
-
         frames.push({
-            periodStart,
-            periodLabel: formatRacePeriodLabel(periodStart, frequency),
-            labels: chartRows.map(entity => getEntityLabel(entity, entityType)),
-            values: chartRows.map(entity => getEntityMetricValue(entity, sortingBasis))
+            label: formatRacePeriodLabel(periodStart, frequency),
+            total: cumulativeTracks.length,
+            rows: entities.slice(0, rowCount).map(entity => ({
+                ...getRaceRow(entity, entityType),
+                value: getEntityMetricValue(entity, sortingBasis)
+            }))
         });
     });
 
     if (!frames.length) {
         frames.push({
-            periodStart: timeline[0] || Date.now(),
-            periodLabel: timeline[0] ? formatRacePeriodLabel(timeline[0], frequency) : "N/A",
-            labels: [],
-            values: []
+            label: timeline[0] ? formatRacePeriodLabel(timeline[0], frequency) : "No dates",
+            total: 0,
+            rows: []
         });
     }
 
     return frames;
 }
 
-function updateChartScaleForFrame(chart, sortingBasis) {
-    if (!chart?.options?.scales) return;
-
-    const orientation = chart.options.indexAxis === "x" ? "vertical" : "horizontal";
-    const valueAxisKey = orientation === "vertical" ? "y" : "x";
-    const valueAxis = chart.options.scales[valueAxisKey];
-    if (!valueAxis) return;
-
-    const dataValues = Array.isArray(chart.data?.datasets?.[0]?.data)
-        ? chart.data.datasets[0].data.map(value => Number(value)).filter(Number.isFinite)
-        : [];
-
-    if (dataValues.length === 0) {
-        valueAxis.min = undefined;
-        valueAxis.max = undefined;
-        return;
-    }
-
-    if (isDateMetricSorting(sortingBasis)) {
-        const minValue = Math.min(...dataValues);
-        const maxValue = Math.max(...dataValues);
-        const datePadding = Math.max(24 * 60 * 60 * 1000, Math.round((maxValue - minValue) * 0.03));
-        valueAxis.min = minValue - datePadding;
-        valueAxis.max = maxValue + datePadding;
-        valueAxis.beginAtZero = false;
-        return;
-    }
-
-    valueAxis.min = undefined;
-    valueAxis.max = undefined;
-}
-
-function applyRaceFrameToChart(chart, frame, labelElement, sortingBasis) {
-    if (!chart || !frame) return;
-    
-    chart.data.labels = frame.labels;
-    chart.data.datasets[0].data = frame.values;
-    updateChartScaleForFrame(chart, sortingBasis);
-    
-    const wrapper = chart.canvas.parentNode;
-    if (wrapper && wrapper.classList.contains("chart-wrapper")) {
-        const minBarThickness = 30;
-        const requiredHeight = Math.max(400, frame.labels.length * minBarThickness);
-        wrapper.style.height = requiredHeight + "px";
-    }
-
-    chart.update();
-    if (labelElement) {
-        labelElement.textContent = `Period: ${frame.periodLabel}`;
-    }
-}
-
-function mountRaceChart(targetDiv, titleText, initialFrame, sortingBasis) {
+function mountRace(targetDiv, frames, entityType, sortingBasis) {
     targetDiv.innerHTML = "";
-
     const wrapper = document.createElement("div");
-    wrapper.className = "chart-wrapper";
-
-    const minBarThickness = 30;
-    const requiredHeight = Math.max(400, (initialFrame?.labels?.length || 0) * minBarThickness);
-    wrapper.style.height = requiredHeight + "px";
-
-    const frameLabel = document.createElement("div");
-    frameLabel.className = "race-frame-label";
-    frameLabel.textContent = initialFrame ? `Period: ${initialFrame.periodLabel}` : "Period: N/A";
-    wrapper.appendChild(frameLabel);
-
-    const canvas = document.createElement("canvas");
-    wrapper.appendChild(canvas);
+    wrapper.className = "race-wrapper";
     targetDiv.appendChild(wrapper);
+    return createRaceChart(wrapper, frames, {
+        slots: getRaceSlots(),
+        sortingBasis,
+        entityType,
+        title: getRaceTitle(entityType, sortingBasis)
+    });
+}
 
-    const chart = createBarChartInCanvas(canvas, initialFrame?.labels || [], initialFrame?.values || [], sortingBasis, titleText || "");
-
-    return { chart, frameLabel };
+// One race state for the toolbar, the GIF export and theme changes, whether
+// one chart or two side by side are running.
+function setActiveRace(mode, charts, totalFrames) {
+    const race = {
+        mode,
+        charts,
+        totalFrames,
+        position: 0,
+        frameIndex: 0,
+        drawAt(position) {
+            race.position = Math.max(0, Math.min(totalFrames - 1, position));
+            race.frameIndex = Math.round(race.position);
+            charts.forEach(chart => chart.draw(race.position));
+            syncRaceToolbar();
+        },
+        updateFrame(frameIndex) {
+            race.drawAt(frameIndex);
+        },
+        redraw() {
+            race.drawAt(race.position);
+        }
+    };
+    state.activeRaceState = race;
+    race.drawAt(0);
+    if (state.raceRenderArmed) {
+        startRacePlayback();
+    }
 }
 
 export function renderBarRaceSingle(tracks, entityType, targetDiv, sortingBasis) {
@@ -786,28 +801,8 @@ export function renderBarRaceSingle(tracks, entityType, targetDiv, sortingBasis)
     const bounds = resolveRaceTimeBounds([tracks]);
     const timeline = buildRaceTimeline(bounds.start, bounds.end, frequency);
     const frames = buildBarRaceFramesFromTracks(tracks, entityType, sortingBasis, xValue, maxPerArtist, timeline, frequency, bounds.end);
-    const initialFrame = frames[0] || {
-        periodLabel: "N/A",
-        labels: [],
-        values: []
-    };
-    const mounted = mountRaceChart(targetDiv, `Bar Chart Race (${sortingBasis})`, initialFrame, sortingBasis);
-
-    state.activeRaceState = {
-        mode: "single",
-        frameIndex: 0,
-        totalFrames: frames.length,
-        updateFrame: (frameIndex) => {
-            const safeIndex = Math.max(0, Math.min(frames.length - 1, frameIndex));
-            state.activeRaceState.frameIndex = safeIndex;
-            applyRaceFrameToChart(mounted.chart, frames[safeIndex], mounted.frameLabel, sortingBasis);
-        }
-    };
-
-    state.activeRaceState.updateFrame(0);
-    if (state.raceRenderArmed) {
-        startRacePlayback();
-    }
+    const chart = mountRace(targetDiv, frames, entityType, sortingBasis);
+    setActiveRace("single", [chart], frames.length);
 }
 
 export function renderBarRaceComparison(leftTracks, rightTracks, leftEntityType, rightEntityType, leftSortingBasis, rightSortingBasis, leftXValue, rightXValue, leftMaxPerArtist, rightMaxPerArtist, leftTargetDiv, rightTargetDiv) {
@@ -817,41 +812,9 @@ export function renderBarRaceComparison(leftTracks, rightTracks, leftEntityType,
     const leftFrames = buildBarRaceFramesFromTracks(leftTracks, leftEntityType, leftSortingBasis, leftXValue, leftMaxPerArtist, timeline, frequency, bounds.end);
     const rightFrames = buildBarRaceFramesFromTracks(rightTracks, rightEntityType, rightSortingBasis, rightXValue, rightMaxPerArtist, timeline, frequency, bounds.end);
 
-    const leftInitial = leftFrames[0] || {
-        periodLabel: "N/A",
-        labels: [],
-        values: []
-    };
-    const rightInitial = rightFrames[0] || {
-        periodLabel: "N/A",
-        labels: [],
-        values: []
-    };
-
-    const leftMounted = mountRaceChart(leftTargetDiv, `Left (${leftSortingBasis})`, leftInitial, leftSortingBasis);
-    const rightMounted = mountRaceChart(rightTargetDiv, `Right (${rightSortingBasis})`, rightInitial, rightSortingBasis);
-
-    const totalFrames = Math.max(leftFrames.length, rightFrames.length);
-    state.activeRaceState = {
-        mode: "comparison",
-        frameIndex: 0,
-        totalFrames,
-        updateFrame: (frameIndex) => {
-            const safeIndex = Math.max(0, Math.min(totalFrames - 1, frameIndex));
-            state.activeRaceState.frameIndex = safeIndex;
-
-            const leftFrame = leftFrames[Math.min(safeIndex, leftFrames.length - 1)] || leftInitial;
-            const rightFrame = rightFrames[Math.min(safeIndex, rightFrames.length - 1)] || rightInitial;
-
-            applyRaceFrameToChart(leftMounted.chart, leftFrame, leftMounted.frameLabel, leftSortingBasis);
-            applyRaceFrameToChart(rightMounted.chart, rightFrame, rightMounted.frameLabel, rightSortingBasis);
-        }
-    };
-
-    state.activeRaceState.updateFrame(0);
-    if (state.raceRenderArmed) {
-        startRacePlayback();
-    }
+    const left = mountRace(leftTargetDiv, leftFrames, leftEntityType, leftSortingBasis);
+    const right = mountRace(rightTargetDiv, rightFrames, rightEntityType, rightSortingBasis);
+    setActiveRace("comparison", [left, right], Math.max(leftFrames.length, rightFrames.length));
 }
 
 const displayModeSelect = document.getElementById("display-mode");
@@ -889,26 +852,5 @@ if (displayModeSelect) {
 
 const raceSpeedInput = document.getElementById("race-speed-ms");
 if (raceSpeedInput) {
-    raceSpeedInput.addEventListener("change", () => {
-        syncRacePlaybackSpeedFromInput();
-        if (state.racePlaybackTimerId !== null) {
-            const currentFrame = state.activeRaceState?.frameIndex || 0;
-            stopRacePlayback();
-            if (state.activeRaceState) {
-                state.activeRaceState.updateFrame(currentFrame);
-                state.racePlaybackTimerId = setInterval(() => {
-                    if (!state.activeRaceState || typeof state.activeRaceState.updateFrame !== "function") {
-                        stopRacePlayback();
-                        return;
-                    }
-                    const nextIndex = state.activeRaceState.frameIndex + 1;
-                    if (nextIndex >= state.activeRaceState.totalFrames) {
-                        stopRacePlayback();
-                        return;
-                    }
-                    state.activeRaceState.updateFrame(nextIndex);
-                }, state.racePlaybackSpeedMs);
-            }
-        }
-    });
+    raceSpeedInput.addEventListener("change", syncRacePlaybackSpeedFromInput);
 }
