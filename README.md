@@ -28,6 +28,7 @@ work. Serve the folder over HTTP instead (`python3 -m http.server`).
 
 Unreleased:
 
+- Link previews on Reddit, Discord and elsewhere show a wide image of a bar chart race and a graph instead of the square logo, and the descriptions mention the graphs.
 - In Graphs, a Dates switch next to the dates picks what they do. Zoom only (the default, Show from / Show until) just picks the stretch shown, and the numbers count the whole history or the list's plays, so a running total doesn't restart at the first date and an all-time rank stays all-time. Count only these dates leaves plays outside the dates out of the numbers. Either way the graph starts and ends on the chosen dates, a note under them says what they do, and links keep the choice (g.dates=count).
 - A list with equation steps is built from the whole history, and the steps are its only filters: the Artist, Album, Track and Time menus are paused for it. Each paused menu says so with a note and a "paused" tag, their chips above the list are crossed out, and their settings come back once the steps are cleared. In comparison this is decided per side.
 - Fixed the page freezing when applying a bar chart race, most of all in comparison: a race in daily steps over years of history re-ranked the whole library thousands of times in one go. Races now build in slices with a progress note, scrobble-count races update their top bars play by play, races over 2,000 steps ask for a longer step, and the default step follows the length of the history (days under a year, weeks under four, months beyond).
