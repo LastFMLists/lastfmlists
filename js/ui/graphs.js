@@ -9,7 +9,7 @@ import { trackEvent } from '../analytics.js';
 import { buildEntitiesFromTracks } from '../data/filters.js';
 import { getDefaultXValue, isSortingBasisUsingXValue } from '../data/metrics.js';
 import { state } from '../state.js';
-import { customColor, setCustomColor, suggestColor } from './artist-colors.js';
+import { colorLinkPairs, customColor, setCustomColor, suggestColor } from './artist-colors.js';
 import { formatRaceValue } from './bar-race.js';
 import { getEntityMetricValue } from './charts.js';
 import { getActiveView, setActiveView } from './shell.js';
@@ -54,7 +54,8 @@ const graph = {
     period: "month",
     scale: "linear",
     // How far down a rank graph goes; lines below it run off the bottom.
-    rankLimit: 50,
+    // "auto" goes just deep enough for the lines, at most to 100.
+    rankLimit: "auto",
     from: "",
     to: "",
     // Plays from a list opened here, with its filters already applied.
@@ -353,7 +354,7 @@ function drawChart() {
                     type: log ? "logarithmic" : "linear",
                     reverse: rank,
                     min: rank ? 1 : (log ? undefined : 0),
-                    max: rank && graph.rankLimit ? graph.rankLimit : undefined,
+                    max: rank ? shownRankLimit() : undefined,
                     grid: { color: hairline },
                     border: { display: false },
                     ticks: {
@@ -605,11 +606,12 @@ function renderControls() {
 
     if (graph.show === "rank") {
         box.appendChild(field("Ranks shown", segmented("Ranks shown", [
-            [10, "Top 10"], [25, "Top 25"], [50, "Top 50"], [100, "Top 100"], [0, "All"]
+            ["auto", "Auto"], [10, "Top 10"], [25, "Top 25"], [50, "Top 50"], [100, "Top 100"], [0, "All"]
         ], graph.rankLimit, value => {
             graph.rankLimit = value;
             renderControls();
             drawChart();
+            announce();
         })));
     }
 
@@ -647,12 +649,18 @@ function renderControls() {
 
 const status = () => section.querySelector(".graph-status");
 
+// Lets the address bar follow the graph on screen.
+function announce() {
+    document.dispatchEvent(new CustomEvent("graph:changed"));
+}
+
 async function refresh() {
     if (getActiveView() !== "graphs") {
         dirty = true;
         return;
     }
     dirty = false;
+    announce();
     if (!graph.series.length) {
         lastResult = null;
         if (chart) chart.destroy();
@@ -674,7 +682,27 @@ async function refresh() {
     }
     lastResult = result;
     status().textContent = "";
+    fitRankLimit();
     drawChart();
+}
+
+const RANK_STEPS = [10, 25, 50, 100];
+
+function shownRankLimit() {
+    if (graph.rankLimit !== "auto") return graph.rankLimit || undefined;
+    const worst = Math.max(...lastResult.values.flat().filter(value => value !== null));
+    return RANK_STEPS.find(limit => limit >= worst) || 100;
+}
+
+// When every line sits below the ranks shown, the graph would be empty, so
+// it goes down far enough to show the best of them.
+function fitRankLimit() {
+    if (graph.show !== "rank" || !graph.rankLimit || graph.rankLimit === "auto") return;
+    const best = Math.min(...lastResult.values.flat().filter(value => value !== null));
+    if (!Number.isFinite(best) || best <= graph.rankLimit) return;
+    graph.rankLimit = RANK_STEPS.find(limit => limit >= best) || 0;
+    renderControls();
+    announce();
 }
 
 let dirty = true;
@@ -701,9 +729,11 @@ function openFromList() {
     if (!list || !list.entities.length) return;
     graph.series = list.entities.slice(0, 5).map(entity => makeSeries(entityIdentity(entity, list.entityType)));
     graph.metric = SCROBBLE_ORDER_SORTS.has(list.sortingBasis) ? "scrobbles" : list.sortingBasis;
-    graph.x = list.xValue ? String(list.xValue) : "";
+    graph.x = list.xValue && isSortingBasisUsingXValue(graph.metric) ? String(list.xValue) : "";
     graph.show = "rank";
     graph.scope = "cumulative";
+    graph.scale = "linear";
+    graph.rankLimit = "auto";
     graph.source = { label: list.title, tracks: list.tracks };
     sortedCache = { from: null, plays: [] };
     graph.period = autoPeriod(sourcePlays());
@@ -714,6 +744,99 @@ function openFromList() {
     renderSource();
     renderControls();
     dirty = true;
+    setActiveView("graphs");
+}
+
+// An artist, album or track page: that one item's all-time rank over the
+// years (or months, for a shorter history). The page already shows its
+// plays over time, so the rank is what the graph adds.
+function openEntity({ type, name, artist }) {
+    graph.series = [makeSeries({ type, name, artist: type === "artist" ? name : artist })];
+    graph.metric = "scrobbles";
+    graph.x = "";
+    graph.show = "rank";
+    graph.scope = "cumulative";
+    graph.scale = "linear";
+    graph.source = null;
+    const plays = sourcePlays();
+    const years = plays.length ? (Number(plays[plays.length - 1].Date) - Number(plays[0].Date)) / (365.25 * 86400000) : 0;
+    graph.period = years > 3 ? "year" : years > 0.5 ? "month" : "week";
+    graph.rankLimit = "auto";
+    graph.from = "";
+    graph.to = "";
+    built = true;
+    renderSeries();
+    renderSource();
+    renderControls();
+    dirty = true;
+    trackEvent(`graphs/entity/${type}`, `Graphs: opened from a ${type} page`);
+    setActiveView("graphs");
+}
+
+// ---- Links ----
+//
+// view=graphs, then one g.line per line in order (a:Name, al:Album|Artist,
+// t:Track|Artist) and only the settings that differ from the defaults. A
+// graph of a list's plays adds g.plays=list, and the list's own settings
+// come along so the visitor gets the same plays.
+
+const LINE_PREFIXES = { artist: "a", album: "al", track: "t" };
+const PREFIX_TYPES = { a: "artist", al: "album", t: "track" };
+const RANK_LIMITS = { 10: "10", 25: "25", 50: "50", 100: "100", 0: "all" };
+
+export function graphLinkPairs(listPairs) {
+    const pairs = [["view", "graphs"]];
+    graph.series.forEach(series => {
+        pairs.push(["g.line", `${LINE_PREFIXES[series.type]}:${series.type === "artist" ? series.name : `${series.name}|${series.artist}`}`]);
+    });
+    if (graph.metric !== "scrobbles") pairs.push(["g.measure", graph.metric]);
+    if (graph.x) pairs.push(["g.x", graph.x]);
+    if (graph.show === "rank") pairs.push(["g.show", "rank"]);
+    if (graph.show === "rank" && graph.rankLimit in RANK_LIMITS) pairs.push(["g.ranks", RANK_LIMITS[graph.rankLimit]]);
+    if (graph.scope === "period") pairs.push(["g.count", "each"]);
+    if (graph.period !== "month") pairs.push(["g.period", graph.period]);
+    if (graph.scale === "logarithmic") pairs.push(["g.scale", "log"]);
+    if (graph.from) pairs.push(["g.from", graph.from]);
+    if (graph.to) pairs.push(["g.to", graph.to]);
+    if (graph.source) pairs.push(["g.plays", "list"], ...listPairs());
+    pairs.push(...colorLinkPairs(graph.series.map(series => series.label.toLowerCase())));
+    return pairs;
+}
+
+// Opens the graph a link describes, once the visitor's history is loaded.
+// With g.plays=list the link's list has just been applied, so its plays
+// are the ones on the Lists tab.
+export function openGraphFromLink(params) {
+    graph.series = params.getAll("g.line").map(value => {
+        const split = value.indexOf(":");
+        const type = PREFIX_TYPES[value.slice(0, split)];
+        if (split < 1 || !type) return null;
+        const rest = value.slice(split + 1);
+        const bar = rest.lastIndexOf("|");
+        if (type === "artist") return makeSeries({ type, name: rest, artist: rest });
+        if (bar < 1) return null;
+        return makeSeries({ type, name: rest.slice(0, bar), artist: rest.slice(bar + 1) });
+    }).filter(Boolean).slice(0, MAX_SERIES);
+    const measure = params.get("g.measure");
+    graph.metric = measure && metricOptions().some(option => option.value === measure) ? measure : "scrobbles";
+    graph.x = params.get("g.x") || "";
+    graph.show = params.get("g.show") === "rank" || DATE_SORTS.has(graph.metric) ? "rank" : "value";
+    const ranks = params.get("g.ranks");
+    graph.rankLimit = ranks === "all" ? 0 : RANK_STEPS.includes(Number(ranks)) ? Number(ranks) : "auto";
+    graph.scope = params.get("g.count") === "each" ? "period" : "cumulative";
+    graph.period = ["day", "week", "year"].includes(params.get("g.period")) ? params.get("g.period") : "month";
+    graph.scale = params.get("g.scale") === "log" ? "logarithmic" : "linear";
+    graph.from = params.get("g.from") || "";
+    graph.to = params.get("g.to") || "";
+    const list = params.get("g.plays") === "list" ? state.graphableList : null;
+    graph.source = list ? { label: list.title, tracks: list.tracks } : null;
+    sortedCache = { from: null, plays: [] };
+    built = true;
+    renderSeries();
+    renderSource();
+    renderControls();
+    dirty = true;
+    trackEvent("link/graph", "Opened a graph link");
     setActiveView("graphs");
 }
 
@@ -781,6 +904,7 @@ if (section) {
         if (!event.currentTarget.disabled && getActiveView() !== "graphs") setActiveView("graphs");
     });
     document.getElementById("graph-this-list")?.addEventListener("click", openFromList);
+    document.addEventListener("graphs:open-entity", (event) => openEntity(event.detail));
     document.addEventListener("view:changed", (event) => {
         if (event.detail.view === "graphs") showGraphs();
     });

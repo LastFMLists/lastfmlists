@@ -331,7 +331,10 @@ function paint() {
                 <span class="entity-kicker">${TYPE_TITLES[entity.type]}</span>
                 <h2>${escapeHTML(entity.name)}</h2>
                 ${byline.length ? `<p class="entity-byline">${byline.join(" ")}</p>` : ""}
-                <a class="entity-lastfm" href="${escapeHTML(lastfmUrl(entity))}" target="_blank" rel="noopener"><i class="fab fa-lastfm" aria-hidden="true"></i>Open on Last.fm</a>
+                <div class="entity-header-links">
+                    <a class="entity-lastfm" href="${escapeHTML(lastfmUrl(entity))}" target="_blank" rel="noopener"><i class="fab fa-lastfm" aria-hidden="true"></i>Open on Last.fm</a>
+                    <button type="button" class="entity-lastfm entity-graph" data-action="graph" title="Your all-time rank for this ${entity.type} over the years, in the Graphs tab"><i class="fas fa-chart-line" aria-hidden="true"></i>Graph its rank over time</button>
+                </div>
             </div>
         </header>
 
@@ -573,6 +576,12 @@ if (section) {
         const target = event.target;
 
         if (target.closest('[data-action="back"]')) { backToList(); return; }
+        if (target.closest('[data-action="graph"]')) {
+            const { type, name, artist } = page.entity;
+            hideEntityView();
+            document.dispatchEvent(new CustomEvent("graphs:open-entity", { detail: { type, name, artist } }));
+            return;
+        }
 
         const linkButton = target.closest("[data-link]");
         if (linkButton) { openLink(page.links[Number(linkButton.dataset.link)]); return; }

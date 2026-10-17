@@ -19,7 +19,8 @@ import './ui/entity-page.js';
 import './ui/equation-editor.js';
 import './ui/explore.js';
 import './ui/graphs.js';
-import { applySettings, startFromUrl, takePendingSettings } from './ui/url-state.js';
+import { openGraphFromLink } from './ui/graphs.js';
+import { applySettings, startFromUrl, takePendingGraph, takePendingSettings } from './ui/url-state.js';
 import './ui/export.js';
 import { initFilterControls } from './ui/filter-controls.js';
 import { failLoadNotice, finishLoadNotice, startLoadNotice } from './ui/load-notice.js';
@@ -340,11 +341,14 @@ document.getElementById("username-form").addEventListener("submit", async (event
 
     state.historyLoad = null;
     setListControlsLocked(false);
-    // A link's list settings open that list. Otherwise the first visit lands
-    // on Explore and later ones on the tab used last.
+    // A link's list settings open that list, and a graph link opens its
+    // graph (after its list, when it graphs a list's plays). Otherwise the
+    // first visit lands on Explore and later ones on the tab used last.
     const linkSettings = takePendingSettings();
+    const linkGraph = takePendingGraph();
     if (linkSettings) applySettings(linkSettings);
-    else setActiveView(rememberedView() || "explore");
+    if (linkGraph) openGraphFromLink(linkGraph);
+    else if (!linkSettings) setActiveView(rememberedView() || "explore");
     if (history.progress) {
         // Some pages never arrived. The lists work, but say what's missing and
         // how to fill the gap: a saved copy remembers the missing pages.

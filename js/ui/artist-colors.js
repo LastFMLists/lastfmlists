@@ -347,14 +347,15 @@ export function setShownNames(keys) {
 
 // [key, value] pairs for the address bar: color=f19ec2:Sakurazaka46 for
 // each picked color on screen, color.other and color.auto=0 when changed.
-export function colorLinkPairs() {
+export function colorLinkPairs(keys = shownKeys) {
     const pairs = [];
-    shownKeys.forEach(key => {
+    keys = new Set(keys);
+    keys.forEach(key => {
         const entry = fromLink.colors[key] || store.colors[key];
         if (entry && isHex(entry.color)) pairs.push(["color", `${entry.color.slice(1)}:${entry.name}`]);
     });
-    if (shownKeys.size && otherIsCustom()) pairs.push(["color.other", otherColor("light").slice(1)]);
-    if (shownKeys.size && !autoColorsOn()) pairs.push(["color.auto", "0"]);
+    if (keys.size && otherIsCustom()) pairs.push(["color.other", otherColor("light").slice(1)]);
+    if (keys.size && !autoColorsOn()) pairs.push(["color.auto", "0"]);
     return pairs;
 }
 

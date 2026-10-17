@@ -2251,6 +2251,22 @@ label.race-swatch:focus-within {
     text-decoration: none;
 }
 
+.entity-header-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.2rem 1.1rem;
+}
+
+button.entity-lastfm {
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
 .entity-lastfm:hover {
     color: var(--accent-strong);
     text-decoration: underline;

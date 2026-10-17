@@ -24,6 +24,7 @@ import {
     updateActiveFilters,
     updateComparisonInteractionState
 } from './filters-panel.js';
+import { graphLinkPairs } from './graphs.js';
 import { displayEntities } from './lists.js';
 import { getActiveView, setActiveView } from './shell.js';
 
@@ -91,9 +92,9 @@ function sideSettings(values, mode, prefix, pairs) {
     });
 }
 
-function currentPairs() {
+// The list's settings, also used by a graph of that list's plays.
+function listPairs() {
     const pairs = [];
-    if (getActiveView() !== "lists") return pairs;
 
     const mode = document.getElementById("display-mode")?.value || "list";
     GLOBAL_BASE_SETTING_IDS.forEach(id => {
@@ -113,8 +114,16 @@ function currentPairs() {
         values.equations = document.getElementById("equations")?.value || "";
         sideSettings(values, mode, "", pairs);
     }
+    return pairs;
+}
+
+function currentPairs() {
+    const view = getActiveView();
+    if (view === "graphs") return graphLinkPairs(listPairs);
+    if (view !== "lists") return [];
+    const pairs = listPairs();
     // Picked colors of the artists on screen, so the link looks the same.
-    if (mode !== "list") pairs.push(...colorLinkPairs());
+    if ((document.getElementById("display-mode")?.value || "list") !== "list") pairs.push(...colorLinkPairs());
     return pairs;
 }
 
@@ -137,13 +146,14 @@ export function syncUrl() {
 // ---- Query string -> settings, applied after the history has loaded ----
 
 let pending = null;
+let pendingGraph = null;
 
 function readQuery() {
     const params = new URLSearchParams(location.search);
     const settings = { comparison: params.get("cmp") === "1", left: {}, right: {}, globals: {} };
     let any = false;
     params.forEach((value, key) => {
-        if (key === "cmp" || key.startsWith("color")) return;
+        if (key === "cmp" || key === "view" || key.startsWith("color") || key.startsWith("g.")) return;
         const right = key.startsWith("r.");
         const id = idFor(right ? key.slice(2) : key);
         if (!id) return;
@@ -157,9 +167,17 @@ function readQuery() {
 // Called once the page is ready. A link's settings wait until the visitor
 // has loaded their own history, then open that list.
 export function startFromUrl() {
-    applyLinkColors(new URLSearchParams(location.search));
+    const params = new URLSearchParams(location.search);
+    applyLinkColors(params);
+    if (params.get("view") === "graphs") pendingGraph = params;
     pending = readQuery();
     if (pending) trackEvent("link/settings", "Opened a link with list settings");
+}
+
+export function takePendingGraph() {
+    const params = pendingGraph;
+    pendingGraph = null;
+    return params;
 }
 
 export function takePendingSettings() {
@@ -226,3 +244,4 @@ document.addEventListener("list:rendered", syncUrl);
 document.addEventListener("view:changed", syncUrl);
 document.addEventListener("artist-colors:shown", syncUrl);
 document.addEventListener("artist-colors:changed", syncUrl);
+document.addEventListener("graph:changed", syncUrl);
