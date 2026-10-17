@@ -219,6 +219,7 @@ export function insertRacePlaybackToolbar(targetDiv) {
 
 export function destroyVisualizationState() {
     stopRacePlayback();
+    raceBuild += 1;
     state.chartInstances.forEach(chart => {
         try {
             chart.destroy();
@@ -707,6 +708,18 @@ export function ensureRaceDateDefaults(force = false) {
     if (force || !raceEndInput.value) {
         raceEndInput.value = endDefault;
     }
+
+    // Until someone picks a step, it follows the span: days for a short
+    // history, weeks or months for longer ones, so the race stays a few
+    // hundred steps long instead of thousands.
+    // Set once per load (or reset); a step picked by hand or from a link
+    // stays.
+    const frequency = document.getElementById("race-frequency");
+    if (frequency && (force || !frequency.dataset.defaulted)) {
+        const years = (Date.now() - (firstScrobbleTimestamp || Date.now())) / (365.25 * 86400000);
+        frequency.value = years > 4 ? "month" : years > 1 ? "week" : "day";
+        frequency.dataset.defaulted = "true";
+    }
 }
 
 function buildRaceTimeline(startTimestamp, endTimestamp, frequency) {
@@ -763,9 +776,25 @@ function getRaceTitle(entityType, sortingBasis) {
     return option ? `${plural} by ${option.textContent.trim().toLowerCase()}` : plural;
 }
 
-function buildBarRaceFramesFromTracks(tracks, entityType, sortingBasis, xValue, caps, timeline, frequency, endTimestamp) {
+// More steps than this make a race nobody would sit through, and building
+// them takes long on a big library.
+const MAX_RACE_STEPS = 2000;
+
+const pauseForPaint = () => new Promise(resolve => setTimeout(resolve, 0));
+
+function raceRowFromPlay(play, entityType) {
+    if (entityType === "artist") return getRaceRow({ name: play.Artist }, "artist");
+    if (entityType === "album") return getRaceRow({ name: play.Album, artist: play.Artist }, "album");
+    return getRaceRow(play, "track");
+}
+
+// Builds the race's steps a slice at a time, pausing so the page stays
+// responsive. Returns the frames, { error }, or null when cancelled.
+async function buildRaceFrames(tracks, entityType, sortingBasis, xValue, caps, timeline, frequency, endTimestamp, { onProgress, cancelled }) {
+    if (timeline.length > MAX_RACE_STEPS) {
+        return { error: `That race has ${timeline.length.toLocaleString()} steps. Pick weeks or months, or a shorter date range, to keep it under ${MAX_RACE_STEPS.toLocaleString()}.` };
+    }
     const rowCount = getRaceSlots() + RACE_SPARE_ROWS;
-    const frames = [];
     const sortedTracks = [...(tracks || [])]
         .filter(track => {
             const timestamp = parseInt(track.Date, 10);
@@ -773,30 +802,64 @@ function buildBarRaceFramesFromTracks(tracks, entityType, sortingBasis, xValue, 
         })
         .sort((a, b) => (parseInt(a.Date, 10) || 0) - (parseInt(b.Date, 10) || 0));
 
-    let pointer = 0;
-    const cumulativeTracks = [];
+    // Play counts only ever go up, so the top of the race can be kept up to
+    // date play by play instead of re-ranking the whole library every step.
+    const incremental = sortingBasis === "scrobbles" && caps.perArtist === Infinity && caps.perAlbum === Infinity;
+    const entries = new Map();
+    let top = [];
+    const ahead = (a, b) => b.count - a.count || a.order - b.order;
+    const bump = (play) => {
+        const row = raceRowFromPlay(play, entityType);
+        let entry = entries.get(row.key);
+        if (!entry) {
+            entry = { row, count: 0, order: entries.size };
+            entries.set(row.key, entry);
+        }
+        entry.count += 1;
+        let index = top.indexOf(entry);
+        if (index < 0) {
+            if (top.length < rowCount) index = top.push(entry) - 1;
+            else if (ahead(top[top.length - 1], entry) > 0) index = top.length - 1, top[index] = entry;
+            else return;
+        }
+        while (index > 0 && ahead(top[index - 1], entry) > 0) {
+            top[index] = top[index - 1];
+            top[index - 1] = entry;
+            index -= 1;
+        }
+    };
 
-    timeline.forEach(periodStart => {
-        while (pointer < sortedTracks.length) {
-            const candidate = sortedTracks[pointer];
-            const timestamp = parseInt(candidate.Date, 10);
-            const candidatePeriodStart = getRacePeriodStartTimestamp(timestamp, frequency);
-            if (candidatePeriodStart > periodStart) break;
-            cumulativeTracks.push(candidate);
+    const frames = [];
+    let pointer = 0;
+    let lastPause = performance.now();
+    for (let step = 0; step < timeline.length; step++) {
+        const periodStart = timeline[step];
+        const from = pointer;
+        while (pointer < sortedTracks.length && getRacePeriodStartTimestamp(parseInt(sortedTracks[pointer].Date, 10), frequency) <= periodStart) {
+            if (incremental) bump(sortedTracks[pointer]);
             pointer += 1;
         }
-
-        const entities = applyEntityCaps(buildEntitiesFromTracks(cumulativeTracks, entityType, sortingBasis, xValue), entityType, caps);
-
-        frames.push({
-            label: formatRacePeriodLabel(periodStart, frequency),
-            total: cumulativeTracks.length,
-            rows: entities.slice(0, rowCount).map(entity => ({
+        let rows;
+        if (incremental) {
+            rows = top.map(entry => ({ ...entry.row, value: entry.count }));
+        } else if (step > 0 && pointer === from) {
+            rows = frames[step - 1].rows;
+        } else {
+            const entities = applyEntityCaps(buildEntitiesFromTracks(sortedTracks.slice(0, pointer), entityType, sortingBasis, xValue), entityType, caps);
+            rows = entities.slice(0, rowCount).map(entity => ({
                 ...getRaceRow(entity, entityType),
                 value: getEntityMetricValue(entity, sortingBasis)
-            }))
-        });
-    });
+            }));
+        }
+        frames.push({ label: formatRacePeriodLabel(periodStart, frequency), total: pointer, rows });
+
+        if (performance.now() - lastPause > 30) {
+            onProgress(step / timeline.length);
+            await pauseForPaint();
+            if (cancelled()) return null;
+            lastPause = performance.now();
+        }
+    }
 
     if (!frames.length) {
         frames.push({
@@ -807,6 +870,15 @@ function buildBarRaceFramesFromTracks(tracks, entityType, sortingBasis, xValue, 
     }
 
     return frames;
+}
+
+function showRaceNote(targetDiv, text) {
+    targetDiv.innerHTML = "";
+    const note = document.createElement("p");
+    note.className = "race-note";
+    note.setAttribute("role", "status");
+    note.textContent = text;
+    targetDiv.appendChild(note);
 }
 
 function mountRace(targetDiv, frames, entityType, sortingBasis) {
@@ -852,23 +924,51 @@ function setActiveRace(mode, charts, totalFrames) {
     }
 }
 
-export function renderBarRaceSingle(tracks, entityType, targetDiv, sortingBasis) {
+// Each new race cancels one still being built.
+let raceBuild = 0;
+
+export async function renderBarRaceSingle(tracks, entityType, targetDiv, sortingBasis) {
+    const run = ++raceBuild;
     const frequency = (document.getElementById("race-frequency")?.value || "day").toLowerCase();
     const xValue = parseInt(document.getElementById("x-value")?.value, 10) || getDefaultXValue(sortingBasis);
     const caps = currentEntityCaps();
     const bounds = resolveRaceTimeBounds([tracks]);
     const timeline = buildRaceTimeline(bounds.start, bounds.end, frequency);
-    const frames = buildBarRaceFramesFromTracks(tracks, entityType, sortingBasis, xValue, caps, timeline, frequency, bounds.end);
+    showRaceNote(targetDiv, "Building the race…");
+    const frames = await buildRaceFrames(tracks, entityType, sortingBasis, xValue, caps, timeline, frequency, bounds.end, {
+        onProgress: (done) => showRaceNote(targetDiv, `Building the race… ${Math.round(done * 100)}%`),
+        cancelled: () => run !== raceBuild
+    });
+    if (!frames || run !== raceBuild) return;
+    if (frames.error) {
+        showRaceNote(targetDiv, frames.error);
+        return;
+    }
     const chart = mountRace(targetDiv, frames, entityType, sortingBasis);
     setActiveRace("single", [chart], frames.length);
 }
 
-export function renderBarRaceComparison(leftTracks, rightTracks, leftEntityType, rightEntityType, leftSortingBasis, rightSortingBasis, leftXValue, rightXValue, leftCaps, rightCaps, leftTargetDiv, rightTargetDiv) {
+export async function renderBarRaceComparison(leftTracks, rightTracks, leftEntityType, rightEntityType, leftSortingBasis, rightSortingBasis, leftXValue, rightXValue, leftCaps, rightCaps, leftTargetDiv, rightTargetDiv) {
+    const run = ++raceBuild;
     const frequency = (document.getElementById("race-frequency")?.value || "day").toLowerCase();
     const bounds = resolveRaceTimeBounds([leftTracks, rightTracks]);
     const timeline = buildRaceTimeline(bounds.start, bounds.end, frequency);
-    const leftFrames = buildBarRaceFramesFromTracks(leftTracks, leftEntityType, leftSortingBasis, leftXValue, leftCaps, timeline, frequency, bounds.end);
-    const rightFrames = buildBarRaceFramesFromTracks(rightTracks, rightEntityType, rightSortingBasis, rightXValue, rightCaps, timeline, frequency, bounds.end);
+    const progress = (base) => (done) => {
+        const text = `Building the races… ${Math.round((base + done) * 50)}%`;
+        showRaceNote(leftTargetDiv, text);
+        showRaceNote(rightTargetDiv, text);
+    };
+    progress(0)(0);
+    const cancelled = () => run !== raceBuild;
+    const leftFrames = await buildRaceFrames(leftTracks, leftEntityType, leftSortingBasis, leftXValue, leftCaps, timeline, frequency, bounds.end, { onProgress: progress(0), cancelled });
+    if (!leftFrames || cancelled()) return;
+    const rightFrames = leftFrames.error ? leftFrames : await buildRaceFrames(rightTracks, rightEntityType, rightSortingBasis, rightXValue, rightCaps, timeline, frequency, bounds.end, { onProgress: progress(1), cancelled });
+    if (!rightFrames || cancelled()) return;
+    if (leftFrames.error || rightFrames.error) {
+        showRaceNote(leftTargetDiv, leftFrames.error || rightFrames.error);
+        rightTargetDiv.innerHTML = "";
+        return;
+    }
 
     const left = mountRace(leftTargetDiv, leftFrames, leftEntityType, leftSortingBasis);
     const right = mountRace(rightTargetDiv, rightFrames, rightEntityType, rightSortingBasis);

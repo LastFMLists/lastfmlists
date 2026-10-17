@@ -640,9 +640,15 @@ document.getElementById("comparison-toggle").addEventListener("click", () => {
             ...snapshot,
             equations: (document.getElementById("equations")?.value || snapshot.equations || "").toString()
         };
+        // The right list starts as a copy of the left one, so comparing
+        // means changing one thing (a year, a filter) instead of setting
+        // up a second list from nothing.
         state.comparisonFilterStates.right = {
-            equations: (document.getElementById("equations-right")?.value || "").toString()
+            ...state.comparisonFilterStates.left,
+            equations: (document.getElementById("equations-right")?.value || state.comparisonFilterStates.left.equations || "").toString()
         };
+        const rightEquations = document.getElementById("equations-right");
+        if (rightEquations && !rightEquations.value) rightEquations.value = state.comparisonFilterStates.right.equations;
         state.comparisonStateInitialized = true;
     }
 

@@ -94,6 +94,9 @@ export function applySerializedControlValue(control, serializedValue) {
     }
 
     control.value = safeValue;
+    // A value the select doesn't offer (like an empty one for "Generate
+    // lists of") would leave it blank; fall back to its first option.
+    if (control.tagName === "SELECT" && control.selectedIndex === -1) control.selectedIndex = 0;
 }
 
 export function parseSerializedNumberList(serializedValue) {
