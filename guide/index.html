@@ -3,19 +3,15 @@
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-	<!-- DRAFT: remove this line once the page is written -->
-	<meta name="robots" content="noindex">
 	<title>Guide · lastfmlists</title>
-	<!-- DRAFT: one sentence, about 150 characters, saying what the guide covers -->
-	<meta name="description" content="">
+	<meta name="description" content="How to use lastfmlists: what every sort and filter does, how to combine them, and recipes for streaks, album collages and bar chart races.">
 	<meta name="theme-color" content="#FFFCF8">
 	<link rel="canonical" href="https://lastfmlists.com/guide/">
 	<meta property="og:type" content="article">
 	<meta property="og:site_name" content="lastfmlists">
 	<meta property="og:url" content="https://lastfmlists.com/guide/">
 	<meta property="og:title" content="Guide · lastfmlists">
-	<!-- DRAFT: same text as the meta description -->
-	<meta property="og:description" content="">
+	<meta property="og:description" content="How to use lastfmlists: what every sort and filter does, how to combine them, and recipes for streaks, album collages and bar chart races.">
 	<meta property="og:image" content="https://lastfmlists.com/logo.png">
 	<meta name="twitter:card" content="summary">
 	<script>
@@ -53,18 +49,7 @@
 	<main>
 		<article class="page">
 			<h1>How to use lastfmlists</h1>
-			<p class="draft">One or two sentences under the title: who the guide is for and where to start. Rename the title if you like.</p>
-
-			<!--
-				Each section has a short id so the app and the FAQ can link straight to it,
-				e.g. /guide/#equations. Keep the ids even if you rename the headings.
-				Screenshots go in /guide/img/ and are added like this:
-				<figure>
-					<img src="/guide/img/filters.png" alt="What the screenshot shows" width="1200" height="800" loading="lazy">
-					<figcaption>Optional caption</figcaption>
-				</figure>
-				Delete each .draft note once its section is written.
-			-->
+			<p class="page-lede">This guide explains what everything on the site does. To get going quickly, read Getting started and Reading a list, then try a few of the recipes. The <a href="/faq/">FAQ</a> has short answers to common questions.</p>
 
 			<nav class="page-toc" aria-label="Contents">
 				<ol>
@@ -86,67 +71,168 @@
 
 			<section id="getting-started">
 				<h2>Getting started</h2>
-				<p class="draft">What happens after you type a username: what gets downloaded, the live preview while loading, why big libraries take a while, the progress in the tab title and "Notify me".</p>
+				<p>Type your Last.fm username on the main page and click Load my data. The site downloads your whole listening history from Last.fm, one page at a time. While it loads, you see a preview of your top tracks or artists that fills in as pages arrive.</p>
+				<p>Small libraries load in seconds. Libraries with hundreds of thousands of scrobbles can take a few minutes, because Last.fm only allows a few requests per second. The tab title shows the progress, so you can switch to another tab while you wait. On a computer, a &ldquo;Notify me when it&rsquo;s done&rdquo; button shows up after 10 seconds, and it sends you a browser notification when your lists are ready.</p>
+				<p>Click Save Data to keep your history in your browser. Next time you load the same username, only the scrobbles you made since then get downloaded. You can also save in the middle of a load, and the next load continues where it stopped.</p>
 			</section>
 
 			<section id="lists">
 				<h2>Reading a list</h2>
-				<p class="draft">List type (tracks, albums, artists, scrobbles), list length, the numbers in parentheses ("Show unfiltered stats in parentheses"), and clicking a row to open its page.</p>
+				<p>The settings are in the panel on the left. Under List settings, &ldquo;Generate lists of&rdquo; picks tracks, albums, artists or scrobbles. Tracks, albums and artists are ranked lists. Scrobbles is your history itself, one row per play, sorted oldest or newest first.</p>
+				<p>&ldquo;Sort lists by&rdquo; decides how the list is ranked, see <a href="#sorts">Sorts</a> below. List length sets how many rows you see: the top 10, 25, 50 or 100, all of them, or a number you type.</p>
+				<p>Tick &ldquo;Show unfiltered stats in parentheses&rdquo; to see each row&rsquo;s all-time rank and play count next to its filtered numbers. This is useful when you&rsquo;ve filtered to one year and want to see how a song compares to the rest of your history.</p>
+				<p>Click any row to open its own page.</p>
 			</section>
 
 			<section id="sorts">
 				<h2>Sorts</h2>
-				<p class="draft">Group the sorts instead of listing all 23: plain counts; spread (different days, weeks, months); streaks; records in a time window (single day, week, month, X hours); firsts and speed (first to X, fastest to X); average listening time; time spent and share of global scrobbles. Then explain X once, since its meaning changes with the sort.</p>
+				<p>Scrobble count is the default: the things you played the most.</p>
+				<p>Number of days played, weeks played and months played count how many different days (weeks, months) you played something on. These favour the songs you kept coming back to over the ones you played 30 times in one evening.</p>
+				<p>Most plays in a row counts plays back to back, with nothing else in between. This is the &ldquo;I had it on repeat&rdquo; list.</p>
+				<p>Most days in a row, weeks in a row and months in a row are streaks: how many days (weeks, months) in a row you played something at least once. Weeks start on Monday.</p>
+				<p>Most scrobbles in a single day, week or month finds each item&rsquo;s best day (week, month) on the calendar. Most scrobbles within X hours does the same with a sliding window, so a binge that started at 10 pm and went past midnight still counts as one. Within 24 hours and within 7 days (rolling) are shortcuts for the two most common windows.</p>
+				<p>First to X scrobbles ranks items by the date they reached X plays, earliest first. Fastest to X scrobbles ranks them by how long it took from the first play to the Xth.</p>
+				<p>Oldest and Newest average play date take the average date of all of an item&rsquo;s plays. Oldest finds your long-time favourites, Newest finds what you only got into lately.</p>
+				<p>Time spent listening multiplies plays by track length. Percentage of global scrobbles shows how much of something&rsquo;s total plays on Last.fm came from you. Both need <a href="#details">Load Details</a> first.</p>
+				<h3 id="x">What X means</h3>
+				<p>Some sorts need a number, and a box for it appears under the sort when you pick one. For First and Fastest to X it&rsquo;s the play milestone, like 100 plays. For Within X hours it&rsquo;s the length of the window. For the average play dates it&rsquo;s the minimum number of plays an item needs to be included, so songs you played once don&rsquo;t fill the list.</p>
 			</section>
 
 			<section id="filters">
 				<h2>Filters</h2>
-				<p class="draft">One short part per panel group (Artist, Album, Track, Time, session and day starters). Apply Filters versus Reset, and the chips above the list. Use h3 headings for the groups if it gets long.</p>
+				<p>Filters decide which scrobbles count. Everything in the Artist, Album, Track and Time menus throws out the plays that don&rsquo;t match, and the list is then built from what&rsquo;s left. If you set Year to 2023, a list of your top tracks becomes your top tracks of 2023, counted only with plays from 2023.</p>
+				<p>A few filters look at your whole history instead: the scrobble counts marked &ldquo;your data&rdquo;, the ranks in your top lists, tracks scrobbled per artist or album, year of first scrobble, and days since last scrobble. These describe the artist, album or track in general. Artist scrobbles at least 500 keeps plays of artists you&rsquo;ve played 500 times or more overall, even if you also set a year.</p>
+				<p>Set up as many filters as you want across the menus, then click Apply Filters. A scrobble has to match all of them to count. The active filters show as chips above the list, and clicking a chip opens that filter so you can change it. Reset clears everything.</p>
+
+				<h3 id="filters-names">Artist, album and track</h3>
+				<p>The three menus work the same way, each for its own name.</p>
+				<p>Artist name (album title, track title) matches one exact name. Capital letters don&rsquo;t matter. Initial matches the first character, so B gives you everything starting with B.</p>
+				<p>Includes keeps names that contain a word or part of a word. Type it and press Enter or click Add. Words in the same group are alternatives: love and heart in one group keeps titles with either word. Add as new group adds a word that has to match as well, so love in the first group and remix in the second keeps only titles with both. Excludes works the other way round and leaves names out. Capital letters and hyphens are ignored.</p>
+				<p>Length and word count take a minimum and a maximum. Track title length from 1 to 4 finds the shortest titles you play. Track title word count from 8 up finds the longest ones.</p>
+				<p>Scrobbles (your data) and rank keep items by your all-time play count or their place in your top lists. Artist rank from 1 to 10 turns any list into &ldquo;only my top 10 artists&rdquo;, which works well with a time filter: your top 10 artists&rsquo; songs from one year.</p>
+				<p>Tracks scrobbled per artist (per album) counts how many different tracks you&rsquo;ve played by that artist (from that album). Set it to 1 on an artist list to find one-hit wonders, artists you only ever played one song by.</p>
+				<p>Year of first scrobble keeps the things you discovered in a given year. Days since last scrobble keeps items by how long ago you last played them: 365 and up finds the ones you forgot about.</p>
+				<p>Tracks per artist, at the top of the Artist menu, shows at most that many tracks by the same artist, so one artist can&rsquo;t fill the whole list. Set it to 1 for your top song by each artist. It only shows up for track and scrobble lists.</p>
+				<p>The last part of each menu needs <a href="#details">Load Details</a>. Global listeners and global playcount are how popular something is on all of Last.fm. Track global listeners under 10,000 is a quick way to find your most obscure favourites. Artist tags are genres, countries and other labels from Last.fm, and they use the same word groups as Includes: rock and metal in one group finds either. Tags are only as good as what people tagged on Last.fm, so smaller artists sometimes have none. Track duration is in seconds, so 600 and up finds the songs over 10 minutes.</p>
+
+				<h3 id="filters-time">Time</h3>
+				<p>Played in the last keeps plays from the last 7, 30, 90 or 365 days, or any number of days you type.</p>
+				<p>Date range keeps plays between two dates, and both days are included.</p>
+				<p>Year, Month, Day of month and Weekday each take one or more values. Pick June, July and August in Month and you get your summer lists across every year. Add a Year and you get one specific summer. Saturday and Sunday in Weekday shows your weekend music.</p>
+				<p>Time of day keeps plays between two times, and it works past midnight: 22:00 to 04:00 gives you your late-night listening.</p>
+				<p>Position in your history uses scrobble numbers, where 1 is your very first scrobble. From 1 to 1000 shows what your first thousand scrobbles were.</p>
+
+				<h3 id="filters-starters">Session and day starters</h3>
+				<p>These look at what you start listening with.</p>
+				<p>Session starter keeps only the first scrobble after a long break. The break is 6 hours by default, and you can change it under Long gap before a session. With this on, a track list shows the songs you most often start a listening session with.</p>
+				<p>Day starter keeps the first scrobble of each day. First of the day (literal) takes the first play after midnight. First of the day (smart) also needs the long gap before it, so if you listened from 11 pm to 1 am, the song at 12:05 doesn&rsquo;t count as the start of a new day.</p>
 			</section>
 
 			<section id="recipes">
 				<h2>Recipes</h2>
-				<p class="draft">5 to 8 "How do I see…" examples you'd actually use, each with its exact settings. Ideas: top albums of one summer, songs mostly played after midnight, artists you binged and dropped, your longest daily streak, your first 100 scrobbles. Give each one an h3 and its own id (e.g. id="recipe-summer") so it can be linked, and later get a "try it" link.</p>
+				<p>Some combinations to try. Anything not mentioned stays at its default.</p>
+
+				<h3 id="recipe-summer">Your top albums of one summer</h3>
+				<p>Generate lists of Albums. In Time, set Year to the year you want and Month to June, July and August.</p>
+
+				<h3 id="recipe-night">Songs you play late at night</h3>
+				<p>Generate lists of Tracks. Set Time of day from 23:00 to 04:00. Tick Show unfiltered stats in parentheses: when the two play counts are close, that song is mostly a night song.</p>
+
+				<h3 id="recipe-binged">Artists you binged and dropped</h3>
+				<p>Generate lists of Artists and sort by Most scrobbles in a single week. In the Artist menu, set Days since last scrobble to 365 or more.</p>
+
+				<h3 id="recipe-streak">Your longest streaks</h3>
+				<p>Sort by Most days in a row for daily streaks, or Most plays in a row for songs on repeat. Add a Year to find the longest streak of that year.</p>
+
+				<h3 id="recipe-beginning">Where your Last.fm started</h3>
+				<p>Generate lists of Scrobbles, sorted Oldest first, to read your first plays in order. Or generate Tracks and set Position in your history from 1 to 1000 to see the top songs of your first thousand scrobbles.</p>
+
+				<h3 id="recipe-one-per-artist">One song per artist</h3>
+				<p>Generate lists of Tracks, set Tracks per artist to 1 and List length to 50. You get your top 50 songs with no artist twice.</p>
+
+				<h3 id="recipe-discoveries">Your discoveries of a year</h3>
+				<p>Generate lists of Artists and set Year of first scrobble to the year you want. The list shows the artists you found that year, ranked by how much you&rsquo;ve played them since.</p>
+
+				<h3 id="recipe-hidden-gems">Hidden gems</h3>
+				<p>This one needs Load Details. Generate lists of Tracks, set Track global listeners to at most 5,000 and Track scrobbles to at least 20. You get the songs you love that hardly anyone else listens to.</p>
 			</section>
 
 			<section id="details">
 				<h2>Load Details and Load All Details</h2>
-				<p class="draft">What each one downloads, roughly how long it takes, which filters and sorts it unlocks, and which one most people need.</p>
+				<p>Your listening history only has names and dates. Some filters and sorts need more than that: track length, tags, and how many listeners and plays something has on all of Last.fm. That&rsquo;s what the two buttons at the top download.</p>
+				<p>Load Details gets this info for your top 250 artists, top 500 albums and top 1,000 tracks. That covers almost everything you listen to often, and it&rsquo;s enough for almost everything on the site.</p>
+				<p>Load All Details does the same for every artist, album and track you&rsquo;ve ever scrobbled. It needs one request per item, and Last.fm only allows a few per second, so it can take hours on a big library. Leave the tab open while it runs. It can&rsquo;t be saved part-way yet, so if you close the tab, you have to start it again.</p>
+				<p>Both buttons tell you how many items they will fetch and ask before they start. When they finish, click Save Data so you don&rsquo;t have to download the details again.</p>
 			</section>
 
 			<section id="charts">
 				<h2>Charts and the bar chart race</h2>
-				<p class="draft">Chart orientation and scale, the race settings (start and end date, update frequency, speed), and GIF export.</p>
+				<p>Display mode switches between List, Bar Chart and Bar Chart Race. List length sets how many bars there are, and all your filters still apply.</p>
+				<p>Bar Chart draws the list as bars. Chart orientation puts the names down the side or along the bottom. The logarithmic scale helps when the top item is far ahead of everything else.</p>
+				<p>Bar Chart Race animates how the list changed over time. Pick a start and end date, how often it updates (every day, week or month) and the speed in milliseconds per frame, where lower is faster. Weeks or months work best for long stretches of time, days for a year or less. Because filters still apply, you can race only one genre, or only your weekend listening.</p>
 			</section>
 
 			<section id="comparison">
 				<h2>Comparison mode</h2>
-				<p class="draft">What it's for, the left and right editing switch, and one good use, such as this year against last year.</p>
+				<p>Comparison puts two lists side by side. Click Comparison: Off at the bottom of the filter panel to turn it on, then use Editing: Left list / Right list to choose which side your changes go to. Each side has its own list type, sort, filters and equations. Display mode, list length and the chart settings are shared.</p>
+				<p>Some ideas: this year against last year, weekdays against weekends, or your top tracks now against your top tracks from your first 10,000 scrobbles.</p>
 			</section>
 
 			<section id="equations">
 				<h2>Equations</h2>
-				<p class="draft">Mark this as advanced. The three commands (filter, sort, unique), how fields and operators combine, and two or three worked pipelines explained line by line. Put pipelines in &lt;pre&gt;&lt;code&gt; blocks. The placeholder in the Equations box is a good first example.</p>
+				<p>Equations are for things the filter menus can&rsquo;t do, like comparing two fields with each other. They&rsquo;re meant for people who like tinkering, and you never need them for the normal lists.</p>
+				<p>Type them into the box in the Equations menu, one step per line or separated by semicolons. Each step works on the result of the one before it. There are four commands:</p>
+				<ul>
+					<li><code>filter</code> followed by a condition keeps the scrobbles where the condition is true. You can leave out the word filter.</li>
+					<li><code>sort</code> followed by a field, and then <code>asc</code> or <code>desc</code>, sorts by that field.</li>
+					<li><code>unique</code> followed by a field and a number keeps at most that many items for each value of the field. Without a number it keeps one.</li>
+					<li><code>show</code> followed by a field adds that field&rsquo;s value to every row, so you can see what you sorted or filtered by.</li>
+				</ul>
+				<p>Fields are the same things the menus use, written with hyphens, like <code>artist-name</code>, <code>track-name-length</code>, <code>artist-scrobble-count</code> or <code>year</code>. The list next to the box has all of them, and clicking one puts it into the box. Conditions use <code>=</code>, <code>!=</code>, <code>&lt;</code>, <code>&lt;=</code>, <code>&gt;</code> and <code>&gt;=</code>, and you can do maths with <code>+</code>, <code>-</code>, <code>*</code>, <code>/</code> and <code>%</code> (the remainder). Text goes in quotes. Months go from 1 to 12, and weekdays go from 0 for Sunday to 6 for Saturday.</p>
+				<p>The example in the box:</p>
+				<pre><code>artist-name-length = track-name-length
+sort track-scrobble-count desc
+unique track-name-length 1
+sort track-name-length asc</code></pre>
+				<p>Step by step: keep the plays where the artist name and the track title have the same number of characters. Sort them by how much you&rsquo;ve played the track. Keep one track for each title length, which is your most played one since the list is already sorted. Then sort those by title length. You end up with your top song for every title length where the artist name is just as long.</p>
+				<p>A few more:</p>
+				<pre><code>track-name = artist-name</code></pre>
+				<p>Self-titled songs, where the track has the same name as the artist.</p>
+				<pre><code>year - artist-first-scrobble-year >= 5</code></pre>
+				<p>Plays from at least five years after you found the artist. On an artist list, this shows who you&rsquo;re still listening to years later.</p>
+				<pre><code>artist-name = "Radiohead"
+sort track-name-length desc
+show track-name-length</code></pre>
+				<p>Radiohead songs from the longest title to the shortest, with the length shown on each row.</p>
 			</section>
 
 			<section id="entity-pages">
 				<h2>Artist, album and track pages</h2>
-				<p class="draft">What's on them, "Show all lists", and how clicking a ranking jumps to the highlighted row.</p>
+				<p>Click any artist, album or track in a list to open its page. It shows your scrobbles, its rank in your library, its rank among that artist&rsquo;s tracks or albums, your first and last play, a link to its Last.fm page and up to three of its best placements. There&rsquo;s also a graph of your plays over time.</p>
+				<p>Show all lists opens every ranking it appears in: each year, month and week, the last 7 to 365 days, the play milestones, the streaks and the other sorts. Click a ranking and that list opens with the item highlighted, at the same position the page said. The browser&rsquo;s Back button takes you back to the page as you left it.</p>
 			</section>
 
 			<section id="exporting">
 				<h2>Exporting</h2>
-				<p class="draft">PNG of a list, the album cover grid, and the GIF from a race.</p>
+				<p>Export Image saves the current list or chart as a PNG. You can pick a light or dark theme, and whether the active filters are printed on it. If the display mode is Bar Chart Race, Export Image saves the race as a GIF instead.</p>
+				<p>Export Grid makes an album cover collage from the current list. Set the number of columns and rows, up to 50 each. Allow duplicate covers lets the same cover show up more than once, which happens on track lists when several songs come from one album. Skip missing artwork leaves out items without a cover instead of leaving gaps. Show artist &amp; album text prints the names on the covers.</p>
+				<p>For a classic 3x3 of your top albums: generate a list of Albums sorted by Scrobble count, add a time filter if you want one, then click Export Grid and set 3 columns and 3 rows.</p>
 			</section>
 
 			<section id="games">
 				<h2>Games</h2>
-				<p class="draft">One or two lines each for Higher or Lower, Fill the List and Put Them In Order, plus where your records are kept.</p>
+				<p>The Games tab opens once your data is loaded. The games only use the history you already have, so they don&rsquo;t download anything.</p>
+				<p>Higher or Lower shows two artists, albums or tracks, and you pick the one you&rsquo;ve scrobbled more. It gets harder over your first 20 wins.</p>
+				<p>Fill the List picks a top 10 list from your library, like &ldquo;Top albums of 2021&rdquo;, and you type as many of the ten as you can. You choose which kinds of lists come up, and there&rsquo;s an optional time limit and a hard mode that hides the artist.</p>
+				<p>Put Them In Order gives you a few items to sort by how much you&rsquo;ve played them. It starts with three and goes up to five as you keep winning.</p>
+				<p>Your best scores are kept in your browser.</p>
 			</section>
 
 			<section id="saving">
 				<h2>Saving and privacy</h2>
-				<p class="draft">What Save Data does, that everything stays in the browser, and what GoatCounter counts.</p>
+				<p>Save Data stores your history, the lists built from it, album covers and any details you loaded in your browser&rsquo;s storage. Nothing is uploaded anywhere. Every browser and device has its own copy, and clearing your browser&rsquo;s site data deletes it.</p>
+				<p>When you load a saved username, the site only asks Last.fm for scrobbles newer than your saved ones, which is much faster. If you saved in the middle of a load, the next load downloads only the pages that were still missing.</p>
+				<p>The site counts anonymous visits and which features get used with GoatCounter. It never sends usernames, filter values, artist, album or track names, or scrobbles. The code is on <a href="https://github.com/LastFMLists/lastfmlists">GitHub</a> if you want to check.</p>
 			</section>
 
 			<div class="page-cta">

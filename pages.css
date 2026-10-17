@@ -220,22 +220,6 @@
     background-color: var(--accent-strong);
 }
 
-/* Writing notes for drafts. Delete each one once its section is written. */
-.draft {
-    margin: 0 0 0.9rem;
-    padding: 0.7rem 0.9rem;
-    border: 2px dashed var(--primary-accent-color);
-    border-radius: var(--radius-sm);
-    color: var(--secondary-text-color);
-    font-size: 0.92rem;
-}
-
-.draft::before {
-    content: "Draft note: ";
-    font-weight: 700;
-    color: var(--accent-strong);
-}
-
 @media (max-width: 520px) {
     .page-header {
         flex-wrap: wrap;

@@ -27,6 +27,8 @@ work. Serve the folder over HTTP instead (`python3 -m http.server`).
 
 Unreleased:
 
+- A guide at /guide/ that explains every sort and filter with recipes, and a FAQ at /faq/. The question mark next to the GitHub link opens the guide.
+- Clearer sort names: Most plays in a row (was Max consecutive scrobbles), Most days, weeks and months in a row (was Max listening streak), Number of days, weeks and months played (was Scrobbled on different days, weeks and months), Oldest and Newest average play date, Most scrobbles within 7 days (rolling) (was 168 hours), and Oldest first and Newest first for scrobble lists.
 - Save Data works while your history is still loading. It saves the pages that have finished downloading, and loading the same username again continues from there instead of starting over.
 - Pages that fail to download are tried again at the end of the load. If they still fail, the lists say how many scrobbles are missing, and a saved copy fills the gap on the next load. Failed pages used to be skipped without a word.
 - Scrobbles you make while a load runs no longer shift its pages, which could skip or double scrobbles at the page edges. They are picked up on the next load.

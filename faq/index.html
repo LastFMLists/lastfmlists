@@ -3,22 +3,177 @@
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-	<!-- DRAFT: remove this line once the page is written -->
-	<meta name="robots" content="noindex">
 	<title>FAQ · lastfmlists</title>
-	<!-- DRAFT: one sentence, about 150 characters, saying what the FAQ answers -->
-	<meta name="description" content="">
+	<meta name="description" content="Answers about lastfmlists: what it does, where your data is stored, why loading takes time, and how to make streak lists, album collages and bar chart races.">
 	<meta name="theme-color" content="#FFFCF8">
 	<link rel="canonical" href="https://lastfmlists.com/faq/">
 	<meta property="og:type" content="article">
 	<meta property="og:site_name" content="lastfmlists">
 	<meta property="og:url" content="https://lastfmlists.com/faq/">
 	<meta property="og:title" content="FAQ · lastfmlists">
-	<!-- DRAFT: same text as the meta description -->
-	<meta property="og:description" content="">
+	<meta property="og:description" content="Answers about lastfmlists: what it does, where your data is stored, why loading takes time, and how to make streak lists, album collages and bar chart races.">
 	<meta property="og:image" content="https://lastfmlists.com/logo.png">
 	<meta name="twitter:card" content="summary">
-	<!-- FAQPage structured data goes here, built from the finished questions and answers -->
+	<script type="application/ld+json">
+	{
+	 "@context": "https://schema.org",
+	 "@type": "FAQPage",
+	 "mainEntity": [
+	  {
+	   "@type": "Question",
+	   "name": "What is this site?",
+	   "acceptedAnswer": {
+	    "@type": "Answer",
+	    "text": "Lastfmlists is a free site where you can explore your Last.fm listening history through lists, charts and games."
+	   }
+	  },
+	  {
+	   "@type": "Question",
+	   "name": "How do I use this site?",
+	   "acceptedAnswer": {
+	    "@type": "Answer",
+	    "text": "Type your Last.fm username on the main page to load your listening history. Once it's loaded, you can filter it by artist, album, track, time and more. The guide explains every setting."
+	   }
+	  },
+	  {
+	   "@type": "Question",
+	   "name": "Does it work with Spotify, Apple Music, etc.?",
+	   "acceptedAnswer": {
+	    "@type": "Answer",
+	    "text": "Yes. The site uses your Last.fm data, so anything you scrobble to Last.fm is included, whatever app you listen in."
+	   }
+	  },
+	  {
+	   "@type": "Question",
+	   "name": "Do I need to register?",
+	   "acceptedAnswer": {
+	    "@type": "Answer",
+	    "text": "No, your Last.fm username is enough. You never give a password."
+	   }
+	  },
+	  {
+	   "@type": "Question",
+	   "name": "Is it free?",
+	   "acceptedAnswer": {
+	    "@type": "Answer",
+	    "text": "Lastfmlists is 100% free and ad-free, but donations are appreciated if you like the site."
+	   }
+	  },
+	  {
+	   "@type": "Question",
+	   "name": "Where is my data stored?",
+	   "acceptedAnswer": {
+	    "@type": "Answer",
+	    "text": "Your listening history stays in your browser, and it's only kept after you click Save Data. The site sends your username to Last.fm to download your scrobbles, and anonymous usage counts to GoatCounter. Those counts never include your username or what you listen to."
+	   }
+	  },
+	  {
+	   "@type": "Question",
+	   "name": "Do I lose everything when I refresh?",
+	   "acceptedAnswer": {
+	    "@type": "Answer",
+	    "text": "Yes, unless you save your data first."
+	   }
+	  },
+	  {
+	   "@type": "Question",
+	   "name": "Do I have to download everything again every time?",
+	   "acceptedAnswer": {
+	    "@type": "Answer",
+	    "text": "No. If you saved your data, the next load only downloads the scrobbles you made since then."
+	   }
+	  },
+	  {
+	   "@type": "Question",
+	   "name": "Why does loading take so long?",
+	   "acceptedAnswer": {
+	    "@type": "Answer",
+	    "text": "Loading large libraries can take a few minutes. If it takes over 15 minutes and seems stuck, save your data and refresh the page. The next load continues where it stopped. Load All Details can take hours, but for almost everything, Load Details is enough."
+	   }
+	  },
+	  {
+	   "@type": "Question",
+	   "name": "What's the difference between Load Details and Load All Details?",
+	   "acceptedAnswer": {
+	    "@type": "Answer",
+	    "text": "Load Details downloads extra Last.fm info for your top artists, albums and tracks: track length, genre and country tags, and global listener and play counts. Load All Details does the same for every track you've ever scrobbled, which can take hours. Load Details is enough for almost everything. More in the guide."
+	   }
+	  },
+	  {
+	   "@type": "Question",
+	   "name": "Why are some filters greyed out?",
+	   "acceptedAnswer": {
+	    "@type": "Answer",
+	    "text": "While your listening history is loading, filters can't be applied yet. Some filters also rely on Last.fm metadata, like track length, tags and global play counts. These stay disabled until you click Load Details."
+	   }
+	  },
+	  {
+	   "@type": "Question",
+	   "name": "Can I look at a friend's stats?",
+	   "acceptedAnswer": {
+	    "@type": "Answer",
+	    "text": "Yes, as long as their Last.fm listening history is public."
+	   }
+	  },
+	  {
+	   "@type": "Question",
+	   "name": "How do I find my longest listening streak?",
+	   "acceptedAnswer": {
+	    "@type": "Answer",
+	    "text": "Set “Sort lists by” to Most plays in a row to see what you played the most times back to back. For the most days in a row, use Most days in a row. There are weekly and monthly versions too. All the sorts are explained in the guide."
+	   }
+	  },
+	  {
+	   "@type": "Question",
+	   "name": "How do I make an album collage (3x3, 5x5)?",
+	   "acceptedAnswer": {
+	    "@type": "Answer",
+	    "text": "Click Export Grid at the top to turn your current list into an album collage. You can set its size and a few other options. More in the guide."
+	   }
+	  },
+	  {
+	   "@type": "Question",
+	   "name": "How do I make a bar chart race GIF?",
+	   "acceptedAnswer": {
+	    "@type": "Answer",
+	    "text": "Set Display mode to Bar Chart Race, pick the dates and speed, then click Export Image. The race is saved as a GIF. More in the guide."
+	   }
+	  },
+	  {
+	   "@type": "Question",
+	   "name": "Can I compare two lists?",
+	   "acceptedAnswer": {
+	    "@type": "Answer",
+	    "text": "Yes. Turn on Comparison in the filter panel, and the left and right lists get their own filters. More in the guide."
+	   }
+	  },
+	  {
+	   "@type": "Question",
+	   "name": "Are there games?",
+	   "acceptedAnswer": {
+	    "@type": "Answer",
+	    "text": "Yes, three: Higher or Lower, Fill the List and Put Them In Order. They use the history you've already loaded, so they start instantly. More in the guide."
+	   }
+	  },
+	  {
+	   "@type": "Question",
+	   "name": "Is there a mobile app?",
+	   "acceptedAnswer": {
+	    "@type": "Answer",
+	    "text": "Not yet, an Android app is in the works. Until then, the site works in your phone's browser."
+	   }
+	  },
+	  {
+	   "@type": "Question",
+	   "name": "How do I report a bug or support the site?",
+	   "acceptedAnswer": {
+	    "@type": "Answer",
+	    "text": "Message me on Reddit (u/Alet404) or open an issue on GitHub. You can support the site on Ko-fi."
+	   }
+	  }
+	 ]
+	}
+	</script>
 	<script>
 		// Runs before the stylesheet paints, so a saved dark theme doesn't flash light.
 		(function () {
@@ -54,90 +209,101 @@
 	<main>
 		<article class="page">
 			<h1>Frequently asked questions</h1>
-			<p class="draft">Optional line under the title, e.g. pointing to the guide for longer explanations.</p>
+			<p class="page-lede">Short answers to common questions. The <a href="/guide/">guide</a> explains everything in more detail.</p>
 
-			<!--
-				One section per question. The h2 is the question, phrased the way someone
-				would type it into a search box. Answer it in the first sentence, keep it to
-				two to four sentences, and link to the guide (/guide/#details etc.) for more.
-				The questions below are placeholders: reword, drop or add as you like, and keep
-				the ids stable so the app can link to them.
-				Delete each .draft note once its answer is written.
-			-->
-
-			<section id="free">
-				<h2>Is it free? Do I need to log in or give my password?</h2>
-				<p class="draft">Answer here.</p>
+			<section id="what-is">
+				<h2>What is this site?</h2>
+				<p>Lastfmlists is a free site where you can explore your Last.fm listening history through lists, charts and games.</p>
 			</section>
 
-			<section id="data">
-				<h2>Where is my data stored? Does anything get sent to a server?</h2>
-				<p class="draft">Answer here.</p>
-			</section>
-
-			<section id="loading-time">
-				<h2>Why does loading take so long?</h2>
-				<p class="draft">Answer here.</p>
-			</section>
-
-			<section id="details">
-				<h2>What's the difference between Load Details and Load All Details?</h2>
-				<p class="draft">Answer here, then link to /guide/#details.</p>
-			</section>
-
-			<section id="greyed-out">
-				<h2>Why are some filters greyed out?</h2>
-				<p class="draft">Answer here.</p>
+			<section id="how-to-use">
+				<h2>How do I use this site?</h2>
+				<p>Type your Last.fm username on the main page to load your listening history. Once it&#39;s loaded, you can filter it by artist, album, track, time and more. The <a href="/guide/">guide</a> explains every setting.</p>
 			</section>
 
 			<section id="streaming-services">
-				<h2>Does it work with Spotify, Apple Music or YouTube Music?</h2>
-				<p class="draft">Answer here.</p>
+				<h2>Does it work with Spotify, Apple Music, etc.?</h2>
+				<p>Yes. The site uses your Last.fm data, so anything you scrobble to Last.fm is included, whatever app you listen in.</p>
 			</section>
 
-			<section id="friends">
-				<h2>Can I look at a friend's stats?</h2>
-				<p class="draft">Answer here.</p>
+			<section id="register">
+				<h2>Do I need to register?</h2>
+				<p>No, your Last.fm username is enough. You never give a password.</p>
 			</section>
 
-			<section id="hidden-profile">
-				<h2>What if a profile hides its recent listening?</h2>
-				<p class="draft">Check what the site actually does before writing this one. I didn't find any special handling in the code.</p>
+			<section id="free">
+				<h2>Is it free?</h2>
+				<p>Lastfmlists is 100% free and ad-free, but <a href="https://ko-fi.com/lastfmlists">donations</a> are appreciated if you like the site.</p>
 			</section>
 
-			<section id="streaks">
-				<h2>How do I find my longest listening streak?</h2>
-				<p class="draft">Answer here.</p>
-			</section>
-
-			<section id="collage">
-				<h2>How do I make an album collage, like a 3x3 or 5x5?</h2>
-				<p class="draft">Answer here.</p>
-			</section>
-
-			<section id="race-gif">
-				<h2>How do I make a bar chart race GIF?</h2>
-				<p class="draft">Answer here.</p>
-			</section>
-
-			<section id="numbers-differ">
-				<h2>Why are my numbers different from what Last.fm shows?</h2>
-				<p class="draft">Only keep this one if you know the real reasons.</p>
+			<section id="data">
+				<h2>Where is my data stored?</h2>
+				<p>Your listening history stays in your browser, and it&#39;s only kept after you click Save Data. The site sends your username to Last.fm to download your scrobbles, and anonymous usage counts to GoatCounter. Those counts never include your username or what you listen to.</p>
 			</section>
 
 			<section id="refresh">
 				<h2>Do I lose everything when I refresh?</h2>
-				<p class="draft">Answer here.</p>
+				<p>Yes, unless you save your data first.</p>
+			</section>
+
+			<section id="saved-data">
+				<h2>Do I have to download everything again every time?</h2>
+				<p>No. If you saved your data, the next load only downloads the scrobbles you made since then.</p>
+			</section>
+
+			<section id="loading-time">
+				<h2>Why does loading take so long?</h2>
+				<p>Loading large libraries can take a few minutes. If it takes over 15 minutes and seems stuck, save your data and refresh the page. The next load continues where it stopped. Load All Details can take hours, but for almost everything, Load Details is enough.</p>
+			</section>
+
+			<section id="details">
+				<h2>What&#39;s the difference between Load Details and Load All Details?</h2>
+				<p>Load Details downloads extra Last.fm info for your top artists, albums and tracks: track length, genre and country tags, and global listener and play counts. Load All Details does the same for every track you&#39;ve ever scrobbled, which can take hours. Load Details is enough for almost everything. <a href="/guide/#details">More in the guide.</a></p>
+			</section>
+
+			<section id="greyed-out">
+				<h2>Why are some filters greyed out?</h2>
+				<p>While your listening history is loading, filters can&#39;t be applied yet. Some filters also rely on Last.fm metadata, like track length, tags and global play counts. These stay disabled until you click Load Details.</p>
+			</section>
+
+			<section id="friends">
+				<h2>Can I look at a friend&#39;s stats?</h2>
+				<p>Yes, as long as their Last.fm listening history is public.</p>
+			</section>
+
+			<section id="streaks">
+				<h2>How do I find my longest listening streak?</h2>
+				<p>Set &ldquo;Sort lists by&rdquo; to Most plays in a row to see what you played the most times back to back. For the most days in a row, use Most days in a row. There are weekly and monthly versions too. <a href="/guide/#sorts">All the sorts are explained in the guide.</a></p>
+			</section>
+
+			<section id="collage">
+				<h2>How do I make an album collage (3x3, 5x5)?</h2>
+				<p>Click Export Grid at the top to turn your current list into an album collage. You can set its size and a few other options. <a href="/guide/#exporting">More in the guide.</a></p>
+			</section>
+
+			<section id="race-gif">
+				<h2>How do I make a bar chart race GIF?</h2>
+				<p>Set Display mode to Bar Chart Race, pick the dates and speed, then click Export Image. The race is saved as a GIF. <a href="/guide/#charts">More in the guide.</a></p>
+			</section>
+
+			<section id="compare">
+				<h2>Can I compare two lists?</h2>
+				<p>Yes. Turn on Comparison in the filter panel, and the left and right lists get their own filters. <a href="/guide/#comparison">More in the guide.</a></p>
+			</section>
+
+			<section id="games">
+				<h2>Are there games?</h2>
+				<p>Yes, three: Higher or Lower, Fill the List and Put Them In Order. They use the history you&#39;ve already loaded, so they start instantly. <a href="/guide/#games">More in the guide.</a></p>
 			</section>
 
 			<section id="mobile">
 				<h2>Is there a mobile app?</h2>
-				<p class="draft">Answer here.</p>
+				<p>Not yet, an Android app is in the works. Until then, the site works in your phone&#39;s browser.</p>
 			</section>
 
 			<section id="contact">
 				<h2>How do I report a bug or support the site?</h2>
-				<p class="draft">Answer here.</p>
+				<p>Message me on <a href="https://www.reddit.com/user/Alet404/">Reddit (u/Alet404)</a> or open an issue on <a href="https://github.com/LastFMLists/lastfmlists/issues">GitHub</a>. You can support the site on <a href="https://ko-fi.com/lastfmlists">Ko-fi</a>.</p>
 			</section>
 
 			<div class="page-cta">
