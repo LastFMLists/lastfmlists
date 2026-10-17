@@ -20,8 +20,11 @@ const ROWS_SHOWN = 5;
 const ROWS_EXPANDED = 15;
 const OPEN_LIST_LENGTH = 100;
 
-function box(id, title, note, entityType, sortingBasis = "scrobbles", { x = "", filters = {}, needsDetails = false } = {}) {
-    return { id, title, note, needsDetails, query: { entityType, sortingBasis, xValue: x === "" ? "" : String(x), filters } };
+// `when` decides from the library's size whether the box says anything a
+// box above doesn't already: "last 30 days" of a 9-day-old account is just
+// its top list again.
+function box(id, title, note, entityType, sortingBasis = "scrobbles", { x = "", filters = {}, needsDetails = false, when = null } = {}) {
+    return { id, title, note, needsDetails, when, query: { entityType, sortingBasis, xValue: x === "" ? "" : String(x), filters } };
 }
 
 // The sections, in page order. `year` is the year picked in Your year.
@@ -35,13 +38,15 @@ function sections(year, milestone) {
                 box("top-artists", "Top artists", "Your most played artists of all time.", "artist"),
                 box("top-albums", "Top albums", "Your most played albums of all time.", "album"),
                 box("top-tracks", "Top tracks", "Your most played tracks of all time.", "track"),
-                box("recent-artists", "Last 30 days: artists", "Who you've been listening to lately.", "artist", "scrobbles", { filters: { "last-n-days": "30" } }),
-                box("recent-albums", "Last 30 days: albums", "The albums on rotation right now.", "album", "scrobbles", { filters: { "last-n-days": "30" } }),
-                box("recent-tracks", "Last 30 days: tracks", "Your songs of the month.", "track", "scrobbles", { filters: { "last-n-days": "30" } })
+                box("recent-artists", "Last 30 days: artists", "Who you've been listening to lately.", "artist", "scrobbles", { filters: { "last-n-days": "30" }, when: lib => lib.days > 60 }),
+                box("recent-albums", "Last 30 days: albums", "The albums on rotation right now.", "album", "scrobbles", { filters: { "last-n-days": "30" }, when: lib => lib.days > 60 }),
+                box("recent-tracks", "Last 30 days: tracks", "Your songs of the month.", "track", "scrobbles", { filters: { "last-n-days": "30" }, when: lib => lib.days > 60 })
             ]
         },
         {
             id: "year",
+            // With one year of history this repeats Highlights.
+            when: lib => lib.years > 1,
             title: "Your year",
             yearPicker: true,
             boxes: [
@@ -61,8 +66,8 @@ function sections(year, milestone) {
                 box("streak-track-days", "Tracks, days in a row", "Songs you played every day, the longest.", "track", "consecutive-days"),
                 box("streak-track-plays", "Tracks on repeat", "The most plays in a row, nothing in between.", "track", "consecutive-scrobbles"),
                 box("streak-artist-plays", "Artist binges", "The most plays in a row by one artist.", "artist", "consecutive-scrobbles"),
-                box("streak-album-weeks", "Albums, weeks in a row", "Albums you kept coming back to every week.", "album", "consecutive-weeks"),
-                box("streak-artist-months", "Artists, months in a row", "The artists that stuck around the longest.", "artist", "consecutive-months")
+                box("streak-album-weeks", "Albums, weeks in a row", "Albums you kept coming back to every week.", "album", "consecutive-weeks", { when: lib => lib.days > 21 }),
+                box("streak-artist-months", "Artists, months in a row", "The artists that stuck around the longest.", "artist", "consecutive-months", { when: lib => lib.days > 90 })
             ]
         },
         {
@@ -97,7 +102,7 @@ function sections(year, milestone) {
                 box("old-favourites", "Oldest favourites", "Artists whose plays are furthest in the past on average (25+ plays).", "artist", "oldest-average-listening-time", { x: 25 }),
                 box("new-obsessions", "New obsessions", "Tracks whose plays are the most recent on average (10+ plays).", "track", "newest-average-listening-time", { x: 10 }),
                 box("one-song-artists", "One-song artists", "Artists you've only ever played one track by.", "artist", "scrobbles", { filters: { "artist-track-count-max": "1" } }),
-                box("first-thousand", "Where it started", "Your top tracks from your first 1,000 scrobbles.", "track", "scrobbles", { filters: { "scrobble-order-from": "1", "scrobble-order-to": "1000" } }),
+                box("first-thousand", "Where it started", "Your top tracks from your first 1,000 scrobbles.", "track", "scrobbles", { filters: { "scrobble-order-from": "1", "scrobble-order-to": "1000" }, when: lib => lib.scrobbles > 2000 }),
                 box("hidden-gems", "Hidden gems", "Tracks you've played 20+ times that have under 5,000 listeners on Last.fm.", "track", "scrobbles", { filters: { "track-listeners-max": "5000", "track-scrobble-count-min": "20" }, needsDetails: true })
             ]
         }
@@ -214,13 +219,51 @@ function paintBox(boxDef) {
     const more = element.querySelector('[data-action="more"]');
     more.hidden = !rows || rows.length <= ROWS_SHOWN;
     more.textContent = expanded.has(boxDef.id) ? "Show less" : "Show more";
+    // A box with nothing in it is left out, and so is a section with no
+    // boxes left, along with its chip.
+    element.hidden = Boolean(rows) && rows.length === 0;
+    hideEmptyGroup(element.closest(".explore-group"));
+}
+
+function hideEmptyGroup(group) {
+    if (!group) return;
+    const boxes = [...group.querySelectorAll(".explore-box")];
+    const empty = boxes.every(b => b.hidden);
+    const id = group.id.replace(/^explore-/, "");
+    if (id === "year") {
+        // Keep the picker, so another year can still be chosen.
+        let note = group.querySelector(".explore-year-empty");
+        if (empty && !note) {
+            note = document.createElement("p");
+            note.className = "explore-empty explore-year-empty";
+            group.querySelector(".explore-grid").before(note);
+        }
+        if (note) {
+            note.hidden = !empty;
+            note.textContent = `No plays in ${year}.`;
+        }
+        return;
+    }
+    group.hidden = empty;
+    const chip = jump.querySelector(`[data-jump="${id}"]`);
+    if (chip) chip.hidden = empty;
+}
+
+function libraryShape(years) {
+    const tracks = state.allTracks;
+    const days = tracks.length ? (Number(tracks.at(-1).Date) - Number(tracks[0].Date)) / 86400000 : 0;
+    return { scrobbles: tracks.length, days, years: years.length };
 }
 
 function render() {
     const years = libraryYears();
     if (!years.includes(year)) year = years[0];
+    const lib = libraryShape(years);
+    const fits = (item) => !item.when || item.when(lib);
     const groups = sections(year, defaultMilestone())
-        .map(group => ({ ...group, boxes: group.boxes.filter(b => !b.needsDetails || state.extendedDataLoaded) }));
+        .filter(fits)
+        .map(group => ({ ...group, boxes: group.boxes.filter(b => fits(b) && (!b.needsDetails || state.extendedDataLoaded)) }))
+        .filter(group => group.boxes.length);
     boxesById = new Map(groups.flatMap(group => group.boxes.map(b => [b.id, b])));
 
     jump.innerHTML = groups.map(group =>

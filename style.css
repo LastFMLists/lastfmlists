@@ -3077,6 +3077,12 @@ footer a:hover {
     gap: 0.9rem;
 }
 
+.explore-box[hidden],
+.explore-group[hidden],
+.explore-chip[hidden] {
+    display: none;
+}
+
 .explore-box {
     display: flex;
     flex-direction: column;

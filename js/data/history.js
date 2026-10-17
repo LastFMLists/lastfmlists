@@ -523,12 +523,14 @@ export async function loadHistory(username, saved, onPreview = null) {
         }
     };
     let scrobbleCount = base.length;
-    let lastPreviewAt = 0;
-    const emitPreview = (force = false) => {
-        if (!buildingWholeHistory || typeof onPreview !== "function" || !range) return;
-        const now = Date.now();
-        if (!force && now - lastPreviewAt < 400) return; // throttle DOM work
-        lastPreviewAt = now;
+    // At most one repaint per 400 ms; a page that arrives inside that window
+    // is painted when it ends, so a pause never leaves an old count up. A
+    // late paint is dropped once the download is over, so it can't cover the
+    // finished list.
+    let previewTimer = null;
+    const paintPreview = () => {
+        previewTimer = null;
+        if (!range || state.historyLoad?.phase !== "history") return;
         onPreview({
             artistTally,
             trackTally,
@@ -536,6 +538,15 @@ export async function loadHistory(username, saved, onPreview = null) {
             noteText: "Live preview, still loading. Ranked by scrobble count, and your filters apply once loading finishes.",
             countLabel: "Scrobbles so far"
         });
+    };
+    const emitPreview = (force = false) => {
+        if (!buildingWholeHistory || typeof onPreview !== "function" || !range) return;
+        if (force) {
+            clearTimeout(previewTimer);
+            paintPreview();
+        } else if (previewTimer === null) {
+            previewTimer = setTimeout(paintPreview, 400);
+        }
     };
     const showPageProgress = () => {
         loadingDiv.innerHTML = buildingWholeHistory
@@ -578,6 +589,7 @@ export async function loadHistory(username, saved, onPreview = null) {
     }
 
     emitPreview(true);
+    clearTimeout(previewTimer);
     // The top lists and rankings still have to be built, so drop the percentage
     // rather than sit at 100% while that runs.
     setLoadProgress(null);

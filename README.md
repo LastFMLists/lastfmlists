@@ -27,6 +27,8 @@ work. Serve the folder over HTTP instead (`python3 -m http.server`).
 
 Unreleased:
 
+- Explore fits small libraries: empty boxes are left out, sections with nothing left disappear with their chip, and boxes that would repeat another one are skipped (Last 30 days needs more than 60 days of history, Your year more than one year, Where it started more than 2,000 scrobbles).
+- The loading preview no longer freezes on an old page count when downloads pause, and the greyed-out tabs during a load say they are available once loading finishes.
 - Lists can be shared as links. The address bar holds the username and the list's settings (?user=name&type=artist&sort=consecutive-days&year=2024), including both sides of a comparison and the equations. Opening a link loads that user and shows the same list; a link without user= applies its settings to whoever loads their own data. Refreshing keeps the list. Page views sent to GoatCounter count the path only, never the username or settings.
 - The first visit lands on Explore; later visits open the tab you used last.
 - The Equations menu is a step editor, ported from the Android app. Each step is picked from a list (Keep matching plays, Order plays, Keep first per value, Show value), fields have readable names, either side of a condition can be a field, number, text or a calculation, and steps can be moved and removed. A short guide has one-click examples. The text form is still there as the Advanced text editor, which points out mistakes and switches back to steps once the text is valid.
