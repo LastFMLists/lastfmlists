@@ -4820,6 +4820,10 @@ button.game-card:hover {
     color: var(--secondary-text-color);
 }
 
+.graph-dates-note {
+    flex-basis: 100%;
+}
+
 .graph-segmented {
     display: inline-flex;
     flex-wrap: wrap;

@@ -28,6 +28,7 @@ work. Serve the folder over HTTP instead (`python3 -m http.server`).
 
 Unreleased:
 
+- In Graphs, the dates are now Show from and Show until and only zoom: the numbers always count the whole history (or the list's plays), so a running total doesn't restart at the first date shown and an all-time rank stays all-time. The graph starts and ends exactly on the chosen dates, and a note under them says so. They used to drop every play outside the range before counting.
 - A list with equation steps is built from the whole history, and the steps are its only filters: the Artist, Album, Track and Time menus are paused for it. Each paused menu says so with a note and a "paused" tag, their chips above the list are crossed out, and their settings come back once the steps are cleared. In comparison this is decided per side.
 - Fixed the page freezing when applying a bar chart race, most of all in comparison: a race in daily steps over years of history re-ranked the whole library thousands of times in one go. Races now build in slices with a progress note, scrobble-count races update their top bars play by play, races over 2,000 steps ask for a longer step, and the default step follows the length of the history (days under a year, weeks under four, months beyond).
 - Comparison is switched on under List settings; the Left/Right side switch shows above Apply only while comparing, the right list starts as a copy of the left, and turning comparison off returns to the left list. Each side keeps its own caps, and a side with a scrobble list keeps both sides as lists.

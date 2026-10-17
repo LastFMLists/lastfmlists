@@ -147,7 +147,8 @@ function parseDay(value, endOfDay) {
     return date.getTime();
 }
 
-// The plays the graph counts, oldest first, within the chosen dates.
+// The plays the graph counts, oldest first: the whole history, or a list's
+// plays. The dates never filter these; they only pick the stretch shown.
 let sortedCache = { from: null, plays: [] };
 function sourcePlays() {
     const from = graph.source ? graph.source.tracks : state.allTracks || [];
@@ -157,13 +158,20 @@ function sourcePlays() {
             plays: from.filter(play => Number.isFinite(Number(play.Date))).sort((a, b) => Number(a.Date) - Number(b.Date))
         };
     }
-    const start = parseDay(graph.from, false);
-    const end = parseDay(graph.to, true);
-    if (start === null && end === null) return sortedCache.plays;
-    return sortedCache.plays.filter(play => {
-        const time = Number(play.Date);
-        return (start === null || time >= start) && (end === null || time <= end);
-    });
+    return sortedCache.plays;
+}
+
+// The first play at or after a time, so counts within a period can start
+// there while totals still include everything before.
+function firstIndexFrom(plays, time) {
+    let low = 0;
+    let high = plays.length;
+    while (low < high) {
+        const mid = (low + high) >> 1;
+        if (Number(plays[mid].Date) < time) low = mid + 1;
+        else high = mid;
+    }
+    return low;
 }
 
 // ---- Working out the lines ----
@@ -178,10 +186,18 @@ async function computeLines(onProgress) {
     // keeps to the lines it started with.
     const lines = [...graph.series];
     const plays = sourcePlays();
-    if (!plays.length) return { error: "There are no plays in this date range." };
+    if (!plays.length) return { error: "There are no plays to count." };
+    // Show from / Show until only choose the stretch of time on screen. The
+    // numbers always count every play: a total on the first day shown
+    // includes the years before it, and a rank is the rank in the whole
+    // list at that point.
+    const shownFrom = parseDay(graph.from, false);
+    const shownUntil = parseDay(graph.to, true);
+    const first = shownFrom ?? Number(plays[0].Date);
+    const last = shownUntil ?? Number(plays[plays.length - 1].Date);
+    if (first > last) return { error: "Show from is after Show until." };
     const timeline = [];
-    const last = Number(plays[plays.length - 1].Date);
-    for (let start = periodStart(Number(plays[0].Date), graph.period); start <= last; start = nextPeriod(start, graph.period)) {
+    for (let start = periodStart(first, graph.period); start <= last; start = nextPeriod(start, graph.period)) {
         timeline.push(start);
         if (timeline.length > MAX_POINTS) {
             return { error: `That makes more than ${MAX_POINTS.toLocaleString()} points. Pick a longer period or a shorter date range.` };
@@ -207,8 +223,8 @@ async function computeLines(onProgress) {
             return { error: "Ranking every point takes too long for this many plays. Pick a longer period or a shorter date range." };
         }
         const types = [...new Set(lines.map(series => series.type))];
-        let pointer = 0;
-        let periodFrom = 0;
+        let pointer = firstIndexFrom(plays, timeline[0]);
+        let periodFrom = pointer;
         for (let index = 0; index < timeline.length; index++) {
             const end = nextPeriod(timeline[index], graph.period);
             while (pointer < plays.length && Number(plays[pointer].Date) < end) pointer++;
@@ -232,8 +248,8 @@ async function computeLines(onProgress) {
         for (let seriesIndex = 0; seriesIndex < lines.length; seriesIndex++) {
             const series = lines[seriesIndex];
             const own = plays.filter(playMatcher(series));
-            let pointer = 0;
-            let periodFrom = 0;
+            let pointer = firstIndexFrom(own, timeline[0]);
+            let periodFrom = pointer;
             let previous = { size: -1, value: null };
             for (let index = 0; index < timeline.length; index++) {
                 const end = nextPeriod(timeline[index], graph.period);
@@ -492,7 +508,7 @@ function recolorSeries() {
 function topFive(type) {
     const x = parseInt(graph.x, 10) || getDefaultXValue(graph.metric);
     const plays = sourcePlays();
-    if (!graph.source && graph.metric === "scrobbles" && !graph.from && !graph.to) return topEntities(type).slice(0, 5);
+    if (!graph.source && graph.metric === "scrobbles") return topEntities(type).slice(0, 5);
     return buildEntitiesFromTracks(plays, type, graph.metric, x).slice(0, 5).map(entity => makeSeries(entityIdentity(entity, type)));
 }
 
@@ -765,7 +781,10 @@ function buildControls() {
     };
     const from = dateInput("from");
     const to = dateInput("to");
-    box.append(field("From", from), field("To", to));
+    box.append(field("Show from", from), field("Show until", to));
+    box.appendChild(el("p", "graph-note graph-dates-note", graph.source
+        ? "The dates only choose what part of the graph you see. The numbers always count all of your list's plays."
+        : "The dates only choose what part of the graph you see. The numbers still count your whole history, so a total on the first day shown includes the years before it."));
 }
 
 // Back to the starting graph: your top 5 artists' total plays.
