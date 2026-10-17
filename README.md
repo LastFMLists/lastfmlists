@@ -27,6 +27,7 @@ work. Serve the folder over HTTP instead (`python3 -m http.server`).
 
 Unreleased:
 
+- Search engines and link previews: a robots.txt, a sitemap, link preview tags for Reddit, Discord and other sites, and a description of the site's features that search engines can read.
 - Refreshing the page resets the filters, instead of showing old filters the list wasn't using.
 - Long loads can run in another tab. The tab title shows the loading progress and "✓ Ready" when your lists are done, and after 10 seconds a "Notify me when it's done" button can send a browser notification when loading finishes or fails. The browser asks for permission only when you click it.
 - Anonymous usage counts through GoatCounter: visits, list types, filters, games, entity pages, exports, library size ranges, and page and data load times as ranges. No usernames, names or scrobbles are sent.

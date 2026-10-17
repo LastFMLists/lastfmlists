@@ -4,8 +4,46 @@
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 	<title>lastfmlists: lists and statistics for Last.fm</title>
-	<meta name="description" content="Make lists, charts and statistics from your Last.fm scrobbles.">
+	<meta name="description" content="Free lists, charts and stats from your Last.fm scrobbles: listening streaks, album collages, bar chart races and games. No login, runs in your browser.">
 	<meta name="theme-color" content="#FFFCF8">
+	<link rel="canonical" href="https://lastfmlists.com/">
+	<!-- Link previews on Reddit, Discord and other sites -->
+	<meta property="og:type" content="website">
+	<meta property="og:site_name" content="lastfmlists">
+	<meta property="og:url" content="https://lastfmlists.com/">
+	<meta property="og:title" content="lastfmlists: lists and statistics for Last.fm">
+	<meta property="og:description" content="Free lists, charts and stats from your Last.fm scrobbles: listening streaks, album collages, bar chart races and games. No login, runs in your browser.">
+	<meta property="og:image" content="https://lastfmlists.com/logo.png">
+	<meta property="og:image:width" content="500">
+	<meta property="og:image:height" content="500">
+	<meta property="og:image:alt" content="lastfmlists logo">
+	<meta name="twitter:card" content="summary">
+	<!-- What search engines read about the site -->
+	<script type="application/ld+json">
+	{
+		"@context": "https://schema.org",
+		"@type": "WebApplication",
+		"name": "lastfmlists",
+		"url": "https://lastfmlists.com/",
+		"description": "Lists, charts, statistics and games made from your Last.fm scrobbles. The site runs in your browser, and your data stays there.",
+		"applicationCategory": "MultimediaApplication",
+		"operatingSystem": "Any web browser",
+		"isAccessibleForFree": true,
+		"offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+		"featureList": [
+			"Top track, album and artist lists from your Last.fm history, sorted by scrobbles, streaks, records and more",
+			"Listening streaks by day, week and month",
+			"Most scrobbles in a single day, week, month or any number of hours",
+			"Filters by date, year, month, weekday, time of day, name, tag, track length and more",
+			"Bar charts and animated bar chart races, exportable as PNG and GIF",
+			"Album cover collage grids",
+			"Side-by-side comparison of two lists",
+			"A page for every artist, album and track with your ranks and play history",
+			"Games: Higher or Lower, Fill the List and Put Them In Order"
+		],
+		"sameAs": ["https://github.com/LastFMLists/lastfmlists"]
+	}
+	</script>
 	<script>
 		// Runs before the stylesheet paints, so a saved dark theme doesn't flash light.
 		(function () {
