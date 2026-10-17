@@ -142,7 +142,8 @@ function computeEntities(query) {
     const filterList = Object.entries(query.filters)
         .filter(([id]) => id !== "max-per-artist" && id !== "max-per-album" && id !== "equations")
         .map(([id, value]) => ({ id, value: String(value) }));
-    let tracks = filterList.length ? filterTracks(filterList, state.allTracks) : state.allTracks;
+    // Like on the Lists tab, equation steps replace the other filters.
+    let tracks = filterList.length && !query.filters.equations ? filterTracks(filterList, state.allTracks) : state.allTracks;
     const x = query.xValue === "" ? getDefaultXValue(query.sortingBasis) : Number(query.xValue);
     if (query.filters.equations) tracks = applyEquationPipeline(tracks, query.filters.equations, { xValue: x }).tracks;
     let entities = buildEntitiesFromTracks(tracks, query.entityType, query.sortingBasis, x);

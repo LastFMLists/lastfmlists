@@ -234,9 +234,11 @@
                     </div>
                 </div>
 
-                <div class="dropdown">
+                <div class="dropdown" data-pausable>
                     <button class="dropdown-button"><i class="fas fa-microphone" aria-hidden="true"></i><span>Artist</span></button>
                     <div class="dropdown-content">
+                        <p class="paused-note">Paused while Equations has steps: a list with steps is built from your whole history, and the steps are its filters. Add these conditions as steps, or clear the steps to use this menu again.</p>
+
 
                         <label for="max-per-artist">Displayed per artist</label>
                         <input type="number" id="max-per-artist" placeholder="e.g., 1" min="1">
@@ -339,9 +341,11 @@
 
 
                 <!-- Album Filters -->
-                <div class="dropdown">
+                <div class="dropdown" data-pausable>
                     <button class="dropdown-button"><i class="fas fa-compact-disc" aria-hidden="true"></i><span>Album</span></button>
                     <div class="dropdown-content">
+                        <p class="paused-note">Paused while Equations has steps: a list with steps is built from your whole history, and the steps are its filters. Add these conditions as steps, or clear the steps to use this menu again.</p>
+
 
                         <label for="max-per-album">Displayed tracks per album</label>
                         <input type="number" id="max-per-album" placeholder="e.g., 1" min="1">
@@ -438,9 +442,11 @@
                 </div>
 
                 <!-- Track Filters -->
-                <div class="dropdown">
+                <div class="dropdown" data-pausable>
                     <button class="dropdown-button"><i class="fas fa-music" aria-hidden="true"></i><span>Track</span></button>
                     <div class="dropdown-content">
+                        <p class="paused-note">Paused while Equations has steps: a list with steps is built from your whole history, and the steps are its filters. Add these conditions as steps, or clear the steps to use this menu again.</p>
+
                         <!-- Category 1: Title filters -->
                         <label for="track-name">Track title</label>
                         <input type="text" id="track-name" placeholder="e.g., Yesterday">
@@ -531,9 +537,11 @@
                 </div>
 
                 <!-- Time Filters -->
-                <div class="dropdown">
+                <div class="dropdown" data-pausable>
                     <button class="dropdown-button"><i class="fas fa-clock" aria-hidden="true"></i><span>Time</span></button>
                     <div class="dropdown-content">
+                        <p class="paused-note">Paused while Equations has steps: a list with steps is built from your whole history, and the steps are its filters. Add these conditions as steps, or clear the steps to use this menu again.</p>
+
 
                         <label for="last-n-days">Last X days</label>
                         <input type="number" id="last-n-days" placeholder="e.g., 30">
@@ -619,7 +627,7 @@
                         <!-- js/ui/equation-editor.js builds the step editor; the text boxes hold the result -->
                         <div class="equation-editor-layout is-visual">
                             <div class="equation-editor-pane">
-                                <p class="eq-intro">Steps run from top to bottom on the plays that pass your filters, before the list is grouped and ranked. Play counts and ranks count the plays your filters and the filter steps above have kept, so the order of the steps matters.</p>
+                                <p class="eq-intro">Steps run from top to bottom on your whole history, before the list is grouped and ranked. While there are steps, they are the list's filters: the Artist, Album, Track and Time menus are paused. Play counts and ranks count the plays kept by the filter steps above, so the order of the steps matters.</p>
                                 <div class="eq-side" data-side="left">
                                     <label for="equations" class="eq-side-title">Left list</label>
                                     <textarea id="equations" rows="5" spellcheck="false" placeholder="e.g., artist-name-length = track-name-length; sort track-scrobble-count desc; unique track-name-length 1; sort track-name-length asc"></textarea>

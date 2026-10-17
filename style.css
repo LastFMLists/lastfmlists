@@ -4835,3 +4835,43 @@ button.game-card:hover {
         margin-left: 0;
     }
 }
+
+/* ==========================================================================
+   Filters paused while Equations has steps
+   ========================================================================== */
+
+.paused-note {
+    display: none;
+    margin: 0 0 0.7rem;
+    padding: 0.55rem 0.7rem;
+    border-radius: var(--radius-sm);
+    background: var(--accent-soft);
+    color: var(--primary-text-color);
+    font-size: 0.82rem;
+    line-height: 1.4;
+}
+
+#filters-section.equations-active .dropdown[data-pausable] .paused-note {
+    display: block;
+}
+
+#filters-section.equations-active .dropdown[data-pausable] > .dropdown-button span::after {
+    content: "paused";
+    margin-left: 0.5rem;
+    padding: 0.05rem 0.45rem;
+    border: 1px solid var(--border-color);
+    border-radius: 999px;
+    color: var(--secondary-text-color);
+    font-size: 0.7rem;
+    font-weight: 600;
+    vertical-align: 1px;
+}
+
+#filters-section.equations-active .dropdown[data-pausable] > .dropdown-button {
+    color: var(--secondary-text-color);
+}
+
+.filter-label.is-paused {
+    opacity: 0.6;
+    text-decoration: line-through;
+}

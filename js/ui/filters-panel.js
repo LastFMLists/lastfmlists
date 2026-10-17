@@ -247,7 +247,36 @@ function xValueLabel(sortingBasis) {
 }
 
 // Function to update the active filters display
+// Settings that pick or shape the list rather than throw out plays. The
+// rest (the Artist, Album, Track and Time menus) are play filters, which a
+// list with equation steps doesn't use: the steps are its filters.
+const LIST_SETTING_IDS = new Set([
+    ...GLOBAL_BASE_SETTING_IDS, "entity-type", "sorting-basis", "x-value",
+    "max-per-artist", "max-per-album", "equations", "equations-right", "comparison-edit-target"
+]);
+export const isPlayFilter = (id) => !LIST_SETTING_IDS.has(id);
+
+const PAUSED_NOTE = "Paused while Equations has steps";
+
+// The equation steps of the list the panel is editing.
+function editedSideHasSteps() {
+    const right = isComparisonEnabled() && getComparisonEditTarget() === "right";
+    return Boolean((document.getElementById(right ? "equations-right" : "equations")?.value || "").trim());
+}
+
+// The Artist, Album, Track and Time menus say when they are paused.
+export function syncEquationPause() {
+    const section = document.getElementById("filters-section");
+    if (section) section.classList.toggle("equations-active", editedSideHasSteps());
+}
+
+["equations", "equations-right"].forEach(id => {
+    document.getElementById(id)?.addEventListener("input", syncEquationPause);
+});
+document.getElementById("comparison-edit-target")?.addEventListener("change", syncEquationPause);
+
 export function updateActiveFilters() {
+    syncEquationPause();
     const activeFiltersDiv = document.getElementById("active-filters");
     activeFiltersDiv.innerHTML = ""; // Clear previous filters
 
@@ -406,15 +435,16 @@ export function updateActiveFilters() {
     };
 
     // Each chip is a button that opens its filter (see ui/filter-controls.js).
-    const appendFilterLabel = (text, id) => {
+    const appendFilterLabel = (text, id, paused = false) => {
         const filterLabel = document.createElement("button");
         filterLabel.type = "button";
         filterLabel.classList.add("filter-label");
-        filterLabel.textContent = text;
+        filterLabel.textContent = paused ? `${text} (paused)` : text;
         if (id) {
             filterLabel.dataset.filterId = id;
-            filterLabel.title = "Change this filter";
+            filterLabel.title = paused ? `${PAUSED_NOTE}. Click to change it.` : "Change this filter";
         }
+        filterLabel.classList.toggle("is-paused", paused);
         activeFiltersDiv.appendChild(filterLabel);
     };
 
@@ -471,23 +501,26 @@ export function updateActiveFilters() {
                 return;
             }
 
-            if (leftValue === rightValue) {
-                appendFilterLabel(`${labelById[canonicalId]}: ${formatTagValue(canonicalId, leftValue)}`, canonicalId);
+            const leftPaused = Boolean(leftEquationValue) && isPlayFilter(canonicalId);
+            const rightPaused = Boolean(rightEquationValue) && isPlayFilter(canonicalId);
+            if (leftValue === rightValue && leftPaused === rightPaused) {
+                appendFilterLabel(`${labelById[canonicalId]}: ${formatTagValue(canonicalId, leftValue)}`, canonicalId, leftPaused);
                 return;
             }
 
             if (leftValue) {
-                appendFilterLabel(`${labelById[canonicalId]}: ${formatTagValue(canonicalId, leftValue)} (Left)`, canonicalId);
+                appendFilterLabel(`${labelById[canonicalId]}: ${formatTagValue(canonicalId, leftValue)} (Left)`, canonicalId, leftPaused);
             }
 
             if (rightValue) {
-                appendFilterLabel(`${labelById[canonicalId]}: ${formatTagValue(canonicalId, rightValue)} (Right)`, canonicalId);
+                appendFilterLabel(`${labelById[canonicalId]}: ${formatTagValue(canonicalId, rightValue)} (Right)`, canonicalId, rightPaused);
             }
         });
 
         return;
     }
 
+    const singleListSteps = Boolean((document.getElementById("equations")?.value || "").trim());
     filters.forEach(filter => {
         const element = document.getElementById(filter.id);
         if (!element) return; // Skip if element is not found
@@ -537,7 +570,7 @@ export function updateActiveFilters() {
         if (filter.id === "max-per-album" && listType !== "track" && listType !== "scrobble") shouldShow = false;
 
         if (shouldShow) {
-            appendFilterLabel(`${filter.label}: ${displayValue}`, filter.id);
+            appendFilterLabel(`${filter.label}: ${displayValue}`, filter.id, singleListSteps && isPlayFilter(filter.id));
         }
     });
 }

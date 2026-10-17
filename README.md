@@ -28,6 +28,7 @@ work. Serve the folder over HTTP instead (`python3 -m http.server`).
 
 Unreleased:
 
+- A list with equation steps is built from the whole history, and the steps are its only filters: the Artist, Album, Track and Time menus are paused for it. Each paused menu says so with a note and a "paused" tag, their chips above the list are crossed out, and their settings come back once the steps are cleared. In comparison this is decided per side.
 - Fixed the page freezing when applying a bar chart race, most of all in comparison: a race in daily steps over years of history re-ranked the whole library thousands of times in one go. Races now build in slices with a progress note, scrobble-count races update their top bars play by play, races over 2,000 steps ask for a longer step, and the default step follows the length of the history (days under a year, weeks under four, months beyond).
 - Comparison is switched on under List settings; the Left/Right side switch shows above Apply only while comparing, the right list starts as a copy of the left, and turning comparison off returns to the left list. Each side keeps its own caps, and a side with a scrobble list keeps both sides as lists.
 - Graphs show the lines, the graph, then Graph (the ready-made graphs) and Period, with everything else behind Customize; reset and download are small buttons beside the lines. "My top 5" replaces the lines with your top 5 artists, albums or tracks (on a list's graph, the list's top 5), tooltips list lines best first, and lines along #1 or 0 are no longer cut off.

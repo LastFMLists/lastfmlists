@@ -350,14 +350,8 @@ export function displayEntities() {
     const xValue = parseInt(document.getElementById("x-value").value) || getDefaultXValue(sortingBasis);
     const comparisonButtonActive = isComparisonEnabled();
 
-    const baseTracks = filterTracks(state.activeFilters, state.allTracks);
     const leftState = state.comparisonFilterStates.left || {};
     const rightState = state.comparisonFilterStates.right || {};
-    const leftFilters = convertStateToFilterArray(leftState);
-    const rightFilters = convertStateToFilterArray(rightState);
-
-    const leftTracksBase = comparisonButtonActive ? filterTracks(leftFilters, state.allTracks) : baseTracks;
-    const rightTracksBase = comparisonButtonActive ? filterTracks(rightFilters, state.allTracks) : baseTracks;
 
     const equationsLeft = comparisonButtonActive
         ? ((leftState.equations || "").trim())
@@ -365,6 +359,18 @@ export function displayEntities() {
     const equationsRight = comparisonButtonActive
         ? ((document.getElementById("equations-right")?.value || rightState.equations || "").trim())
         : "";
+
+    // A list with equation steps starts from the whole history: the steps
+    // are its filters, and the other menus are paused for it (the panel and
+    // the filter chips say so). Without steps, the menus filter as usual.
+    const sideBase = (equations, sideState) => {
+        if (equations) return state.allTracks;
+        return comparisonButtonActive
+            ? filterTracks(convertStateToFilterArray(sideState), state.allTracks)
+            : filterTracks(state.activeFilters, state.allTracks);
+    };
+    const leftTracksBase = sideBase(equationsLeft, leftState);
+    const rightTracksBase = comparisonButtonActive ? sideBase(equationsRight, rightState) : leftTracksBase;
 
     const leftXValue = parseInt(leftState["x-value"], 10) || getDefaultXValue(leftState["sorting-basis"] || sortingBasis);
     const rightXValue = parseInt(rightState["x-value"], 10) || getDefaultXValue(rightState["sorting-basis"] || sortingBasis);
