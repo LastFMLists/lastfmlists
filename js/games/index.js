@@ -1,6 +1,6 @@
 // Wiring shared by the three games.
 
-import { setActiveView } from '../ui/shell.js';
+import { getActiveView, setActiveView } from '../ui/shell.js';
 import {
     ftlFinish,
     ftlForceGuess,
@@ -35,7 +35,7 @@ export function initGames() {
     const tabLists = document.getElementById("tab-lists");
     const tabGames = document.getElementById("tab-games");
     if (tabLists) tabLists.addEventListener("click", () => {
-        if (document.body.classList.contains("view-games")) setActiveView("lists");
+        if (getActiveView() !== "lists") setActiveView("lists");
     });
     if (tabGames) tabGames.addEventListener("click", () => {
         if (!tabGames.disabled && !document.body.classList.contains("view-games")) setActiveView("games");

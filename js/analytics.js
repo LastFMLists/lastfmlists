@@ -130,6 +130,7 @@ const BUTTON_EVENTS = {
     "save-data": ["save-data", "Save Data"],
     "confirm-export-grid": ["export/grid", "Export grid"],
     "tab-games": ["view/games", "Games tab opened"],
+    "tab-explore": ["view/explore", "Explore tab opened"],
     "ftl-start": ["game/fill-the-list", "Fill the List started"]
 };
 

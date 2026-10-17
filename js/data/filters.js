@@ -344,21 +344,15 @@ export function filterTracks(filtersOverride = null, sourceTracks = null) {
             return selectedWeekdays.length === 0 || selectedWeekdays.includes(weekday);
         },
 
-        "time-of-day-start": (item, value) => {
-            const endValue = document.getElementById("time-of-day-end")?.value || "";
-            return isWithinTimeRange(item.Date, value, endValue);
-        },
+        "time-of-day-start": (item, value) => isWithinTimeRange(item.Date, value, pairedValue("time-of-day-end")),
 
-        "time-of-day-end": (item, value) => {
-            const startValue = document.getElementById("time-of-day-start")?.value || "";
-            return isWithinTimeRange(item.Date, startValue, value);
-        },
+        "time-of-day-end": (item, value) => isWithinTimeRange(item.Date, pairedValue("time-of-day-start"), value),
 
         "session-starter-only": (item, value) => {
             if (value !== "use-gap") return true;
             const previousTimestamp = state.previousScrobbleTimestampByOrder[item.order];
             if (previousTimestamp === null || previousTimestamp === undefined) return true;
-            const configuredGap = parseFloat(document.getElementById("day-starter-gap-hours")?.value);
+            const configuredGap = parseFloat(pairedValue("day-starter-gap-hours"));
             const gapHours = isNaN(configuredGap) ? 6 : configuredGap;
             const minGapMs = gapHours * 60 * 60 * 1000;
             return parseInt(item.Date, 10) - previousTimestamp >= minGapMs;
@@ -369,7 +363,7 @@ export function filterTracks(filtersOverride = null, sourceTracks = null) {
 
             const isDayStarter = state.isFirstScrobbleOfDayByOrder[item.order] === true;
             const previousTimestamp = state.previousScrobbleTimestampByOrder[item.order];
-            const configuredGap = parseFloat(document.getElementById("day-starter-gap-hours")?.value);
+            const configuredGap = parseFloat(pairedValue("day-starter-gap-hours"));
             const gapHours = isNaN(configuredGap) ? 6 : configuredGap;
             const minGapMs = gapHours * 60 * 60 * 1000;
             const hasLongGap = previousTimestamp === null || previousTimestamp === undefined
@@ -407,6 +401,11 @@ export function filterTracks(filtersOverride = null, sourceTracks = null) {
     };
 
     const effectiveFilters = Array.isArray(filtersOverride) ? filtersOverride : state.activeFilters;
+    // Filters that need a second setting (the other end of a time range, the
+    // long gap) read it from the same set of filters, not from the panel on
+    // screen, so comparison sides and Explore boxes get their own value.
+    const pairedValues = new Map(effectiveFilters.map(filter => [filter.id, filter.value]));
+    const pairedValue = (id) => pairedValues.get(id) ?? "";
 
     const activePredicates = effectiveFilters
         .filter(filter => filterFunctions[filter.id])

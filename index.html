@@ -121,6 +121,7 @@
         </section>
 
         <nav id="view-tabs" class="view-tabs" aria-label="Switch view">
+            <button type="button" id="tab-explore" class="view-tab" data-view="explore" aria-pressed="false" disabled title="Load your data first to explore"><i class="fas fa-compass" aria-hidden="true"></i><span>Explore</span></button>
             <button type="button" id="tab-lists" class="view-tab is-active" data-view="lists" aria-pressed="true"><i class="fas fa-list" aria-hidden="true"></i><span>Lists</span></button>
             <button type="button" id="tab-games" class="view-tab" data-view="games" aria-pressed="false" disabled title="Load your data first to play"><i class="fas fa-gamepad" aria-hidden="true"></i><span>Games</span></button>
         </nav>
@@ -651,6 +652,15 @@
         <section id="results-section" class="content-block">
             <h2>Top Tracks</h2>
             <div id="results"></div>
+        </section>
+
+        <section id="explore-section" class="content-block" aria-labelledby="explore-title">
+            <div class="explore-head">
+                <h2 id="explore-title">Explore</h2>
+                <p>Ready-made lists from your history. Click a name to see its stats, or open a list to change its filters.</p>
+            </div>
+            <nav class="explore-jump" aria-label="Explore sections"></nav>
+            <div id="explore-body"></div>
         </section>
 
         <section id="entity-section" class="content-block" hidden></section>

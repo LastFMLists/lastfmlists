@@ -128,30 +128,41 @@ if (themeToggleButton) {
     });
 }
 
-// ---- View switching (Lists / Games) ----
+// ---- View switching (Explore / Lists / Games) ----
+const VIEWS = ["explore", "lists", "games"];
+
+export function getActiveView() {
+    if (document.body.classList.contains("view-games")) return "games";
+    if (document.body.classList.contains("view-explore")) return "explore";
+    return "lists";
+}
+
 export function setActiveView(view) {
     const games = view === "games";
     document.body.classList.toggle("view-games", games);
-    const listsTab = document.getElementById("tab-lists");
-    const gamesTab = document.getElementById("tab-games");
-    if (listsTab) {
-        listsTab.classList.toggle("is-active", !games);
-        listsTab.setAttribute("aria-pressed", String(!games));
-    }
-    if (gamesTab) {
-        gamesTab.classList.toggle("is-active", games);
-        gamesTab.setAttribute("aria-pressed", String(games));
-    }
+    document.body.classList.toggle("view-explore", view === "explore");
+    VIEWS.forEach(name => {
+        const tab = document.getElementById(`tab-${name}`);
+        if (!tab) return;
+        tab.classList.toggle("is-active", name === view);
+        tab.setAttribute("aria-pressed", String(name === view));
+    });
     if (games) hlShowHome();
     else hlClearTimer();
+    document.dispatchEvent(new CustomEvent("view:changed", { detail: { view } }));
 }
 
-// The Games tab is only usable once a library has actually loaded.
+// The Explore and Games tabs are only usable once a library has loaded.
 export function enableGamesTab() {
     const gamesTab = document.getElementById("tab-games");
     if (gamesTab) {
         gamesTab.disabled = false;
         gamesTab.title = "Play games with your listening data";
+    }
+    const exploreTab = document.getElementById("tab-explore");
+    if (exploreTab) {
+        exploreTab.disabled = false;
+        exploreTab.title = "Ready-made lists from your history";
     }
 }
 

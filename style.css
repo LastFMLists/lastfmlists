@@ -186,6 +186,7 @@ body:not(.app-loaded) #results-section,
 body:not(.app-loaded) #active-filters,
 body:not(.app-loaded) #view-tabs,
 body:not(.app-loaded) #games-section,
+body:not(.app-loaded) #explore-section,
 body:not(.app-loaded) footer,
 body:not(.app-loaded) #loading-stats {
     display: none !important;
@@ -204,6 +205,23 @@ body.view-games #filters-section,
 body.view-games #filters-section-toggle,
 body.view-games #results-section,
 body.view-games #active-filters {
+    display: none !important;
+}
+
+/* Explore replaces the filters and the list, like Games does */
+#explore-section {
+    display: none;
+}
+
+body.view-explore #explore-section {
+    display: block;
+}
+
+body.view-explore #filters-section,
+body.view-explore #filters-section-toggle,
+body.view-explore #results-section,
+body.view-explore #active-filters,
+body.view-entity #explore-section {
     display: none !important;
 }
 
@@ -2469,11 +2487,11 @@ footer a:hover {
    ========================================================================== */
 
 @media (min-width: 769px) {
-    body.app-loaded:not(.sidebar-collapsed):not(.view-games) main {
+    body.app-loaded:not(.sidebar-collapsed):not(.view-games):not(.view-explore) main {
         padding-left: calc(var(--sidebar-width) + clamp(1rem, 3vw, 2rem));
     }
 
-    body.app-loaded:not(.sidebar-collapsed):not(.view-games) footer {
+    body.app-loaded:not(.sidebar-collapsed):not(.view-games):not(.view-explore) footer {
         padding-left: calc(var(--sidebar-width) + 1rem);
     }
 }
@@ -2733,6 +2751,224 @@ footer a:hover {
 .view-tab#tab-games:not(:disabled):not(.is-active) {
     border-color: var(--primary-accent-color);
     color: var(--primary-accent-color);
+}
+
+/* ==========================================================================
+   Explore
+   ========================================================================== */
+
+.explore-head h2 {
+    margin: 0;
+    font-size: 1.35rem;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+}
+
+.explore-head p {
+    margin: 0.3rem 0 0;
+    color: var(--secondary-text-color);
+}
+
+/* Section shortcuts; they scroll away, since the session panel already
+   sticks to the top and a phone has no room for a second bar */
+.explore-jump {
+    display: flex;
+    gap: 0.4rem;
+    margin: 0.9rem 0 0;
+    padding: 0.55rem 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+
+.explore-jump::-webkit-scrollbar {
+    display: none;
+}
+
+.explore-chip {
+    flex-shrink: 0;
+    padding: 0.3rem 0.8rem;
+    border: 1px solid var(--border-color);
+    border-radius: 999px;
+    background-color: var(--sidebar-color);
+    color: var(--secondary-text-color);
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.explore-chip:hover {
+    color: var(--primary-text-color);
+    border-color: var(--primary-accent-color);
+}
+
+.explore-group {
+    padding-top: 1.2rem;
+    scroll-margin-top: calc(var(--explore-offset, 4rem) + 0.25rem);
+}
+
+.explore-group-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 0.7rem;
+}
+
+.explore-group-head h3 {
+    margin: 0;
+    font-size: 1.15rem;
+    font-weight: 750;
+}
+
+.explore-year {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    color: var(--secondary-text-color);
+    font-size: 0.9rem;
+}
+
+.explore-year select {
+    width: auto;
+    margin: 0;
+}
+
+/* Three columns on a wide screen, two in between, one on a phone */
+.explore-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+    gap: 0.9rem;
+}
+
+.explore-box {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    padding: 0.9rem 1rem 0.75rem;
+    background-color: var(--sidebar-color);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+}
+
+.explore-box-head h4 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 700;
+}
+
+.explore-box-head p {
+    margin: 0.15rem 0 0.6rem;
+    color: var(--secondary-text-color);
+    font-size: 0.82rem;
+    line-height: 1.35;
+}
+
+.explore-box-rows {
+    flex: 1;
+}
+
+.explore-rows {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.explore-row {
+    display: grid;
+    grid-template-columns: 1.4rem 36px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.32rem 0.35rem;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+}
+
+.explore-row:hover,
+.explore-row:focus-visible {
+    background-color: var(--accent-soft);
+}
+
+.explore-rank {
+    color: var(--secondary-text-color);
+    font-size: 0.82rem;
+    font-weight: 700;
+    text-align: right;
+}
+
+.entity-art.explore-art {
+    width: 36px;
+    height: 36px;
+    font-size: 0.8rem;
+}
+
+.explore-name {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    line-height: 1.25;
+}
+
+.explore-name strong,
+.explore-name small {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.explore-name strong {
+    font-size: 0.9rem;
+    font-weight: 650;
+}
+
+.explore-name small {
+    color: var(--secondary-text-color);
+    font-size: 0.78rem;
+}
+
+.explore-metric {
+    max-width: 9.5rem;
+    color: var(--secondary-text-color);
+    font-size: 0.78rem;
+    text-align: right;
+    line-height: 1.25;
+}
+
+.explore-pending,
+.explore-empty {
+    margin: 0.4rem 0;
+    color: var(--secondary-text-color);
+    font-size: 0.88rem;
+}
+
+.explore-box-foot {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-top: 0.6rem;
+    padding-top: 0.55rem;
+    border-top: 1px solid var(--border-color);
+}
+
+.explore-more,
+.explore-open {
+    padding: 0.25rem 0.1rem;
+    border: 0;
+    background: none;
+    color: var(--secondary-text-color);
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.explore-open {
+    margin-left: auto;
+    color: var(--accent-strong);
+}
+
+.explore-more:hover,
+.explore-open:hover {
+    text-decoration: underline;
 }
 
 /* ==========================================================================

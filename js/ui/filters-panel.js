@@ -36,6 +36,7 @@ import {
     updateRaceControlsVisibility
 } from './charts.js';
 import { displayEntities, getSelectedDisplayMode, highlightEntityRow } from './lists.js';
+import { getActiveView, setActiveView } from './shell.js';
 
 function getEquationInsertTargetInput() {
     const activeElement = document.activeElement;
@@ -787,6 +788,8 @@ export function notifyFilterControlsChanged() {
 //   options.listLength: rows to show ("0" for all)
 //   options.highlight: { type, name, artist } of a row to scroll to
 export function openListQuery(query, options = {}) {
+    // Explore boxes and entity-page rankings open their list from other views.
+    if (getActiveView() !== "lists") setActiveView("lists");
     destroyVisualizationState();
     state.raceRenderArmed = false;
 

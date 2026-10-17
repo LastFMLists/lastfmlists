@@ -27,6 +27,8 @@ work. Serve the folder over HTTP instead (`python3 -m http.server`).
 
 Unreleased:
 
+- An Explore tab with ready-made lists in six themes: highlights, a year of your choice, streaks, records and milestones, when you listen, and rediscover. Each box shows the top 5 (or 15), names open their own page, and Open in Lists opens the full list with its settings filled in. Finished loads land on Explore. Three columns on wide screens, one on phones.
+- The time-of-day range and the long-gap setting are read from the filters being applied, not from the panel on screen, so both sides of a comparison keep their own values.
 - Load Details now covers what it was meant to: every artist with over 100 plays, album with over 10 and track with over 5, and at least your top 250 artists, 500 albums and 1,000 tracks. It used to stop at the top 250, 500 and 1,000 every time.
 - Load Details and Load All Details can be saved part-way. Each result is stored as it arrives, so Save Data keeps it, and the next run downloads only what's missing. Items Last.fm doesn't know aren't asked for again, and items that failed are listed and retried on the next run. When everything already has details, the buttons offer to download them again to update the counts. The tab title shows the progress and "Notify me" works here too.
 - A guide at /guide/ that explains every sort and filter with recipes, and a FAQ at /faq/. The question mark next to the GitHub link opens the guide.

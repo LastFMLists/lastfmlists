@@ -226,6 +226,8 @@ async function loadDetailedMetadata(loadAll = false) {
         : "";
     filterTracks();
     displayEntities();
+    // Explore shows boxes that need details once they are there.
+    document.dispatchEvent(new CustomEvent("data:changed"));
 }
 
 const loadDetailedButton = document.getElementById("load-detailed-data");

@@ -67,6 +67,11 @@ function shortDate(date) {
     return date.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
 }
 
+// Pages opened from Explore go back there; the rest go back to the list.
+function backLabel() {
+    return document.body.classList.contains("view-explore") ? "Back to Explore" : "Back to list";
+}
+
 function plays(count) {
     return `${(count || 0).toLocaleString()} ${count === 1 ? "play" : "plays"}`;
 }
@@ -195,7 +200,7 @@ function renderPage(entity, restored = null) {
     const info = overview(entity);
     if (info.first === null) {
         section.innerHTML = `<div class="entity-page">
-            <button type="button" class="entity-back" data-action="back"><i class="fas fa-arrow-left" aria-hidden="true"></i>Back to list</button>
+            <button type="button" class="entity-back" data-action="back"><i class="fas fa-arrow-left" aria-hidden="true"></i>${backLabel()}</button>
             <p class="entity-empty">This ${ENTITY_NOUNS[entity.type].one} is not in the loaded history.</p>
         </div>`;
         page = { entity, links: [], openSections: new Set() };
@@ -318,7 +323,7 @@ function paint() {
         : [];
 
     section.innerHTML = `<div class="entity-page">
-        <button type="button" class="entity-back" data-action="back"><i class="fas fa-arrow-left" aria-hidden="true"></i>Back to list</button>
+        <button type="button" class="entity-back" data-action="back"><i class="fas fa-arrow-left" aria-hidden="true"></i>${backLabel()}</button>
 
         <header class="entity-header">
             <div class="entity-header-art"></div>

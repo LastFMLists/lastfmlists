@@ -16,6 +16,7 @@ import { initGames } from './games/index.js';
 import { state } from './state.js';
 import { ensureRaceDateDefaults, updateRaceControlsVisibility } from './ui/charts.js';
 import './ui/entity-page.js';
+import './ui/explore.js';
 import './ui/export.js';
 import { initFilterControls } from './ui/filter-controls.js';
 import { failLoadNotice, finishLoadNotice, startLoadNotice } from './ui/load-notice.js';
@@ -34,6 +35,8 @@ import {
     datasetHasExtendedMetadata,
     enableGamesTab,
     setAppLoadedState,
+    getActiveView,
+    setActiveView,
     setListControlsLocked,
     showLoadError,
     updateExtendedDataUI
@@ -334,6 +337,8 @@ document.getElementById("username-form").addEventListener("submit", async (event
 
     state.historyLoad = null;
     setListControlsLocked(false);
+    // Explore is where a finished load lands; the list is one tab away.
+    if (getActiveView() === "lists") setActiveView("explore");
     if (history.progress) {
         // Some pages never arrived. The lists work, but say what's missing and
         // how to fill the gap: a saved copy remembers the missing pages.
