@@ -817,6 +817,8 @@ export function openGraphFromLink(params) {
         if (bar < 1) return null;
         return makeSeries({ type, name: rest.slice(0, bar), artist: rest.slice(bar + 1) });
     }).filter(Boolean).slice(0, MAX_SERIES);
+    // A link with no lines starts from the visitor's own top 5 artists.
+    if (!graph.series.length) graph.series = topEntities("artist").slice(0, 5);
     const measure = params.get("g.measure");
     graph.metric = measure && metricOptions().some(option => option.value === measure) ? measure : "scrobbles";
     graph.x = params.get("g.x") || "";
