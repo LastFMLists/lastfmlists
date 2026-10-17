@@ -148,53 +148,45 @@ export async function fetchTopArtists(username) {
     }
   }
 
-async function fetchArtistDetails(artistName) {
-    const url = `https://ws.audioscrobbler.com/2.0/?method=artist.getinfo&artist=${encodeURIComponent(artistName)}&api_key=${API_KEY}&format=json&autocorrect=0`;
-
-    try {
-        const response = await rateLimitedFetch(url);
-        const data = await response.json();
-
-        if (!data.artist || !data.artist.stats) {
-            console.warn("No details found for artist:", artistName);
-            return null;
+// Last.fm's details for one artist, album or track. Returns { found: true, ... }
+// with the details, { found: false } when Last.fm answered but doesn't know
+// the item, and null when the request failed, so it can be tried again later.
+async function fetchDetails(url, pick) {
+    for (let attempt = 0; attempt < 2; attempt++) {
+        let data = null;
+        try {
+            // Last.fm sends "not found" with an error status but a JSON body,
+            // so the body is read whatever the status.
+            const response = await rateLimitedFetch(url);
+            data = await response.json();
+        } catch (error) {
+            data = null;
         }
-
-        // Update progress display if desired:
-        loadingDiv.innerHTML = `<p>Loading data... Artist: ${artistName}</p>`;
-
-        // Extract tags; ensure it's always an array of lowercased strings.
-        let tags = [];
-        if (data.artist.tags && data.artist.tags.tag) {
-            if (Array.isArray(data.artist.tags.tag)) {
-                tags = data.artist.tags.tag.map(t => t.name.toLowerCase());
-            } else if (data.artist.tags.tag.name) {
-                tags = [data.artist.tags.tag.name.toLowerCase()];
-            }
+        if (data) {
+            const details = pick(data);
+            if (details) return { found: true, ...details };
+            // Error 6 is "not found"; other errors (rate limits, outages) pass.
+            if (data.error === undefined || parseInt(data.error, 10) === 6) return { found: false };
         }
-
-        return {
-            name: data.artist.name,
-            listeners: parseInt(data.artist.stats.listeners, 10),
-            playcount: parseInt(data.artist.stats.playcount, 10),
-            tags: tags, // Array of lowercase tag strings
-        };
-    } catch (error) {
-        console.error("Error fetching artist details:", error);
-        return null;
+        await new Promise(resolve => setTimeout(resolve, 500));
     }
+    return null;
 }
 
-export async function fetchAllArtistDetails(artists, limit) {
-    const limitedArtists = artists.slice(0, limit);
-    const results = await mapWithConcurrency(
-        limitedArtists,
-        (artist) => fetchArtistDetails(artist.name),
-        4
-    );
-    return results.filter(result => result !== null);
+function tagNames(tags) {
+    const list = tags?.tag;
+    if (Array.isArray(list)) return list.map(t => t.name.toLowerCase());
+    return list?.name ? [list.name.toLowerCase()] : [];
 }
 
+export function fetchArtistDetails(artistName) {
+    const url = `https://ws.audioscrobbler.com/2.0/?method=artist.getinfo&artist=${encodeURIComponent(artistName)}&api_key=${API_KEY}&format=json&autocorrect=0`;
+    return fetchDetails(url, data => data.artist?.stats ? {
+        listeners: parseInt(data.artist.stats.listeners, 10) || 0,
+        playcount: parseInt(data.artist.stats.playcount, 10) || 0,
+        tags: tagNames(data.artist.tags)
+    } : null);
+}
   
 // Fetch the user's top albums from Last.fm
 export async function fetchTopAlbums(username) {
@@ -253,44 +245,13 @@ export async function fetchTopAlbums(username) {
 }
 
   
-// Fetch detailed album info for each album
-async function fetchAlbumDetails(album) {
-    const url = `https://ws.audioscrobbler.com/2.0/?method=album.getInfo&api_key=${API_KEY}&artist=${encodeURIComponent(album.artist)}&album=${encodeURIComponent(album.name)}&format=json&autocorrect=0`;
-
-    try {
-        const response = await rateLimitedFetch(url);
-        const data = await response.json();
-
-        if (data.album) {
-
-            loadingDiv.innerHTML = `<p>Loading data... Album: ${album.name}</p>`;
-
-            return {
-                name: album.name,
-                artist: album.artist,
-                listeners: parseInt(data.album.listeners, 10) || 0,
-                playcount: parseInt(data.album.playcount, 10) || 0,
-            };
-        } else {
-            console.warn("No details found for album:", album.name);
-            return null;
-        }
-    } catch (error) {
-        console.error(`Error fetching details for album ${album.name} by ${album.artist}:`, error);
-        return null;
-    }
+export function fetchAlbumDetails(albumName, artistName) {
+    const url = `https://ws.audioscrobbler.com/2.0/?method=album.getInfo&api_key=${API_KEY}&artist=${encodeURIComponent(artistName)}&album=${encodeURIComponent(albumName)}&format=json&autocorrect=0`;
+    return fetchDetails(url, data => data.album ? {
+        listeners: parseInt(data.album.listeners, 10) || 0,
+        playcount: parseInt(data.album.playcount, 10) || 0
+    } : null);
 }
-
-export async function fetchAllAlbumDetails(albums, limit) {
-    const limitedAlbums = albums.slice(0, limit);
-    const results = await mapWithConcurrency(
-        limitedAlbums,
-        (album) => fetchAlbumDetails(album),
-        4
-    );
-    return results.filter(result => result !== null);
-}
-
   
 // Fetch the user's top tracks from Last.fm
 export async function fetchTopTracks(username) {
@@ -346,69 +307,12 @@ export async function fetchTopTracks(username) {
 }
 
   
-// Fetch detailed track info for each track
-async function fetchTrackDetails(track) {
-	const url = `https://ws.audioscrobbler.com/2.0/?method=track.getInfo&api_key=${API_KEY}&artist=${encodeURIComponent(track.artist)}&track=${encodeURIComponent(track.name)}&format=json&autocorrect=0`;
-
-	let attempts = 0;
-	while (attempts < 2) {
-		try {
-			const response = await rateLimitedFetch(url);
-			const data = await response.json();
-
-			// Rate limit detection (Last.fm sometimes returns errors when limited)
-			if (data.error && data.error === 29) {
-				console.warn(`Rate limit hit for track: ${track.name}. Retrying in 500ms...`);
-				await new Promise((resolve) => setTimeout(resolve, 500)); // Properly wait before retrying
-				attempts++;
-				continue; // Retry after delay
-			}
-
-			// Check if the response has valid track data.
-			if (data.track && data.track.name) {
-				if (typeof loadingDiv !== "undefined" && loadingDiv) {
-					loadingDiv.innerHTML = `<p>Loading data... Track: ${track.name}</p>`;
-				}
-				return {
-					name: data.track.name,
-					artist: data.track.artist?.name || track.artist,
-					album: data.track.album?.title || "Unknown",
-					duration: parseInt(data.track.duration, 10) || 0,
-					listeners: parseInt(data.track.listeners, 10) || 0,
-					playcount: parseInt(data.track.playcount, 10) || 0,
-				};
-			} else {
-				console.warn("No details found for track:", track.name);
-				return {
-					name: "Unknown",
-					artist: "Unknown",
-					album: "Unknown",
-					duration: 0,
-					listeners: 0,
-					playcount: 0,
-				};
-			}
-		} catch (error) {
-			console.error(`Error fetching details for track ${track.name} by ${track.artist}:`, error);
-			if (attempts === 0) {
-				console.warn(`Retrying fetch for ${track.name} in 500ms...`);
-				await new Promise((resolve) => setTimeout(resolve, 500)); // Proper wait
-			} else {
-				console.warn(`Skipping track ${track.name} after multiple failures.`);
-				return null;
-			}
-		}
-		attempts++;
-	}
-	return null; // Fallback return in case of failure
-}
-
-export async function fetchAllTrackDetails(tracks, limit) {
-    const limitedTracks = tracks.slice(0, limit);
-    const results = await mapWithConcurrency(
-        limitedTracks,
-        (track) => fetchTrackDetails(track),
-        3
-    );
-    return results.filter(result => result !== null);
+export function fetchTrackDetails(trackName, artistName) {
+    const url = `https://ws.audioscrobbler.com/2.0/?method=track.getInfo&api_key=${API_KEY}&artist=${encodeURIComponent(artistName)}&track=${encodeURIComponent(trackName)}&format=json&autocorrect=0`;
+    return fetchDetails(url, data => data.track?.name ? {
+        album: data.track.album?.title || "Unknown",
+        duration: parseInt(data.track.duration, 10) || 0,
+        listeners: parseInt(data.track.listeners, 10) || 0,
+        playcount: parseInt(data.track.playcount, 10) || 0
+    } : null);
 }

@@ -2,9 +2,9 @@
 // including the live preview shown while pages arrive.
 
 import {
-    fetchAllAlbumDetails,
-    fetchAllArtistDetails,
-    fetchAllTrackDetails,
+    fetchAlbumDetails,
+    fetchArtistDetails,
+    fetchTrackDetails,
     getLastfmErrorMessage,
     mapRecentTrack
 } from '../api/lastfm.js';
@@ -23,10 +23,9 @@ import { escapeHTML, getListLengthLimit, loadingDiv, mapWithConcurrency } from '
 import { state } from '../state.js';
 import { getLocalDayKeyFromTimestamp } from '../time.js';
 import { displayEntities } from '../ui/lists.js';
-import { setLoadProgress } from '../ui/load-notice.js';
+import { finishLoadNotice, setLoadProgress, startLoadNotice } from '../ui/load-notice.js';
 import { updateExtendedDataUI } from '../ui/shell.js';
 import { filterTracks } from './filters.js';
-import { mergeData } from './storage.js';
 
 export function buildHistoryContextMaps() {
     state.previousScrobbleTimestampByOrder = {};
@@ -51,100 +50,181 @@ export function buildHistoryContextMaps() {
     }
 }
 
+// Whether an entry already has its Last.fm details. Saves made before the
+// detailsLoaded marker existed are recognised by the listener count.
+function hasDetails(entry) {
+    return Boolean(entry) && (entry.detailsLoaded === true || typeof entry.listeners === "number");
+}
+
+// Load Details covers everything played often (over 100 plays for an artist,
+// 10 for an album, 5 for a track) and never less than the top 250 artists,
+// 500 albums and 1,000 tracks. Load All Details covers every top-list entry.
+function selectDetailCandidates(all) {
+    const pick = (list, minPlays, atLeast) => {
+        if (all) return list.slice();
+        const playedOften = list.filter(entry => (parseInt(entry.user_scrobbles, 10) || 0) > minPlays);
+        return playedOften.length < atLeast ? list.slice(0, atLeast) : playedOften;
+    };
+    return {
+        artists: pick(state.topArtists, 100, state.artistLimit),
+        albums: pick(state.topAlbums, 10, state.albumLimit),
+        tracks: pick(state.topTracks, 5, state.trackLimit)
+    };
+}
+
+// One job per artist, album and track. Each result is written into the
+// dataset as soon as it arrives, so Save Data keeps what has loaded and the
+// next run only fetches the rest.
+function buildDetailJobs(candidates) {
+    const kinds = [
+        {
+            label: "artists",
+            list: candidates.artists,
+            data: () => state.artistsData,
+            key: entry => entry.name.trim().toLowerCase(),
+            mapKey: entry => entry.name.toLowerCase(),
+            map: () => state.artistDataMap,
+            base: entry => ({ name: entry.name }),
+            fetch: entry => fetchArtistDetails(entry.name)
+        },
+        {
+            label: "albums",
+            list: candidates.albums,
+            data: () => state.albumsData,
+            key: entry => `${entry.name.trim().toLowerCase()}_${entry.artist.trim().toLowerCase()}`,
+            mapKey: entry => `${entry.name.toLowerCase()}||${entry.artist.toLowerCase()}`,
+            map: () => state.albumDataMap,
+            base: entry => ({ name: entry.name, artist: entry.artist }),
+            fetch: entry => fetchAlbumDetails(entry.name, entry.artist)
+        },
+        {
+            label: "tracks",
+            list: candidates.tracks,
+            data: () => state.tracksData,
+            key: entry => `${entry.name.trim().toLowerCase()}_${entry.artist.trim().toLowerCase()}`,
+            mapKey: entry => `${entry.name.toLowerCase()}||${entry.artist.toLowerCase()}`,
+            map: () => state.trackDataMap,
+            base: entry => ({ name: entry.name, artist: entry.artist }),
+            fetch: entry => fetchTrackDetails(entry.name, entry.artist)
+        }
+    ];
+
+    const jobs = [];
+    for (const kind of kinds) {
+        const index = new Map(kind.data().map(entry => [kind.key(entry), entry]));
+        for (const candidate of kind.list) {
+            const key = kind.key(candidate);
+            jobs.push({ kind, candidate, key, index, done: hasDetails(index.get(key)) });
+        }
+    }
+    return jobs;
+}
+
+function storeDetails(job, result) {
+    const { kind, candidate, key, index } = job;
+    let entry = index.get(key);
+    if (!entry) {
+        entry = kind.base(candidate);
+        kind.data().push(entry);
+        index.set(key, entry);
+        kind.map()[kind.mapKey(candidate)] = entry;
+    }
+    if (result.found) {
+        const { found, ...details } = result;
+        Object.assign(entry, details);
+    }
+    // Marked even when Last.fm doesn't know the item, so it isn't asked again.
+    entry.detailsLoaded = true;
+}
+
+let detailsLoading = false;
+
 async function loadDetailedMetadata(loadAll = false) {
-    const selectCandidates = (all) => {
-        const selectedArtists = all
-            ? state.topArtists.slice()
-            : (() => {
-                const preferred = state.topArtists.filter(artist => artist.playcount > 100);
-                return preferred.length < state.artistLimit ? state.topArtists.slice(0, state.artistLimit) : preferred;
-            })();
+    if (detailsLoading) return;
 
-        const selectedAlbums = all
-            ? state.topAlbums.slice()
-            : (() => {
-                const preferred = state.topAlbums.filter(album => album.playcount > 10);
-                return preferred.length < state.albumLimit ? state.topAlbums.slice(0, state.albumLimit) : preferred;
-            })();
-
-        const selectedTracks = all
-            ? state.topTracks.slice()
-            : (() => {
-                const preferred = state.topTracks.filter(track => track.playcount > 5);
-                return preferred.length < state.trackLimit ? state.topTracks.slice(0, state.trackLimit) : preferred;
-            })();
-
-        return { selectedArtists, selectedAlbums, selectedTracks };
+    const allJobs = buildDetailJobs(selectDetailCandidates(loadAll));
+    let jobs = allJobs.filter(job => !job.done);
+    // "12 artists, 3 albums and 1 track", leaving out kinds with none.
+    const countByKind = (list) => {
+        const parts = [["artist", "artists"], ["album", "albums"], ["track", "tracks"]]
+            .map(([one, many]) => {
+                const count = list.filter(job => job.kind.label === many).length;
+                return count ? `${count.toLocaleString()} ${count === 1 ? one : many}` : null;
+            })
+            .filter(Boolean);
+        return parts.length > 1 ? `${parts.slice(0, -1).join(", ")} and ${parts.at(-1)}` : parts.join("");
     };
 
-    const { selectedArtists, selectedAlbums, selectedTracks } = selectCandidates(loadAll);
-
-    const counts = `${selectedArtists.length} artists, ${selectedAlbums.length} albums and ${selectedTracks.length} tracks`;
-    const confirmMsg = loadAll
-        ? `Load All Details downloads metadata for every artist, album and track you have scrobbled: ${counts}. This can take hours.\n\nContinue?`
-        : `Load Details downloads metadata for ${counts}. This is enough for most statistics. Use "Load All Details" for metadata on everything you have scrobbled.\n\nContinue?`;
+    let confirmMsg;
+    if (jobs.length === 0) {
+        // Everything already has details: offer to download them again, since
+        // listener and play counts on Last.fm keep changing.
+        confirmMsg = `Details are already downloaded for all ${countByKind(allJobs)}. Download them again to update the listener and play counts?`;
+        jobs = allJobs;
+    } else {
+        const skipped = allJobs.length - jobs.length;
+        const skippedNote = skipped
+            ? ` ${skipped.toLocaleString()} more already have details from an earlier run and are skipped.`
+            : "";
+        confirmMsg = loadAll
+            ? `Load All Details downloads metadata for every artist, album and track you have scrobbled: ${countByKind(jobs)}.${skippedNote} This can take hours. Click Save Data if you have to stop, and the next run continues from there.\n\nContinue?`
+            : `Load Details downloads metadata for ${countByKind(jobs)}: everything you play often, and at least your top 250 artists, 500 albums and 1,000 tracks.${skippedNote} This is enough for most statistics. Use "Load All Details" for metadata on everything you have scrobbled.\n\nContinue?`;
+    }
     if (!confirm(confirmMsg)) return;
 
-    const username = document.getElementById("username").value.trim();
-    if (!username) return;
+    const buttons = ["load-detailed-data", "load-all-details"].map(id => document.getElementById(id)).filter(Boolean);
+    detailsLoading = true;
+    buttons.forEach(button => { button.disabled = true; });
+    startLoadNotice();
 
-    const activeArtistLimit = loadAll ? Infinity : state.artistLimit;
-    const activeAlbumLimit = loadAll ? Infinity : state.albumLimit;
-    const activeTrackLimit = loadAll ? Infinity : state.trackLimit;
+    let finished = 0;
+    let failed = 0;
+    // At most one repaint per 250 ms; an update inside that window is painted
+    // when it ends, so a pause in the requests never leaves a stale count.
+    let paintTimer = null;
+    const paint = () => {
+        paintTimer = null;
+        loadingDiv.innerHTML = `<p>Loading details... ${finished.toLocaleString()} of ${jobs.length.toLocaleString()}</p>`;
+        setLoadProgress(finished / jobs.length);
+    };
+    const paintProgress = (force = false) => {
+        if (force) {
+            clearTimeout(paintTimer);
+            paint();
+        } else if (paintTimer === null) {
+            paintTimer = setTimeout(paint, 250);
+        }
+    };
 
-    const fetchedArtists = await fetchAllArtistDetails(selectedArtists, activeArtistLimit);
-    console.log("Fetched artist details:", fetchedArtists);
+    try {
+        paintProgress(true);
+        await mapWithConcurrency(jobs, async (job) => {
+            const result = await job.kind.fetch(job.candidate);
+            if (result) storeDetails(job, result);
+            else failed += 1;
+            finished += 1;
+            paintProgress();
+        }, 4);
+    } finally {
+        clearTimeout(paintTimer);
+        detailsLoading = false;
+        buttons.forEach(button => { button.disabled = false; });
+    }
 
-    const fetchedAlbums = await fetchAllAlbumDetails(selectedAlbums, activeAlbumLimit);
-    console.log("Fetched album details:", fetchedAlbums);
+    debugLogDataset("Merged artistsData:", state.artistsData);
+    debugLogDataset("Merged albumsData:", state.albumsData);
+    debugLogDataset("Merged tracksData:", state.tracksData);
 
-    const fetchedTracks = await fetchAllTrackDetails(selectedTracks, activeTrackLimit);
-    console.log("Fetched track details:", fetchedTracks);
+    // Detailed metadata is now available: unlock the gated filters/sorts.
+    state.extendedDataLoaded = true;
+    updateExtendedDataUI();
+    finishLoadNotice("Your details are loaded.");
 
-	// Process fetched data and format it before merging
-	const newArtistsData = fetchedArtists.map(artist => ({
-        ...artist,
-        name: artist.name,
-        listeners: parseInt(artist.listeners, 10) || 0,
-        playcount: parseInt(artist.playcount, 10) || 0,
-        tags: artist.tags || []
-    }));
-    
-    const newAlbumsData = fetchedAlbums.map(album => ({
-        ...album,
-        name: album.name,
-        artist: album.artist,
-        listeners: parseInt(album.listeners, 10) || 0,
-        playcount: parseInt(album.playcount, 10) || 0,
-    }));
-    
-    const newTracksData = fetchedTracks.map(track => ({
-        ...track,
-        name: track.name,
-        artist: track.artist?.name || track.artist,
-        duration: parseInt(track.duration, 10) || 0,
-        listeners: parseInt(track.listeners, 10) || 0,
-        playcount: parseInt(track.playcount, 10) || 0
-    }));
-
-	// Merge the new data into existing global arrays while keeping firstscrobble, user_scrobbles, and rank
-    state.artistsData = mergeData(state.artistsData, newArtistsData, item => item.name.trim().toLowerCase());
-    state.albumsData = mergeData(state.albumsData, newAlbumsData, 
-        item => `${item.name.trim().toLowerCase()}_${item.artist.trim().toLowerCase()}`);
-    state.tracksData = mergeData(state.tracksData, newTracksData, 
-        item => `${item.name.trim().toLowerCase()}_${item.artist.trim().toLowerCase()}`);
-
-	debugLogDataset("Merged artistsData:", state.artistsData);
-	debugLogDataset("Merged albumsData:", state.albumsData);
-	debugLogDataset("Merged tracksData:", state.tracksData);
-
-	// Detailed metadata is now available: unlock the gated filters/sorts.
-	state.extendedDataLoaded = true;
-	updateExtendedDataUI();
-
-	// Update display, filters, etc.
-	loadingDiv.innerHTML = ""; // Clear loading message
-	filterTracks();
+    // Items that failed have no marker, so the next run picks them up.
+    loadingDiv.innerHTML = failed
+        ? `<p class="load-incomplete">Details for ${failed.toLocaleString()} ${failed === 1 ? "item" : "items"} couldn't be downloaded. Click Save Data, then load details again later to fetch just those.</p>`
+        : "";
+    filterTracks();
     displayEntities();
 }
 

@@ -27,6 +27,8 @@ work. Serve the folder over HTTP instead (`python3 -m http.server`).
 
 Unreleased:
 
+- Load Details now covers what it was meant to: every artist with over 100 plays, album with over 10 and track with over 5, and at least your top 250 artists, 500 albums and 1,000 tracks. It used to stop at the top 250, 500 and 1,000 every time.
+- Load Details and Load All Details can be saved part-way. Each result is stored as it arrives, so Save Data keeps it, and the next run downloads only what's missing. Items Last.fm doesn't know aren't asked for again, and items that failed are listed and retried on the next run. When everything already has details, the buttons offer to download them again to update the counts. The tab title shows the progress and "Notify me" works here too.
 - A guide at /guide/ that explains every sort and filter with recipes, and a FAQ at /faq/. The question mark next to the GitHub link opens the guide.
 - Clearer sort names: Most plays in a row (was Max consecutive scrobbles), Most days, weeks and months in a row (was Max listening streak), Number of days, weeks and months played (was Scrobbled on different days, weeks and months), Oldest and Newest average play date, Most scrobbles within 7 days (rolling) (was 168 hours), and Oldest first and Newest first for scrobble lists.
 - Save Data works while your history is still loading. It saves the pages that have finished downloading, and loading the same username again continues from there instead of starting over.
