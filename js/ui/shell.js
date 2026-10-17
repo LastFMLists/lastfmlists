@@ -149,6 +149,7 @@ export function getActiveView() {
 }
 
 export function setActiveView(view) {
+    const previous = getActiveView();
     const games = view === "games";
     document.body.classList.toggle("view-games", games);
     document.body.classList.toggle("view-explore", view === "explore");
@@ -160,6 +161,11 @@ export function setActiveView(view) {
     });
     if (games) hlShowHome();
     else hlClearTimer();
+    // Coming to Lists opens the filters; on phones the drawer would cover
+    // the list, so it stays as it was there.
+    if (view === "lists" && previous !== "lists" && !window.matchMedia("(max-width: 768px)").matches) {
+        openFilterSidebar();
+    }
     if (document.body.classList.contains("app-loaded")) {
         try {
             localStorage.setItem(VIEW_STORAGE_KEY, view);
@@ -188,6 +194,15 @@ function syncSidebarLayoutState() {
     const sidebar = document.getElementById("filters-section");
     if (!sidebar) return;
     document.body.classList.toggle("sidebar-collapsed", sidebar.classList.contains("closed"));
+}
+
+function openFilterSidebar() {
+    const sidebar = document.getElementById("filters-section");
+    const toggle = document.getElementById("filters-section-toggle");
+    if (!sidebar || !sidebar.classList.contains("closed")) return;
+    sidebar.classList.remove("closed");
+    if (toggle) toggle.innerHTML = "&#10094;";
+    syncSidebarLayoutState();
 }
 
 document.getElementById("filters-section-toggle").addEventListener("click", function () {

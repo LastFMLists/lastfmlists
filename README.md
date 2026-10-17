@@ -27,6 +27,8 @@ work. Serve the folder over HTTP instead (`python3 -m http.server`).
 
 Unreleased:
 
+- Explore: Summer songs (June to August) and Christmas season (25 November to 26 December) in Highlights; Records shows the biggest day, week and month instead of two near-identical day lists; Milestones is its own section with a play-count picker that starts at a count ten of your tracks have reached; One-hit wonders lists the tracks with their artists. The year and milestone pickers match the chips, and the top of the tab is shorter, so the first row of boxes fits on a laptop screen.
+- Opening the Lists tab opens the filters on wider screens, and the Games tab no longer stands out from Explore and Lists.
 - Explore fits small libraries: empty boxes are left out, sections with nothing left disappear with their chip, and boxes that would repeat another one are skipped (Last 30 days needs more than 60 days of history, Your year more than one year, Where it started more than 2,000 scrobbles).
 - The loading preview no longer freezes on an old page count when downloads pause, and the greyed-out tabs during a load say they are available once loading finishes.
 - List settings can be shared as links. The address bar holds the settings of the list on screen (?type=artist&sort=consecutive-days&year=2024), including both sides of a comparison and the equations, but never the username. Opening a link applies its settings once the visitor has loaded their own history, and a refresh brings the same list back after loading. Page views sent to GoatCounter count the path only.

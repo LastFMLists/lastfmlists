@@ -7,8 +7,9 @@
 
 import { trackEvent } from '../analytics.js';
 import { createArtworkElement } from '../data/artwork.js';
-import { defaultMilestone, sortMetricText } from '../data/entity-stats.js';
+import { libraryCounts, sortMetricText } from '../data/entity-stats.js';
 import { applyTracksPerEntityFilter, buildEntitiesFromTracks, filterTracks } from '../data/filters.js';
+import { applyEquationPipeline } from '../data/equations.js';
 import { getDefaultXValue } from '../data/metrics.js';
 import { escapeHTML } from '../dom.js';
 import { state } from '../state.js';
@@ -27,7 +28,21 @@ function box(id, title, note, entityType, sortingBasis = "scrobbles", { x = "", 
     return { id, title, note, needsDetails, when, query: { entityType, sortingBasis, xValue: x === "" ? "" : String(x), filters } };
 }
 
-// The sections, in page order. `year` is the year picked in Your year.
+const CHRISTMAS_SEASON = "month * 100 + day-of-month >= 1125;month * 100 + day-of-month <= 1226";
+const MILESTONES = [10, 25, 50, 100, 250, 500, 1000];
+
+// The milestone that ten tracks have reached, from 100 plays down to 10, or
+// null when no track has 10 plays yet and the section has nothing to show.
+function startingMilestone() {
+    const counts = [...libraryCounts("track").values()];
+    for (const plays of [100, 50, 25, 10]) {
+        if (counts.filter(count => count >= plays).length >= 10) return plays;
+    }
+    return counts.some(count => count >= 10) ? 10 : null;
+}
+
+// The sections, in page order. `year` and `milestone` are the values picked
+// in the Your year and Milestones headers.
 function sections(year, milestone) {
     const inYear = { year: String(year) };
     return [
@@ -40,7 +55,11 @@ function sections(year, milestone) {
                 box("top-tracks", "Top tracks", "Your most played tracks of all time.", "track"),
                 box("recent-artists", "Last 30 days: artists", "Who you've been listening to lately.", "artist", "scrobbles", { filters: { "last-n-days": "30" }, when: lib => lib.days > 60 }),
                 box("recent-albums", "Last 30 days: albums", "The albums on rotation right now.", "album", "scrobbles", { filters: { "last-n-days": "30" }, when: lib => lib.days > 60 }),
-                box("recent-tracks", "Last 30 days: tracks", "Your songs of the month.", "track", "scrobbles", { filters: { "last-n-days": "30" }, when: lib => lib.days > 60 })
+                box("recent-tracks", "Last 30 days: tracks", "Your songs of the month.", "track", "scrobbles", { filters: { "last-n-days": "30" }, when: lib => lib.days > 60 }),
+                box("summer", "Summer songs", "Tracks played in June, July and August.", "track", "scrobbles", { filters: { month: "6,7,8" } }),
+                // 25 November to 26 December crosses a month, which the menus
+                // can't say, so it is two equation steps on month and day.
+                box("christmas", "Christmas season", "Tracks played from 25 November to 26 December.", "track", "scrobbles", { filters: { equations: CHRISTMAS_SEASON } })
             ]
         },
         {
@@ -48,7 +67,7 @@ function sections(year, milestone) {
             // With one year of history this repeats Highlights.
             when: lib => lib.years > 1,
             title: "Your year",
-            yearPicker: true,
+            picker: "year",
             boxes: [
                 box("year-artists", `Top artists of ${year}`, `Your most played artists in ${year}.`, "artist", "scrobbles", { filters: inYear }),
                 box("year-albums", `Top albums of ${year}`, `Your most played albums in ${year}.`, "album", "scrobbles", { filters: inYear }),
@@ -72,11 +91,19 @@ function sections(year, milestone) {
         },
         {
             id: "records",
-            title: "Records and milestones",
+            title: "Records",
             boxes: [
                 box("record-track-day", "Biggest days", "The most plays a track got in a single day.", "track", "max-single-day"),
-                box("record-artist-24h", "Biggest 24 hours", "The most plays an artist got within 24 hours.", "artist", "max-rolling-24h"),
                 box("record-album-week", "Biggest weeks", "The most plays an album got in a single week.", "album", "max-single-week"),
+                box("record-artist-month", "Biggest months", "The most plays an artist got in a single month.", "artist", "max-single-month")
+            ]
+        },
+        {
+            id: "milestones",
+            when: lib => lib.milestone !== null,
+            title: "Milestones",
+            picker: "milestone",
+            boxes: [
                 box("milestone-first-artists", `First to ${milestone} plays`, `The first artists to reach ${milestone} plays.`, "artist", "first-n-scrobbles", { x: milestone }),
                 box("milestone-fastest-tracks", `Fastest to ${milestone} plays`, `Tracks that reached ${milestone} plays the quickest.`, "track", "fastest-n-scrobbles", { x: milestone }),
                 box("milestone-fastest-albums", `Albums fastest to ${milestone}`, `Albums that reached ${milestone} plays the quickest.`, "album", "fastest-n-scrobbles", { x: milestone })
@@ -101,7 +128,7 @@ function sections(year, milestone) {
                 box("old-forgotten", "Forgotten favourites", "Artists you haven't played in over a year.", "artist", "scrobbles", { filters: { "artist-days-since-last-min": "365" } }),
                 box("old-favourites", "Oldest favourites", "Artists whose plays are furthest in the past on average (25+ plays).", "artist", "oldest-average-listening-time", { x: 25 }),
                 box("new-obsessions", "New obsessions", "Tracks whose plays are the most recent on average (10+ plays).", "track", "newest-average-listening-time", { x: 10 }),
-                box("one-song-artists", "One-song artists", "Artists you've only ever played one track by.", "artist", "scrobbles", { filters: { "artist-track-count-max": "1" } }),
+                box("one-hit-wonders", "One-hit wonders", "The only track you've ever played by its artist.", "track", "scrobbles", { filters: { "artist-track-count-max": "1" } }),
                 box("first-thousand", "Where it started", "Your top tracks from your first 1,000 scrobbles.", "track", "scrobbles", { filters: { "scrobble-order-from": "1", "scrobble-order-to": "1000" }, when: lib => lib.scrobbles > 2000 }),
                 box("hidden-gems", "Hidden gems", "Tracks you've played 20+ times that have under 5,000 listeners on Last.fm.", "track", "scrobbles", { filters: { "track-listeners-max": "5000", "track-scrobble-count-min": "20" }, needsDetails: true })
             ]
@@ -113,10 +140,11 @@ function sections(year, milestone) {
 
 function computeEntities(query) {
     const filterList = Object.entries(query.filters)
-        .filter(([id]) => id !== "max-per-artist")
+        .filter(([id]) => id !== "max-per-artist" && id !== "equations")
         .map(([id, value]) => ({ id, value: String(value) }));
-    const tracks = filterList.length ? filterTracks(filterList, state.allTracks) : state.allTracks;
+    let tracks = filterList.length ? filterTracks(filterList, state.allTracks) : state.allTracks;
     const x = query.xValue === "" ? getDefaultXValue(query.sortingBasis) : Number(query.xValue);
+    if (query.filters.equations) tracks = applyEquationPipeline(tracks, query.filters.equations, { xValue: x }).tracks;
     let entities = buildEntitiesFromTracks(tracks, query.entityType, query.sortingBasis, x);
     if (query.entityType === "track" && query.filters["max-per-artist"]) {
         entities = applyTracksPerEntityFilter(entities, Number(query.filters["max-per-artist"]));
@@ -159,9 +187,10 @@ const body = document.getElementById("explore-body");
 const jump = sectionElement ? sectionElement.querySelector(".explore-jump") : null;
 
 let year = null;
+let milestone;              // undefined until worked out for a history
 let stamp = null;
 let generation = 0;
-const results = new Map();     // box id + year -> rows
+const results = new Map();     // box id (+ year or milestone) -> rows
 const expanded = new Set();    // box ids showing ROWS_EXPANDED
 let boxesById = new Map();
 
@@ -181,7 +210,21 @@ function libraryYears() {
 }
 
 function resultKey(boxDef) {
-    return boxDef.id.startsWith("year-") ? `${boxDef.id}|${year}` : boxDef.id;
+    if (boxDef.id.startsWith("year-")) return `${boxDef.id}|${year}`;
+    if (boxDef.id.startsWith("milestone-")) return `${boxDef.id}|${milestone}`;
+    return boxDef.id;
+}
+
+function pickerHTML(group, years) {
+    if (group.picker === "year" && years.length > 1) {
+        return `<label class="explore-picker"><span>Year</span><select data-role="year">${years.map(y =>
+            `<option value="${y}"${y === year ? " selected" : ""}>${y}</option>`).join("")}</select></label>`;
+    }
+    if (group.picker === "milestone") {
+        return `<label class="explore-picker"><span>Milestone</span><select data-role="milestone">${MILESTONES.map(n =>
+            `<option value="${n}"${n === milestone ? " selected" : ""}>${n.toLocaleString()} plays</option>`).join("")}</select></label>`;
+    }
+    return "";
 }
 
 // ---- Rendering ----
@@ -190,7 +233,12 @@ function rowsHTML(boxDef) {
     const rows = results.get(resultKey(boxDef));
     // Placeholder rows as tall as the real ones, so the page doesn't shift
     // (and section jumps don't miss) while the boxes above fill in.
-    if (!rows) return `<ol class="explore-rows explore-pending" aria-label="Working it out">${'<li class="explore-row is-placeholder" aria-hidden="true"><span></span><span class="entity-art explore-art"></span><span class="explore-name"><strong>&nbsp;</strong><small>&nbsp;</small></span><span></span></li>'.repeat(ROWS_SHOWN)}</ol>`;
+    // Artist rows have no second line, so neither do their placeholders.
+    if (!rows) {
+        const byline = boxDef.query.entityType === "artist" ? "" : "<small>&nbsp;</small>";
+        const row = `<li class="explore-row is-placeholder" aria-hidden="true"><span></span><span class="entity-art explore-art"></span><span class="explore-name"><strong>&nbsp;</strong>${byline}</span><span></span></li>`;
+        return `<ol class="explore-rows explore-pending" aria-label="Working it out">${row.repeat(ROWS_SHOWN)}</ol>`;
+    }
     if (!rows.length) return `<p class="explore-empty">Nothing here yet.</p>`;
     const shown = rows.slice(0, expanded.has(boxDef.id) ? ROWS_EXPANDED : ROWS_SHOWN);
     return `<ol class="explore-rows">${shown.map((row, index) => {
@@ -230,17 +278,19 @@ function hideEmptyGroup(group) {
     const boxes = [...group.querySelectorAll(".explore-box")];
     const empty = boxes.every(b => b.hidden);
     const id = group.id.replace(/^explore-/, "");
-    if (id === "year") {
-        // Keep the picker, so another year can still be chosen.
-        let note = group.querySelector(".explore-year-empty");
+    if (group.dataset.picker) {
+        // Keep the picker, so another value can still be chosen.
+        let note = group.querySelector(".explore-picker-empty");
         if (empty && !note) {
             note = document.createElement("p");
-            note.className = "explore-empty explore-year-empty";
+            note.className = "explore-empty explore-picker-empty";
             group.querySelector(".explore-grid").before(note);
         }
         if (note) {
             note.hidden = !empty;
-            note.textContent = `No plays in ${year}.`;
+            note.textContent = group.dataset.picker === "year"
+                ? `No plays in ${year}.`
+                : `Nothing has reached ${milestone.toLocaleString()} plays yet.`;
         }
         return;
     }
@@ -252,15 +302,16 @@ function hideEmptyGroup(group) {
 function libraryShape(years) {
     const tracks = state.allTracks;
     const days = tracks.length ? (Number(tracks.at(-1).Date) - Number(tracks[0].Date)) / 86400000 : 0;
-    return { scrobbles: tracks.length, days, years: years.length };
+    return { scrobbles: tracks.length, days, years: years.length, milestone };
 }
 
 function render() {
     const years = libraryYears();
     if (!years.includes(year)) year = years[0];
+    if (milestone === undefined) milestone = startingMilestone();
     const lib = libraryShape(years);
     const fits = (item) => !item.when || item.when(lib);
-    const groups = sections(year, defaultMilestone())
+    const groups = sections(year, milestone)
         .filter(fits)
         .map(group => ({ ...group, boxes: group.boxes.filter(b => fits(b) && (!b.needsDetails || state.extendedDataLoaded)) }))
         .filter(group => group.boxes.length);
@@ -270,11 +321,8 @@ function render() {
         `<button type="button" class="explore-chip" data-jump="${group.id}">${escapeHTML(group.title)}</button>`).join("");
 
     body.innerHTML = groups.map(group => {
-        const picker = group.yearPicker && years.length > 1
-            ? `<label class="explore-year">Year <select data-role="year">${years.map(y =>
-                `<option value="${y}"${y === year ? " selected" : ""}>${y}</option>`).join("")}</select></label>`
-            : "";
-        return `<section class="explore-group" id="explore-${group.id}">
+        const picker = pickerHTML(group, years);
+        return `<section class="explore-group" id="explore-${group.id}"${group.picker ? ` data-picker="${group.picker}"` : ""}>
             <div class="explore-group-head"><h3>${escapeHTML(group.title)}</h3>${picker}</div>
             <div class="explore-grid">${group.boxes.map(b => `<article class="explore-box" data-box="${b.id}">
                 <div class="explore-box-head"><h4 class="explore-box-title"></h4><p class="explore-box-note"></p></div>
@@ -315,6 +363,7 @@ export function showExplore() {
     const now = currentStamp();
     if (now !== stamp) {
         stamp = now;
+        milestone = undefined;
         results.clear();
         expanded.clear();
         render();
@@ -388,17 +437,23 @@ if (sectionElement) {
     });
 
     sectionElement.addEventListener("change", (event) => {
-        if (event.target.dataset.role !== "year") return;
-        year = Number(event.target.value);
-        trackEvent("explore/year", "Explore: changed year");
-        boxesById.forEach(boxDef => { if (boxDef.id.startsWith("year-")) paintYearBox(boxDef); });
+        const role = event.target.dataset.role;
+        if (role === "year") year = Number(event.target.value);
+        else if (role === "milestone") milestone = Number(event.target.value);
+        else return;
+        trackEvent(`explore/${role}`, `Explore: changed ${role}`);
+        repaintGroup(role === "year" ? "year" : "milestones");
         computeMissing();
     });
 }
 
-// Year boxes get new titles and rows; the rest stay as they are.
-function paintYearBox(boxDef) {
-    const fresh = sections(year, defaultMilestone()).find(group => group.id === "year").boxes.find(b => b.id === boxDef.id);
-    if (fresh) boxesById.set(boxDef.id, fresh);
-    paintBox(fresh || boxDef);
+// The picked section's boxes get new titles and rows; the rest stay as they are.
+function repaintGroup(groupId) {
+    const fresh = sections(year, milestone).find(group => group.id === groupId);
+    if (!fresh) return;
+    fresh.boxes.forEach(boxDef => {
+        if (!boxesById.has(boxDef.id)) return;
+        boxesById.set(boxDef.id, boxDef);
+        paintBox(boxDef);
+    });
 }
