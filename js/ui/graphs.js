@@ -9,7 +9,8 @@ import { trackEvent } from '../analytics.js';
 import { buildEntitiesFromTracks } from '../data/filters.js';
 import { getDefaultXValue, isSortingBasisUsingXValue } from '../data/metrics.js';
 import { state } from '../state.js';
-import { colorLinkPairs, customColor, setCustomColor, suggestColor } from './artist-colors.js';
+import { clearCustomColor, colorLinkPairs, customColor, setCustomColor, suggestColor } from './artist-colors.js';
+import { openColorPicker } from './color-picker.js';
 import { formatRaceValue } from './bar-race.js';
 import { getEntityMetricValue } from './charts.js';
 import { getActiveView, setActiveView } from './shell.js';
@@ -291,6 +292,17 @@ function formatValue(value) {
 let chart = null;
 let lastResult = null;
 
+// Picked colors go straight onto the lines, without redrawing the graph.
+function recolorChart() {
+    if (!chart) return;
+    const colors = seriesColors();
+    chart.data.datasets.forEach((dataset, index) => {
+        dataset.borderColor = colors[index];
+        dataset.backgroundColor = colors[index];
+    });
+    chart.update("none");
+}
+
 function drawChart() {
     const canvas = document.getElementById("graph-canvas");
     if (!canvas || !lastResult || typeof Chart === "undefined") return;
@@ -318,7 +330,10 @@ function drawChart() {
             pointRadius: radius,
             pointHoverRadius: 4,
             spanGaps: false,
-            tension: 0
+            tension: 0,
+            // Room past the edges so a line along #1 (or 0) isn't cut in
+            // half. Rank lines still run off the bottom when they drop out.
+            clip: rank ? { left: 6, top: 6, right: 6, bottom: 0 } : 6
         };
     });
 
@@ -334,6 +349,10 @@ function drawChart() {
             plugins: {
                 legend: { display: false },
                 tooltip: {
+                    // Best first at the point under the mouse, not in the
+                    // order the lines were added.
+                    filter: (item) => item.parsed.y !== null && Number.isFinite(item.parsed.y),
+                    itemSort: (a, b) => (rank ? a.parsed.y - b.parsed.y : b.parsed.y - a.parsed.y),
                     callbacks: {
                         label: (context) => `${context.dataset.label}: ${formatValue(context.parsed.y)}`
                     }
@@ -430,57 +449,54 @@ function update(changes, { preset = null } = {}) {
     refresh();
 }
 
-function renderPresets() {
-    const box = section.querySelector(".graph-presets");
-    box.innerHTML = "";
-    box.appendChild(el("span", "graph-presets-title", "Quick start"));
-    PRESETS.forEach(preset => {
-        const active = ["metric", "show", "scope", "period"].every(key => graph[key] === preset[key]);
-        const button = el("button", "graph-chip", preset.label);
-        button.type = "button";
-        button.classList.toggle("is-active", active);
-        button.setAttribute("aria-pressed", String(active));
-        button.addEventListener("click", () => update({ metric: preset.metric, show: preset.show, scope: preset.scope, period: preset.period, x: "" }, { preset: preset.id }));
-        box.appendChild(button);
+let addType = "artist";
+let adding = false;
+let customizing = false;
+let swatches = [];
+
+// New colors go onto the chips in place, so the picker stays open while a
+// color is dragged.
+function recolorSeries() {
+    const colors = seriesColors();
+    swatches.forEach((swatch, index) => {
+        swatch.style.background = colors[index];
     });
 }
 
-let addType = "artist";
-let swatches = [];
-
-// New colors go onto the chips in place, so a color picker that is open
-// stays open while it is dragged.
-function recolorSeries() {
-    const colors = seriesColors();
-    swatches.forEach(({ swatch, picker }, index) => {
-        swatch.style.background = colors[index];
-        if (document.activeElement !== picker) picker.value = colors[index];
-    });
+// Your top items of a type over the plays and measure the graph uses, so
+// on a graph of a list it is that list's top 5.
+function topFive(type) {
+    const x = parseInt(graph.x, 10) || getDefaultXValue(graph.metric);
+    const plays = sourcePlays();
+    if (!graph.source && graph.metric === "scrobbles" && !graph.from && !graph.to) return topEntities(type).slice(0, 5);
+    return buildEntitiesFromTracks(plays, type, graph.metric, x).slice(0, 5).map(entity => makeSeries(entityIdentity(entity, type)));
 }
 
 function renderSeries() {
     const box = section.querySelector(".graph-series");
     box.innerHTML = "";
     const colors = seriesColors();
-    const chips = el("div", "graph-series-chips");
     swatches = [];
     graph.series.forEach((series, index) => {
         const chip = el("span", "graph-series-chip");
-        const swatch = el("label", "race-swatch");
+        const swatch = el("button", "race-swatch");
+        swatch.type = "button";
         swatch.style.background = colors[index];
         swatch.title = `Change the color for ${series.label}`;
-        const picker = document.createElement("input");
-        picker.type = "color";
-        picker.value = colors[index];
-        picker.setAttribute("aria-label", `Color for ${series.label}`);
-        picker.addEventListener("input", () => setCustomColor(series.label, picker.value));
-        swatch.appendChild(picker);
-        swatches.push({ swatch, picker });
+        swatch.setAttribute("aria-label", `Color for ${series.label}`);
+        swatch.setAttribute("aria-haspopup", "dialog");
+        swatch.setAttribute("aria-expanded", "false");
+        swatch.addEventListener("click", () => {
+            const custom = Boolean(customColor(series.label));
+            openColorPicker(swatch, seriesColors()[graph.series.indexOf(series)], color => setCustomColor(series.label, color), {
+                title: `Color for ${series.label}`,
+                reset: custom ? { label: "Automatic", run: () => clearCustomColor(series.label) } : null
+            });
+        });
+        swatches.push(swatch);
         const text = el("span", "graph-series-text");
-        text.append(
-            el("span", "graph-series-name", series.name),
-            el("span", "graph-series-kind", series.type === "artist" ? "Artist" : `${TYPE_NAMES[series.type]} by ${series.artist}`)
-        );
+        text.appendChild(el("span", "graph-series-name", series.name));
+        if (series.type !== "artist") text.appendChild(el("span", "graph-series-kind", `${TYPE_NAMES[series.type]} by ${series.artist}`));
         const remove = el("button", "race-legend-reset", "×");
         remove.type = "button";
         remove.title = "Remove";
@@ -491,12 +507,21 @@ function renderSeries() {
             refresh();
         });
         chip.append(swatch, text, remove);
-        chips.appendChild(chip);
+        box.appendChild(chip);
     });
-    box.appendChild(chips);
 
-    if (graph.series.length >= MAX_SERIES) {
-        box.appendChild(el("p", "graph-note", `Up to ${MAX_SERIES} lines at once. Remove one to add another.`));
+    if (!adding && graph.series.length) {
+        if (graph.series.length < MAX_SERIES) {
+            const open = el("button", "graph-chip graph-add-open");
+            open.type = "button";
+            open.innerHTML = '<i class="fas fa-plus" aria-hidden="true"></i> Add';
+            open.addEventListener("click", () => {
+                adding = true;
+                renderSeries();
+                section.querySelector(".graph-add input")?.focus();
+            });
+            box.appendChild(open);
+        }
         return;
     }
 
@@ -504,14 +529,14 @@ function renderSeries() {
     const typeSelect = document.createElement("select");
     typeSelect.setAttribute("aria-label", "What to add");
     Object.entries(TYPE_NAMES).forEach(([value, label]) => {
-        const option = el("option", "", label);
+        const option = el("option", "", `${label}s`);
         option.value = value;
         option.selected = value === addType;
         typeSelect.appendChild(option);
     });
     const input = document.createElement("input");
     input.type = "text";
-    input.placeholder = addType === "artist" ? "Artist name" : `${TYPE_NAMES[addType]} name`;
+    input.placeholder = `${TYPE_NAMES[addType]} name`;
     input.setAttribute("aria-label", input.placeholder);
     input.setAttribute("list", "graph-names");
     input.autocomplete = "off";
@@ -520,11 +545,16 @@ function renderSeries() {
     topEntities(addType).forEach(series => options.appendChild(Object.assign(document.createElement("option"), { value: series.label })));
     const add = el("button", "graph-chip", "Add");
     add.type = "submit";
-    const top = el("button", "graph-chip", "Add my top 5");
+    const top = el("button", "graph-chip", `My top 5 ${TYPE_NAMES[addType].toLowerCase()}s`);
     top.type = "button";
+    top.title = graph.source ? "Replace the lines with the top 5 of your list" : "Replace the lines with your top 5";
+    const done = el("button", "graph-chip", "Done");
+    done.type = "button";
     const note = el("span", "graph-note");
     note.setAttribute("role", "status");
-    form.append(typeSelect, input, options, add, top, note);
+    form.append(typeSelect, input, options, add, top);
+    if (graph.series.length) form.appendChild(done);
+    form.appendChild(note);
     box.appendChild(form);
 
     typeSelect.addEventListener("change", () => {
@@ -541,21 +571,26 @@ function renderSeries() {
             note.textContent = `Couldn't find that ${addType} in your history.`;
             return;
         }
-        if (!addSeries([found])) note.textContent = "That one is already on the graph.";
+        if (graph.series.some(existing => existing.key === found.key)) {
+            note.textContent = "That one is already on the graph.";
+            return;
+        }
+        graph.series.push(found);
+        adding = graph.series.length < MAX_SERIES;
+        renderSeries();
+        refresh();
+        section.querySelector(".graph-add input")?.focus();
     });
     top.addEventListener("click", () => {
-        const fresh = topEntities(addType).filter(series => !graph.series.some(existing => existing.key === series.key)).slice(0, 5);
-        addSeries(fresh);
+        graph.series = topFive(addType);
+        adding = false;
+        renderSeries();
+        refresh();
     });
-}
-
-function addSeries(list) {
-    const fresh = list.filter(series => !graph.series.some(existing => existing.key === series.key));
-    if (!fresh.length) return false;
-    graph.series.push(...fresh.slice(0, MAX_SERIES - graph.series.length));
-    renderSeries();
-    refresh();
-    return true;
+    done.addEventListener("click", () => {
+        adding = false;
+        renderSeries();
+    });
 }
 
 function renderSource() {
@@ -574,10 +609,55 @@ function renderSource() {
     box.appendChild(clear);
 }
 
+function currentPreset() {
+    return PRESETS.find(preset => ["metric", "show", "scope", "period"].every(key => graph[key] === preset[key])) || null;
+}
+
+// Below the graph: the kind of graph and the period, which is what most
+// people change. Everything else waits behind Customize.
 function renderControls() {
-    renderPresets();
+    const main = section.querySelector(".graph-main-settings");
+    main.innerHTML = "";
+
+    const kind = document.createElement("select");
+    const active = currentPreset();
+    PRESETS.forEach(preset => {
+        const option = el("option", "", preset.label);
+        option.value = preset.id;
+        option.selected = active === preset;
+        kind.appendChild(option);
+    });
+    if (!active) {
+        const custom = el("option", "", "Custom graph");
+        custom.value = "";
+        custom.selected = true;
+        custom.disabled = true;
+        kind.appendChild(custom);
+    }
+    kind.addEventListener("change", () => {
+        const preset = PRESETS.find(item => item.id === kind.value);
+        if (preset) update({ metric: preset.metric, show: preset.show, scope: preset.scope, period: preset.period, x: "" }, { preset: preset.id });
+    });
+    main.appendChild(field("Graph", kind));
+
+    main.appendChild(field("Period", segmented("Period", [
+        ["day", "Day"], ["week", "Week"], ["month", "Month"], ["year", "Year"]
+    ], graph.period, value => update({ period: value }))));
+
+    const toggle = el("button", "graph-chip graph-customize");
+    toggle.type = "button";
+    toggle.setAttribute("aria-expanded", String(customizing));
+    toggle.innerHTML = `<i class="fas fa-sliders" aria-hidden="true"></i> Customize`;
+    toggle.addEventListener("click", () => {
+        customizing = !customizing;
+        renderControls();
+    });
+    main.appendChild(toggle);
+
     const box = section.querySelector(".graph-controls");
+    box.hidden = !customizing;
     box.innerHTML = "";
+    if (!customizing) return;
 
     const metric = document.createElement("select");
     metricOptions().forEach(({ value, label }) => {
@@ -604,6 +684,11 @@ function renderControls() {
         ["rank", "Rank"]
     ], graph.show, value => update({ show: value }))));
 
+    box.appendChild(field("Count", segmented("Count", [
+        ["period", "In each period"],
+        ["cumulative", "Up to each period"]
+    ], graph.scope, value => update({ scope: value }))));
+
     if (graph.show === "rank") {
         box.appendChild(field("Ranks shown", segmented("Ranks shown", [
             ["auto", "Auto"], [10, "Top 10"], [25, "Top 25"], [50, "Top 50"], [100, "Top 100"], [0, "All"]
@@ -614,15 +699,6 @@ function renderControls() {
             announce();
         })));
     }
-
-    box.appendChild(field("Count", segmented("Count", [
-        ["period", "In each period"],
-        ["cumulative", "Up to each period"]
-    ], graph.scope, value => update({ scope: value }))));
-
-    box.appendChild(field("Period", segmented("Period", [
-        ["day", "Day"], ["week", "Week"], ["month", "Month"], ["year", "Year"]
-    ], graph.period, value => update({ period: value }))));
 
     box.appendChild(field("Scale", segmented("Scale", [
         ["linear", "Linear"], ["logarithmic", "Log"]
@@ -637,12 +713,29 @@ function renderControls() {
     to.value = graph.to;
     to.addEventListener("change", () => update({ to: to.value }));
     box.append(field("From", from), field("To", to));
+}
 
-    const download = el("button", "graph-chip graph-download");
-    download.type = "button";
-    download.innerHTML = '<i class="fas fa-download" aria-hidden="true"></i> Download PNG';
-    download.addEventListener("click", downloadPng);
-    box.appendChild(download);
+// Back to the starting graph: your top 5 artists' total plays.
+function resetGraph() {
+    Object.assign(graph, {
+        series: topEntities("artist").slice(0, 5),
+        metric: "scrobbles",
+        x: "",
+        show: "value",
+        scope: "cumulative",
+        period: "month",
+        scale: "linear",
+        rankLimit: "auto",
+        from: "",
+        to: "",
+        source: null
+    });
+    adding = false;
+    addType = "artist";
+    renderSeries();
+    renderSource();
+    renderControls();
+    refresh();
 }
 
 // ---- Running it ----
@@ -906,6 +999,8 @@ if (section) {
         if (!event.currentTarget.disabled && getActiveView() !== "graphs") setActiveView("graphs");
     });
     document.getElementById("graph-this-list")?.addEventListener("click", openFromList);
+    section.querySelector(".graph-reset")?.addEventListener("click", resetGraph);
+    section.querySelector(".graph-download")?.addEventListener("click", downloadPng);
     document.addEventListener("graphs:open-entity", (event) => openEntity(event.detail));
     document.addEventListener("view:changed", (event) => {
         if (event.detail.view === "graphs") showGraphs();
@@ -919,7 +1014,7 @@ if (section) {
     document.addEventListener("artist-colors:changed", () => {
         if (!built) return;
         recolorSeries();
-        drawChart();
+        recolorChart();
     });
     document.getElementById("theme-toggle")?.addEventListener("click", () => setTimeout(() => {
         if (built && getActiveView() === "graphs") {

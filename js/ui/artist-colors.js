@@ -7,6 +7,7 @@
 // "artist-colors:changed" so charts on screen repaint.
 
 import { trackEventOnce } from '../analytics.js';
+import { openColorPicker } from './color-picker.js';
 
 const STORAGE_KEY = "lastfmlists-artist-colors";
 
@@ -259,11 +260,11 @@ export function createColorLegend({ otherLabel, known, addLabel = "Color an arti
     function makeChip(item, { onPick, onReset }) {
         const chipEl = document.createElement("span");
         chipEl.className = "race-legend-item";
-        const swatch = document.createElement("label");
+        const swatch = document.createElement("button");
+        swatch.type = "button";
         swatch.className = "race-swatch";
-        const picker = document.createElement("input");
-        picker.type = "color";
-        swatch.appendChild(picker);
+        swatch.setAttribute("aria-haspopup", "dialog");
+        swatch.setAttribute("aria-expanded", "false");
         const name = document.createElement("span");
         name.className = "race-legend-name";
         name.textContent = item.label;
@@ -272,28 +273,26 @@ export function createColorLegend({ otherLabel, known, addLabel = "Color an arti
         reset.className = "race-legend-reset";
         reset.textContent = "×";
         chipEl.append(swatch, name, reset);
-        picker.addEventListener("input", () => onPick(picker.value));
+        let shown = item;
+        const pick = () => openColorPicker(swatch, shown.color, onPick, {
+            title: `Color for ${shown.label}`,
+            reset: shown.custom ? { label: "Automatic", run: onReset } : null
+        });
+        swatch.addEventListener("click", pick);
         reset.addEventListener("click", onReset);
         return {
             el: chipEl,
             update(next) {
+                shown = next;
                 swatch.style.background = next.color;
-                // Leave the picker alone while it is open, or it would jump.
-                if (document.activeElement !== picker) picker.value = next.color;
-                picker.setAttribute("aria-label", `Color for ${next.label}`);
+                swatch.setAttribute("aria-label", `Color for ${next.label}`);
                 swatch.title = `Change the color for ${next.label}`;
                 reset.hidden = !next.custom;
                 reset.setAttribute("aria-label", `Use the automatic color for ${next.label}`);
                 reset.title = "Use the automatic color";
                 chipEl.classList.toggle("is-custom", next.custom);
             },
-            open() {
-                try {
-                    picker.click();
-                } catch (e) {
-                    picker.focus();
-                }
-            }
+            open: pick
         };
     }
 
