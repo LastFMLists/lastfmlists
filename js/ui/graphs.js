@@ -57,6 +57,9 @@ const graph = {
     // How far down a rank graph goes; lines below it run off the bottom.
     // "auto" goes just deep enough for the lines, at most to 100.
     rankLimit: "auto",
+    // "zoom": the dates only pick the stretch shown. "count": plays outside
+    // them are left out of the numbers too.
+    dateMode: "zoom",
     from: "",
     to: "",
     // Plays from a list opened here, with its filters already applied.
@@ -185,14 +188,20 @@ async function computeLines(onProgress) {
     // Lines added or removed while this runs start a new run; this one
     // keeps to the lines it started with.
     const lines = [...graph.series];
-    const plays = sourcePlays();
-    if (!plays.length) return { error: "There are no plays to count." };
-    // Show from / Show until only choose the stretch of time on screen. The
-    // numbers always count every play: a total on the first day shown
-    // includes the years before it, and a rank is the rank in the whole
-    // list at that point.
+    // In zoom mode the dates only choose the stretch of time on screen and
+    // the numbers count every play: a total on the first day shown includes
+    // the years before it. In count mode plays outside the dates are left
+    // out first, so totals start at 0 and ranks are within the dates.
     const shownFrom = parseDay(graph.from, false);
     const shownUntil = parseDay(graph.to, true);
+    const all = sourcePlays();
+    const plays = graph.dateMode === "count" && (shownFrom !== null || shownUntil !== null)
+        ? all.filter(play => {
+            const time = Number(play.Date);
+            return (shownFrom === null || time >= shownFrom) && (shownUntil === null || time <= shownUntil);
+        })
+        : all;
+    if (!plays.length) return { error: graph.dateMode === "count" ? "There are no plays between these dates." : "There are no plays to count." };
     const first = shownFrom ?? Number(plays[0].Date);
     const last = shownUntil ?? Number(plays[plays.length - 1].Date);
     if (first > last) return { error: "Show from is after Show until." };
@@ -781,10 +790,15 @@ function buildControls() {
     };
     const from = dateInput("from");
     const to = dateInput("to");
-    box.append(field("Show from", from), field("Show until", to));
-    box.appendChild(el("p", "graph-note graph-dates-note", graph.source
-        ? "The dates only choose what part of the graph you see. The numbers always count all of your list's plays."
-        : "The dates only choose what part of the graph you see. The numbers still count your whole history, so a total on the first day shown includes the years before it."));
+    const counting = graph.dateMode === "count";
+    box.append(field(counting ? "Count from" : "Show from", from), field(counting ? "Count until" : "Show until", to));
+    box.appendChild(field("Dates", segmented("Dates", [
+        ["zoom", "Zoom only"], ["count", "Count only these dates"]
+    ], graph.dateMode, value => update({ dateMode: value }))));
+    const everything = graph.source ? "all of your list's plays" : "your whole history";
+    box.appendChild(el("p", "graph-note graph-dates-note", counting
+        ? "Plays outside these dates are left out of the numbers, so totals start at 0 on the first date and ranks only compare plays between the dates."
+        : `The dates only choose what part of the graph you see. The numbers still count ${everything}, so a total on the first day shown includes everything before it.`));
 }
 
 // Back to the starting graph: your top 5 artists' total plays.
@@ -798,6 +812,7 @@ function resetGraph() {
         period: "month",
         scale: "linear",
         rankLimit: "auto",
+        dateMode: "zoom",
         from: "",
         to: "",
         source: null
@@ -905,6 +920,7 @@ function openFromList() {
     graph.source = { label: list.title, tracks: list.tracks };
     sortedCache = { from: null, plays: [] };
     graph.period = autoPeriod(sourcePlays());
+    graph.dateMode = "zoom";
     graph.from = "";
     graph.to = "";
     built = true;
@@ -930,6 +946,7 @@ function openEntity({ type, name, artist }) {
     const years = plays.length ? (Number(plays[plays.length - 1].Date) - Number(plays[0].Date)) / (365.25 * 86400000) : 0;
     graph.period = years > 3 ? "year" : years > 0.5 ? "month" : "week";
     graph.rankLimit = "auto";
+    graph.dateMode = "zoom";
     graph.from = "";
     graph.to = "";
     built = true;
@@ -969,6 +986,7 @@ export function graphLinkPairs(listPairs) {
     if (graph.period !== "month") pairs.push(["g.period", graph.period]);
     if (graph.scale === "logarithmic") pairs.push(["g.scale", "log"]);
     if (graph.from) pairs.push(["g.from", graph.from]);
+    if (graph.dateMode === "count" && (graph.from || graph.to)) pairs.push(["g.dates", "count"]);
     if (graph.to) pairs.push(["g.to", graph.to]);
     if (graph.source) {
         // The list as it was when the graph was opened, even if the Lists
@@ -1005,6 +1023,7 @@ export function openGraphFromLink(params) {
     graph.scope = params.get("g.count") === "each" ? "period" : "cumulative";
     graph.period = ["day", "week", "year"].includes(params.get("g.period")) ? params.get("g.period") : "month";
     graph.scale = params.get("g.scale") === "log" ? "logarithmic" : "linear";
+    graph.dateMode = params.get("g.dates") === "count" ? "count" : "zoom";
     graph.from = params.get("g.from") || "";
     graph.to = params.get("g.to") || "";
     const list = params.get("g.plays") === "list" ? state.graphableList : null;
