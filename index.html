@@ -106,7 +106,7 @@
             </div>
             <div class="session-actions">
                 <button type="button" id="load-detailed-data" disabled aria-label="Load details" title="Downloads Last.fm metadata for your top artists, albums and tracks: track length, genre and country tags, and global listener and play counts. This unlocks the duration, tag and global-stats filters and the “Time spent listening” and “Percentage of global scrobbles” sorts. It covers most uses and takes less time than “Load ALL Details”. Load your data first to use this."><i class="fas fa-circle-down" aria-hidden="true"></i><span class="btn-label">Load Details</span></button>
-                <button type="button" id="load-all-details" disabled aria-label="Load ALL details" title="Downloads the same metadata for every track you have scrobbled, including tracks outside your top lists. This makes thousands of requests and can take hours. Load your data first to use this."><i class="fas fa-cloud-arrow-down" aria-hidden="true"></i><span class="btn-label">Load ALL Details</span></button>
+                <button type="button" id="load-all-details" disabled aria-label="Load ALL details" title="Downloads the same metadata for every artist, album and track you have scrobbled, including the ones outside your top lists. This makes thousands of requests and can take hours. Load your data first to use this."><i class="fas fa-cloud-arrow-down" aria-hidden="true"></i><span class="btn-label">Load ALL Details</span></button>
                 <button type="button" id="save-data" aria-label="Save data" title="Save your loaded data to this browser"><i class="fas fa-floppy-disk" aria-hidden="true"></i><span class="btn-label">Save Data</span></button>
                 <button type="button" id="open-export-options" aria-label="Export as image" title="Export the current list as a PNG image"><i class="fas fa-image" aria-hidden="true"></i><span class="btn-label">Export Image</span></button>
                 <button type="button" id="open-grid-export" aria-label="Export as grid" title="Export album artwork as a collage grid"><i class="fas fa-table-cells" aria-hidden="true"></i><span class="btn-label">Export Grid</span></button>
@@ -619,7 +619,7 @@
                         <!-- js/ui/equation-editor.js builds the step editor; the text boxes hold the result -->
                         <div class="equation-editor-layout is-visual">
                             <div class="equation-editor-pane">
-                                <p class="eq-intro">Steps run from top to bottom on the plays that pass your filters, before the list is grouped and ranked. Play counts and ranks always count your whole history.</p>
+                                <p class="eq-intro">Steps run from top to bottom on the plays that pass your filters, before the list is grouped and ranked. Play counts and ranks count the plays your filters and the filter steps above have kept, so the order of the steps matters.</p>
                                 <div class="eq-side" data-side="left">
                                     <label for="equations" class="eq-side-title">Left list</label>
                                     <textarea id="equations" rows="5" spellcheck="false" placeholder="e.g., artist-name-length = track-name-length; sort track-scrobble-count desc; unique track-name-length 1; sort track-name-length asc"></textarea>

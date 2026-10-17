@@ -531,6 +531,11 @@ export function updateActiveFilters() {
             shouldShow = element.checked === true;
         }
 
+        // The caps do nothing on list types they don't apply to.
+        const listType = document.getElementById("entity-type")?.value || "track";
+        if (filter.id === "max-per-artist" && listType === "artist") shouldShow = false;
+        if (filter.id === "max-per-album" && listType !== "track" && listType !== "scrobble") shouldShow = false;
+
         if (shouldShow) {
             appendFilterLabel(`${filter.label}: ${displayValue}`, filter.id);
         }

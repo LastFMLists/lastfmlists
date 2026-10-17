@@ -5,11 +5,12 @@ import { state } from '../state.js';
 import { getDaysSinceTimestamp, getFirstScrobbleYear } from '../time.js';
 import { getTrackAverageListeningMap } from './metrics.js';
 
-// Play counts, ranks and track counts count the plays that reach the step
-// that asks for them, so the order of the steps matters: a year filter
-// before "artist play count >= 500" means 500 plays in that year, after it
-// means 500 overall. Outside a pipeline (no step plays in the context) they
-// count the whole history.
+// Play counts, ranks and track counts count the plays kept by the filter
+// steps before the step that asks for them (the panel's filters come before
+// the first step), so the order of the steps matters: a year filter before
+// "artist play count >= 500" means 500 plays in that year, after it means
+// 500 in total. Ordering and "keep first per value" steps don't change the
+// counts. Outside a pipeline they count the whole history.
 const STEP_KEYS = {
     artist: (item) => (item.Artist || "").toLowerCase(),
     album: (item) => `${(item.Album || "").toLowerCase()}||${(item.Artist || "").toLowerCase()}`,
@@ -30,8 +31,16 @@ function stepStats(kind, context) {
         if (!tracks.has(key)) tracks.set(key, new Set());
         tracks.get(key).add(STEP_KEYS.track(item));
     });
+    // Tied counts share a rank (1, 2, 2, 4), so a rank filter doesn't
+    // depend on the order earlier steps left the plays in.
     const ranks = new Map();
-    [...counts.entries()].sort((a, b) => b[1] - a[1]).forEach(([key], index) => ranks.set(key, index + 1));
+    let previous = null;
+    let rank = 0;
+    [...counts.entries()].sort((a, b) => b[1] - a[1]).forEach(([key, count], index) => {
+        if (count !== previous) rank = index + 1;
+        previous = count;
+        ranks.set(key, rank);
+    });
     context.stepStats[kind] = { counts, ranks, tracks };
     return context.stepStats[kind];
 }
@@ -350,20 +359,22 @@ function parseEquationExpression(tokens, item, equationContext = {}) {
     return result;
 }
 
-function evaluateEquationSide(sideExpression, item, equationContext = {}) {
+// One side of a condition, read once: text in quotes is a constant, and
+// anything else is tokenized up front so each play only gets evaluated.
+function compileEquationSide(sideExpression) {
     const expression = sideExpression.trim();
-    if (!expression) return null;
+    if (!expression) return () => null;
 
     const doubleQuoted = expression.match(/^"([\s\S]*)"$/);
-    if (doubleQuoted) return doubleQuoted[1];
+    if (doubleQuoted) return () => doubleQuoted[1];
 
     const singleQuoted = expression.match(/^'([\s\S]*)'$/);
-    if (singleQuoted) return singleQuoted[1];
+    if (singleQuoted) return () => singleQuoted[1];
 
     const tokens = tokenizeEquationExpression(expression);
-    if (!tokens || tokens.length === 0) return null;
+    if (!tokens || tokens.length === 0) return () => null;
 
-    return parseEquationExpression(tokens, item, equationContext);
+    return (item, equationContext) => parseEquationExpression(tokens, item, equationContext);
 }
 
 function findTopLevelComparisonOperator(expression) {
@@ -449,9 +460,11 @@ function compileEquationClause(clause) {
 
     if (!leftExpression || !rightExpression) return null;
 
+    const left = compileEquationSide(leftExpression);
+    const right = compileEquationSide(rightExpression);
     return (item, equationContext = {}) => {
-        const leftValue = evaluateEquationSide(leftExpression, item, equationContext);
-        const rightValue = evaluateEquationSide(rightExpression, item, equationContext);
+        const leftValue = left(item, equationContext);
+        const rightValue = right(item, equationContext);
         if (leftValue === null || leftValue === undefined || rightValue === null || rightValue === undefined) {
             return false;
         }
@@ -547,12 +560,15 @@ export function applyEquationPipeline(tracks, equationsInput, equationContext = 
     const textSortCollator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
     const outerContext = equationContext;
 
+    // The plays counts are worked out from: only filter steps shrink it.
+    let countedTracks = currentTracks;
     for (const step of steps) {
-        // Counts and ranks in this step are worked out from the plays it gets.
-        equationContext = { ...outerContext, stepTracks: currentTracks };
+        equationContext = { ...outerContext, stepTracks: countedTracks };
 
         if (step.type === "filter") {
+            const sameList = countedTracks === currentTracks;
             currentTracks = currentTracks.filter(track => step.predicate(track, equationContext));
+            countedTracks = sameList ? currentTracks : countedTracks.filter(track => step.predicate(track, equationContext));
             continue;
         }
 

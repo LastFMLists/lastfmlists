@@ -39,7 +39,7 @@ export const RATE_BURST_CAPACITY = 1000;
 
 // Tooltips for the two metadata-loading buttons, kept in sync with index.html.
 export const LOAD_DETAILS_TOOLTIP = "Downloads Last.fm metadata for your top artists, albums and tracks: track length, genre and country tags, and global listener and play counts. This unlocks the duration, tag and global-stats filters and the “Time spent listening” and “Percentage of global scrobbles” sorts. It covers most uses and takes less time than “Load ALL Details”.";
-export const LOAD_ALL_DETAILS_TOOLTIP = "Downloads the same metadata for every track you have scrobbled, including tracks outside your top lists. This makes thousands of requests and can take hours.";
+export const LOAD_ALL_DETAILS_TOOLTIP = "Downloads the same metadata for every artist, album and track you have scrobbled, including the ones outside your top lists. This makes thousands of requests and can take hours.";
 
 // Dumping allTracks / artistsData to the console keeps every object alive in
 // devtools and stalls the tab on big libraries. Set localStorage
