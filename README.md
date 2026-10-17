@@ -28,6 +28,7 @@ work. Serve the folder over HTTP instead (`python3 -m http.server`).
 
 Unreleased:
 
+- On phones the Explore section chips (Highlights, Your year and so on) wrap onto a second line instead of hiding in a row you had to know to swipe.
 - Adding a line in Graphs starts on the kind of item already on the graph (albums for a graph of albums), and opening a list, a page or a link in Graphs closes an add form left open.
 - Link previews on Reddit, Discord and elsewhere show a wide image of a bar chart race and a graph instead of the square logo, and the descriptions mention the graphs.
 - In Graphs, a Dates switch next to the dates picks what they do. Zoom only (the default, Show from / Show until) just picks the stretch shown, and the numbers count the whole history or the list's plays, so a running total doesn't restart at the first date and an all-time rank stays all-time. Count only these dates leaves plays outside the dates out of the numbers. Either way the graph starts and ends on the chosen dates, a note under them says what they do, and links keep the choice (g.dates=count).
