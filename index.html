@@ -123,6 +123,7 @@
         <nav id="view-tabs" class="view-tabs" aria-label="Switch view">
             <button type="button" id="tab-explore" class="view-tab" data-view="explore" aria-pressed="false" disabled title="Available once your data has loaded"><i class="fas fa-compass" aria-hidden="true"></i><span>Explore</span></button>
             <button type="button" id="tab-lists" class="view-tab is-active" data-view="lists" aria-pressed="true"><i class="fas fa-list" aria-hidden="true"></i><span>Lists</span></button>
+            <button type="button" id="tab-graphs" class="view-tab" data-view="graphs" aria-pressed="false" disabled title="Available once your data has loaded"><i class="fas fa-chart-line" aria-hidden="true"></i><span>Graphs</span></button>
             <button type="button" id="tab-games" class="view-tab" data-view="games" aria-pressed="false" disabled title="Available once your data has loaded"><i class="fas fa-gamepad" aria-hidden="true"></i><span>Games</span></button>
         </nav>
 
@@ -660,7 +661,10 @@
         <div id="active-filters" class="active-filters content-block"></div>
 
         <section id="results-section" class="content-block">
-            <h2>Top Tracks</h2>
+            <div class="results-header">
+                <h2>Top Tracks</h2>
+                <button type="button" id="graph-this-list" class="results-action" hidden title="Plot how the top of this list changed over time"><i class="fas fa-chart-line" aria-hidden="true"></i> Graph over time</button>
+            </div>
             <div id="results"></div>
         </section>
 
@@ -674,6 +678,18 @@
         </section>
 
         <section id="entity-section" class="content-block" hidden></section>
+
+        <section id="graphs-section" class="content-block" aria-labelledby="graphs-title">
+            <h2 id="graphs-title" class="visually-hidden">Graphs</h2>
+            <div class="graph-presets" role="group" aria-label="Quick start"></div>
+            <div class="graph-series"></div>
+            <div class="graph-source" hidden></div>
+            <div class="graph-controls"></div>
+            <div class="graph-stage">
+                <canvas id="graph-canvas" role="img" aria-label="Graph"></canvas>
+            </div>
+            <p class="graph-status" role="status"></p>
+        </section>
 
         <section id="games-section" class="content-block">
             <div id="games-home" class="games-home">

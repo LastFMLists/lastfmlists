@@ -30,7 +30,7 @@ export function setAppLoadedState(username) {
 // While a history load runs the list on screen is only a preview, so the
 // controls that would rebuild it wait until the load is done. Filters can
 // still be set up meanwhile; they apply when the load finishes.
-const LIST_CONTROLS_LOCKED_WHILE_LOADING = ["apply-filters", "reset-filters", "display-mode", "comparison-toggle"];
+const LIST_CONTROLS_LOCKED_WHILE_LOADING = ["apply-filters", "reset-filters", "display-mode", "comparison-toggle", "graph-this-list"];
 const WAIT_FOR_LOAD_MSG = "Available once your data has finished loading";
 
 export function setListControlsLocked(locked) {
@@ -132,8 +132,8 @@ if (themeToggleButton) {
     });
 }
 
-// ---- View switching (Explore / Lists / Games) ----
-const VIEWS = ["explore", "lists", "games"];
+// ---- View switching (Explore / Lists / Graphs / Games) ----
+const VIEWS = ["explore", "lists", "graphs", "games"];
 const VIEW_STORAGE_KEY = "lastfmlists-view";
 
 // The tab used last, so a returning visitor lands where they left off.
@@ -149,6 +149,7 @@ export function rememberedView() {
 export function getActiveView() {
     if (document.body.classList.contains("view-games")) return "games";
     if (document.body.classList.contains("view-explore")) return "explore";
+    if (document.body.classList.contains("view-graphs")) return "graphs";
     return "lists";
 }
 
@@ -157,6 +158,7 @@ export function setActiveView(view) {
     const games = view === "games";
     document.body.classList.toggle("view-games", games);
     document.body.classList.toggle("view-explore", view === "explore");
+    document.body.classList.toggle("view-graphs", view === "graphs");
     VIEWS.forEach(name => {
         const tab = document.getElementById(`tab-${name}`);
         if (!tab) return;
@@ -180,8 +182,13 @@ export function setActiveView(view) {
     document.dispatchEvent(new CustomEvent("view:changed", { detail: { view } }));
 }
 
-// The Explore and Games tabs are only usable once a library has loaded.
+// The Explore, Graphs and Games tabs are only usable once a library has loaded.
 export function enableGamesTab() {
+    const graphsTab = document.getElementById("tab-graphs");
+    if (graphsTab) {
+        graphsTab.disabled = false;
+        graphsTab.title = "Plot your listening over time";
+    }
     const gamesTab = document.getElementById("tab-games");
     if (gamesTab) {
         gamesTab.disabled = false;

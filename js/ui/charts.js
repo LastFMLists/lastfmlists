@@ -263,7 +263,7 @@ function getEntityLabel(entity, entityType) {
     return `${entity.Artist || "Unknown Artist"} - ${entity.Track || "Unknown Track"} (${scrobbleDate})`;
 }
 
-function getEntityMetricValue(entity, sortingBasis) {
+export function getEntityMetricValue(entity, sortingBasis) {
     if (!entity) return 0;
 
     if (["scrobbles", "separate-days", "separate-weeks", "separate-months", "max-single-day", "max-single-week", "max-single-month"].includes(sortingBasis)

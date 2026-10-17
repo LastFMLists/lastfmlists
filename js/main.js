@@ -18,6 +18,7 @@ import { ensureRaceDateDefaults, updateRaceControlsVisibility } from './ui/chart
 import './ui/entity-page.js';
 import './ui/equation-editor.js';
 import './ui/explore.js';
+import './ui/graphs.js';
 import { applySettings, startFromUrl, takePendingSettings } from './ui/url-state.js';
 import './ui/export.js';
 import { initFilterControls } from './ui/filter-controls.js';

@@ -16,8 +16,9 @@ loads `js/main.js` as an ES module; the browser resolves the rest.
     js/time.js            local-calendar day, week and duration helpers
     js/api/               rate limiter and the Last.fm endpoint wrappers
     js/data/              history loading, IndexedDB storage, metrics, equations, filtering
-    js/ui/                shell, lists, charts and the race, filter panel and its controls,
-                          entity pages, exporting, the support banner
+    js/ui/                shell, lists, charts and the race, artist colors, graphs, Explore,
+                          filter panel and its controls, entity pages, exporting, the
+                          support banner
     js/games/             shared scrobble index, records, the right-answer confirmation,
                           and the three games
     js/main.js            entry point: loads a user's data and wires the flows that span modules
@@ -27,6 +28,8 @@ work. Serve the folder over HTTP instead (`python3 -m http.server`).
 
 Unreleased:
 
+- A Graphs tab between Lists and Games. It plots up to eight artists, albums or tracks over time, as a value (plays, days played, longest streak or any other sort) or as a rank, counted in each day, week, month or year or up to it. Quick start has six ready-made graphs, and every setting can be changed: the measure, value or rank, the period, how far down ranks go, a linear or log scale and the dates. Line colors can be picked and are shared with the charts. "Graph over time" on the Lists tab opens the list on screen in Graphs with its filters still applied. Graphs download as PNG.
+- Tracks per artist works for album lists too (albums per artist), and a new Tracks per album cap sits in the Album menu. The album grid goes up to 20 by 20, and the filters are hidden on artist, album and track pages.
 - Equations: play counts, ranks and tracks per artist or album now count only the plays that reach their step, so the order of the steps matters. Filtering the year first and then "artist play count at least 500" finds artists you played 500 times that year; the other way round keeps that year's plays of artists with 500 plays in total. Show value keeps the value from its own step. Two examples in the editor show both orders.
 - Load ALL Details is written in capitals, so it's clear it is the big one.
 - Pick your own artist colors for the bar chart race and the bar chart. Click a swatch in the legend above the chart to change that artist's color, use "Color an artist" to add any artist by name, and × to go back to the automatic color. "Everyone else" can be recolored too. Picked colors stay in this browser for every profile and apply to every chart, including track and album races, comparisons, the GIF and PNG exports. "Color the top artists for me" gives the most-shown artists without a picked color one of the starting colors, skipping any that look like a color you picked; turn it off to color only your own picks. A shared link carries the colors of the artists on screen, and someone opening it sees them for that visit without losing their own.

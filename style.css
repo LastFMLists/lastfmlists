@@ -187,6 +187,7 @@ body:not(.app-loaded) #active-filters,
 body:not(.app-loaded) #view-tabs,
 body:not(.app-loaded) #games-section,
 body:not(.app-loaded) #explore-section,
+body:not(.app-loaded) #graphs-section,
 body:not(.app-loaded) footer,
 body:not(.app-loaded) #loading-stats {
     display: none !important;
@@ -222,6 +223,22 @@ body.view-explore #filters-section-toggle,
 body.view-explore #results-section,
 body.view-explore #active-filters,
 body.view-entity #explore-section {
+    display: none !important;
+}
+
+/* The graph builder has its own controls instead of the filter panel */
+#graphs-section {
+    display: none;
+}
+
+body.view-graphs:not(.view-entity) #graphs-section {
+    display: block;
+}
+
+body.view-graphs #filters-section,
+body.view-graphs #filters-section-toggle,
+body.view-graphs #results-section,
+body.view-graphs #active-filters {
     display: none !important;
 }
 
@@ -2884,11 +2901,11 @@ footer a:hover {
    ========================================================================== */
 
 @media (min-width: 769px) {
-    body.app-loaded:not(.sidebar-collapsed):not(.view-games):not(.view-explore):not(.view-entity) main {
+    body.app-loaded:not(.sidebar-collapsed):not(.view-games):not(.view-explore):not(.view-graphs):not(.view-entity) main {
         padding-left: calc(var(--sidebar-width) + clamp(1rem, 3vw, 2rem));
     }
 
-    body.app-loaded:not(.sidebar-collapsed):not(.view-games):not(.view-explore):not(.view-entity) footer {
+    body.app-loaded:not(.sidebar-collapsed):not(.view-games):not(.view-explore):not(.view-graphs):not(.view-entity) footer {
         padding-left: calc(var(--sidebar-width) + 1rem);
     }
 }
@@ -4388,4 +4405,226 @@ button.game-card:hover {
 
 .load-notify[hidden] {
     display: none;
+}
+
+/* ==========================================================================
+   Graphs
+   ========================================================================== */
+
+#graphs-section {
+    width: 100%;
+    max-width: 1180px;
+    margin: 0 auto;
+    box-sizing: border-box;
+}
+
+.results-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem 1rem;
+}
+
+.results-action,
+.graph-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.3rem 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 999px;
+    background-color: var(--sidebar-color);
+    color: var(--primary-text-color);
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.results-action:hover:not(:disabled),
+.graph-chip:hover:not(:disabled) {
+    border-color: var(--primary-accent-color);
+}
+
+.results-action[hidden] {
+    display: none;
+}
+
+.graph-chip.is-active {
+    background: var(--primary-accent-color);
+    border-color: var(--primary-accent-color);
+    color: #fff;
+}
+
+.graph-chip:disabled,
+.results-action:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.graph-presets,
+.graph-series-chips,
+.graph-add,
+.graph-source,
+.graph-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem 0.5rem;
+}
+
+.graph-presets {
+    margin-bottom: 0.9rem;
+}
+
+.graph-presets-title,
+.graph-field-label {
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--secondary-text-color);
+}
+
+.graph-presets-title {
+    margin-right: 0.25rem;
+}
+
+.graph-series {
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    padding: 0.8rem 0;
+    border-top: 1px solid var(--border-color);
+}
+
+.graph-series-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.25rem 0.4rem 0.25rem 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 999px;
+    background: var(--background-color);
+    font-size: 0.85rem;
+}
+
+.graph-series-text {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.4rem;
+    min-width: 0;
+}
+
+.graph-series-name {
+    font-weight: 650;
+    color: var(--primary-text-color);
+}
+
+.graph-series-kind {
+    font-size: 0.76rem;
+    color: var(--secondary-text-color);
+}
+
+.graph-add select,
+.graph-add input[type="text"],
+.graph-field select,
+.graph-field input {
+    padding: 0.3rem 0.6rem;
+    border: 1px solid var(--border-color);
+    border-radius: 999px;
+    background-color: var(--background-color);
+    color: var(--primary-text-color);
+    font: inherit;
+    font-size: 0.85rem;
+}
+
+.graph-add input[type="text"] {
+    width: 16rem;
+    max-width: 100%;
+}
+
+.graph-field input[type="number"] {
+    width: 5rem;
+}
+
+.graph-note {
+    margin: 0;
+    font-size: 0.8rem;
+    color: var(--secondary-text-color);
+}
+
+.graph-source {
+    margin-bottom: 0.6rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--radius-md);
+    background: var(--accent-soft);
+    font-size: 0.85rem;
+    color: var(--primary-text-color);
+}
+
+.graph-source[hidden] {
+    display: none;
+}
+
+.graph-controls {
+    gap: 0.6rem 1.1rem;
+    padding: 0.8rem 0;
+    border-top: 1px solid var(--border-color);
+}
+
+.graph-field {
+    display: inline-flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.graph-segmented {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+}
+
+.graph-download {
+    align-self: flex-end;
+    margin-left: auto;
+}
+
+.graph-stage {
+    position: relative;
+    height: 440px;
+    padding: 12px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background: var(--background-color);
+}
+
+.graph-status {
+    min-height: 1.2em;
+    margin: 0.5rem 0 0;
+    font-size: 0.85rem;
+    color: var(--secondary-text-color);
+}
+
+@media (max-width: 768px) {
+    .graph-series-chip {
+        max-width: 100%;
+        border-radius: var(--radius-md);
+    }
+
+    .graph-series-text {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0;
+    }
+
+    .graph-stage {
+        height: 340px;
+        padding: 6px;
+    }
+
+    .graph-download {
+        margin-left: 0;
+    }
 }

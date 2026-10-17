@@ -66,6 +66,7 @@ export const state = {
     racePlaybackSpeedMs: 260,
     raceSpeedReadoutElement: null,
     raceToolbar: null,
+    graphableList: null,
 };
 export const unfilteredStatsCache = {
     track: { source: null, length: 0, mapping: null },

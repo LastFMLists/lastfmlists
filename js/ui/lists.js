@@ -384,6 +384,7 @@ export function displayEntities() {
 
         const leftEntities = resolveDisplayEntities(leftPipeline, leftEntityType, leftSortingBasis, leftXValue, leftCaps);
         const rightEntities = resolveDisplayEntities(rightPipeline, rightEntityType, rightSortingBasis, rightXValue, rightCaps);
+        offerGraph(leftEntityType, leftSortingBasis, leftXValue, leftPipeline.tracks, leftEntities);
 
         const resultsDiv = document.getElementById("results");
         resultsDiv.innerHTML = "";
@@ -471,6 +472,7 @@ export function displayEntities() {
 
     const singleEntities = resolveDisplayEntities(leftPipeline, entityType, sortingBasis, xValue, caps);
     state.filteredData = singleEntities;
+    offerGraph(entityType, sortingBasis, xValue, leftPipeline.tracks, singleEntities);
     const resultsTarget = document.getElementById("results");
 
     if (renderMode === DISPLAY_MODE_BAR_CHART) {
@@ -529,6 +531,19 @@ export function displayEntities() {
 // in analytics.js.
 function announceRenderedList(count, listInfo) {
     document.dispatchEvent(new CustomEvent("lists:rendered", { detail: { count, ...listInfo } }));
+}
+
+// "Graph over time" opens the list on screen in the graph builder: its top
+// items, ranked the same way, counted over the plays the list uses.
+function offerGraph(entityType, sortingBasis, xValue, tracks, entities) {
+    const graphable = entityType !== "scrobble" && entities.length > 0;
+    const plural = { track: "Tracks", album: "Albums", artist: "Artists" }[entityType];
+    const sortLabel = document.querySelector(`#sorting-basis option[value="${sortingBasis}"]`)?.textContent.trim().toLowerCase() || sortingBasis;
+    state.graphableList = graphable
+        ? { entityType, sortingBasis, xValue, tracks, entities: entities.slice(0, 10), title: `${plural} by ${sortLabel}` }
+        : null;
+    const button = document.getElementById("graph-this-list");
+    if (button) button.hidden = !graphable;
 }
 
 function displayScrobbles(scrobbles, targetDiv = null, order = "asc") {
