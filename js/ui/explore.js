@@ -401,7 +401,9 @@ if (sectionElement) {
         const boxDef = boxesById.get(row.dataset.box);
         const rows = boxDef && results.get(resultKey(boxDef));
         const hit = rows && rows[Number(row.dataset.row)];
-        if (hit) openEntityPage(hit.identity);
+        if (!hit) return;
+        trackEvent(`explore/name/${boxDef.id}`, `Explore: opened a name from ${boxDef.id}`);
+        openEntityPage(hit.identity);
     };
 
     sectionElement.addEventListener("click", (event) => {
@@ -419,7 +421,10 @@ if (sectionElement) {
         if (!boxDef) return;
         if (event.target.closest('[data-action="more"]')) {
             if (expanded.has(boxDef.id)) expanded.delete(boxDef.id);
-            else expanded.add(boxDef.id);
+            else {
+                expanded.add(boxDef.id);
+                trackEvent(`explore/more/${boxDef.id}`, `Explore: show more in ${boxDef.id}`);
+            }
             paintBox(boxDef);
         } else if (event.target.closest('[data-action="open"]')) {
             trackEvent(`explore/open/${boxDef.id}`, `Explore: opened ${boxDef.id}`);
