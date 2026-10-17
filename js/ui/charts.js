@@ -7,7 +7,7 @@ import {
     SCROBBLE_SORT_ASC,
     SCROBBLE_SORT_DESC
 } from '../config.js';
-import { applyTracksPerEntityFilter, buildEntitiesFromTracks } from '../data/filters.js';
+import { applyEntityCaps, buildEntitiesFromTracks, currentEntityCaps } from '../data/filters.js';
 import { getDefaultXValue, isRollingWindowSortingBasis } from '../data/metrics.js';
 import { getListLengthLimit } from '../dom.js';
 import { state } from '../state.js';
@@ -703,7 +703,7 @@ function getRaceTitle(entityType, sortingBasis) {
     return option ? `${plural} by ${option.textContent.trim().toLowerCase()}` : plural;
 }
 
-function buildBarRaceFramesFromTracks(tracks, entityType, sortingBasis, xValue, maxPerArtist, timeline, frequency, endTimestamp) {
+function buildBarRaceFramesFromTracks(tracks, entityType, sortingBasis, xValue, caps, timeline, frequency, endTimestamp) {
     const rowCount = getRaceSlots() + RACE_SPARE_ROWS;
     const frames = [];
     const sortedTracks = [...(tracks || [])]
@@ -726,10 +726,7 @@ function buildBarRaceFramesFromTracks(tracks, entityType, sortingBasis, xValue, 
             pointer += 1;
         }
 
-        let entities = buildEntitiesFromTracks(cumulativeTracks, entityType, sortingBasis, xValue);
-        if (entityType === "track") {
-            entities = applyTracksPerEntityFilter(entities, maxPerArtist);
-        }
+        const entities = applyEntityCaps(buildEntitiesFromTracks(cumulativeTracks, entityType, sortingBasis, xValue), entityType, caps);
 
         frames.push({
             label: formatRacePeriodLabel(periodStart, frequency),
@@ -797,20 +794,20 @@ function setActiveRace(mode, charts, totalFrames) {
 export function renderBarRaceSingle(tracks, entityType, targetDiv, sortingBasis) {
     const frequency = (document.getElementById("race-frequency")?.value || "day").toLowerCase();
     const xValue = parseInt(document.getElementById("x-value")?.value, 10) || getDefaultXValue(sortingBasis);
-    const maxPerArtist = parseInt(document.getElementById("max-per-artist")?.value, 10) || Infinity;
+    const caps = currentEntityCaps();
     const bounds = resolveRaceTimeBounds([tracks]);
     const timeline = buildRaceTimeline(bounds.start, bounds.end, frequency);
-    const frames = buildBarRaceFramesFromTracks(tracks, entityType, sortingBasis, xValue, maxPerArtist, timeline, frequency, bounds.end);
+    const frames = buildBarRaceFramesFromTracks(tracks, entityType, sortingBasis, xValue, caps, timeline, frequency, bounds.end);
     const chart = mountRace(targetDiv, frames, entityType, sortingBasis);
     setActiveRace("single", [chart], frames.length);
 }
 
-export function renderBarRaceComparison(leftTracks, rightTracks, leftEntityType, rightEntityType, leftSortingBasis, rightSortingBasis, leftXValue, rightXValue, leftMaxPerArtist, rightMaxPerArtist, leftTargetDiv, rightTargetDiv) {
+export function renderBarRaceComparison(leftTracks, rightTracks, leftEntityType, rightEntityType, leftSortingBasis, rightSortingBasis, leftXValue, rightXValue, leftCaps, rightCaps, leftTargetDiv, rightTargetDiv) {
     const frequency = (document.getElementById("race-frequency")?.value || "day").toLowerCase();
     const bounds = resolveRaceTimeBounds([leftTracks, rightTracks]);
     const timeline = buildRaceTimeline(bounds.start, bounds.end, frequency);
-    const leftFrames = buildBarRaceFramesFromTracks(leftTracks, leftEntityType, leftSortingBasis, leftXValue, leftMaxPerArtist, timeline, frequency, bounds.end);
-    const rightFrames = buildBarRaceFramesFromTracks(rightTracks, rightEntityType, rightSortingBasis, rightXValue, rightMaxPerArtist, timeline, frequency, bounds.end);
+    const leftFrames = buildBarRaceFramesFromTracks(leftTracks, leftEntityType, leftSortingBasis, leftXValue, leftCaps, timeline, frequency, bounds.end);
+    const rightFrames = buildBarRaceFramesFromTracks(rightTracks, rightEntityType, rightSortingBasis, rightXValue, rightCaps, timeline, frequency, bounds.end);
 
     const left = mountRace(leftTargetDiv, leftFrames, leftEntityType, leftSortingBasis);
     const right = mountRace(rightTargetDiv, rightFrames, rightEntityType, rightSortingBasis);

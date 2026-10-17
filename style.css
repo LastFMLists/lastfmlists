@@ -225,7 +225,10 @@ body.view-entity #explore-section {
     display: none !important;
 }
 
-/* An entity page takes the place of the list until you go back */
+/* An entity page takes the place of the list until you go back, and the
+   filters go with it: they would change a list nobody can see. */
+body.view-entity #filters-section,
+body.view-entity #filters-section-toggle,
 body.view-entity #results-section,
 body.view-entity #active-filters,
 body.view-games #entity-section,
@@ -2881,11 +2884,11 @@ footer a:hover {
    ========================================================================== */
 
 @media (min-width: 769px) {
-    body.app-loaded:not(.sidebar-collapsed):not(.view-games):not(.view-explore) main {
+    body.app-loaded:not(.sidebar-collapsed):not(.view-games):not(.view-explore):not(.view-entity) main {
         padding-left: calc(var(--sidebar-width) + clamp(1rem, 3vw, 2rem));
     }
 
-    body.app-loaded:not(.sidebar-collapsed):not(.view-games):not(.view-explore) footer {
+    body.app-loaded:not(.sidebar-collapsed):not(.view-games):not(.view-explore):not(.view-entity) footer {
         padding-left: calc(var(--sidebar-width) + 1rem);
     }
 }

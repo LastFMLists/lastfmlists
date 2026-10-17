@@ -14,7 +14,10 @@ import {
 } from '../data/equations.js';
 import {
     convertStateToFilterArray,
+    currentEntityCaps,
+    entityCapsFrom,
     filterTracks,
+    makeCapCounter,
     normalizeEntitySorting,
     resolveDisplayEntities
 } from '../data/filters.js';
@@ -341,7 +344,7 @@ export function displayEntities() {
         document.getElementById("sorting-basis").value = sortingBasis;
     }
 
-    const maxPerArtist = parseInt(document.getElementById("max-per-artist").value) || Infinity;
+    const caps = currentEntityCaps();
     const xValue = parseInt(document.getElementById("x-value").value) || getDefaultXValue(sortingBasis);
     const comparisonButtonActive = isComparisonEnabled();
 
@@ -374,11 +377,11 @@ export function displayEntities() {
         const rightEntityType = rightNormalized.entityType;
         const leftSortingBasis = leftNormalized.sortingBasis;
         const rightSortingBasis = rightNormalized.sortingBasis;
-        const leftMaxPerArtist = parseInt(leftState["max-per-artist"], 10) || maxPerArtist;
-        const rightMaxPerArtist = parseInt(rightState["max-per-artist"], 10) || maxPerArtist;
+        const leftCaps = entityCapsFrom(leftState);
+        const rightCaps = entityCapsFrom(rightState);
 
-        const leftEntities = resolveDisplayEntities(leftPipeline, leftEntityType, leftSortingBasis, leftXValue, leftMaxPerArtist);
-        const rightEntities = resolveDisplayEntities(rightPipeline, rightEntityType, rightSortingBasis, rightXValue, rightMaxPerArtist);
+        const leftEntities = resolveDisplayEntities(leftPipeline, leftEntityType, leftSortingBasis, leftXValue, leftCaps);
+        const rightEntities = resolveDisplayEntities(rightPipeline, rightEntityType, rightSortingBasis, rightXValue, rightCaps);
 
         const resultsDiv = document.getElementById("results");
         resultsDiv.innerHTML = "";
@@ -421,8 +424,8 @@ export function displayEntities() {
                     rightSortingBasis,
                     leftXValue,
                     rightXValue,
-                    leftMaxPerArtist,
-                    rightMaxPerArtist,
+                    leftCaps,
+                    rightCaps,
                     leftList,
                     rightList
                 );
@@ -464,7 +467,7 @@ export function displayEntities() {
         return;
     }
 
-    const singleEntities = resolveDisplayEntities(leftPipeline, entityType, sortingBasis, xValue, maxPerArtist);
+    const singleEntities = resolveDisplayEntities(leftPipeline, entityType, sortingBasis, xValue, caps);
     state.filteredData = singleEntities;
     const resultsTarget = document.getElementById("results");
 
@@ -528,7 +531,7 @@ function announceRenderedList(count, listInfo) {
 
 function displayScrobbles(scrobbles, targetDiv = null, order = "asc") {
     const resultsDiv = targetDiv || document.getElementById("results");
-    const maxPerArtist = parseInt(document.getElementById("max-per-artist").value) || Infinity;
+    const admit = makeCapCounter("scrobble", currentEntityCaps());
     const listLength = getListLengthLimit();
     let tracks = [...scrobbles];
     resultsDiv.innerHTML = "";
@@ -540,17 +543,12 @@ function displayScrobbles(scrobbles, targetDiv = null, order = "asc") {
         return order === "desc" ? bDate - aDate : aDate - bDate;
     });
 
-    // Apply the per-artist cap BEFORE trimming to the list length, otherwise a
-    // capped artist eats slots and the list comes back shorter than requested.
-    const artistCounts = {};
+    // Apply the caps BEFORE trimming to the list length, otherwise a capped
+    // artist eats slots and the list comes back shorter than requested.
     const visible = [];
     for (const track of tracks) {
         if (visible.length >= listLength) break;
-        const artist = track.Artist;
-        if (!artistCounts[artist]) artistCounts[artist] = 0;
-        if (artistCounts[artist] >= maxPerArtist) continue;
-        artistCounts[artist]++;
-        visible.push(track);
+        if (admit(track)) visible.push(track);
     }
 
     visible.forEach((track) => {

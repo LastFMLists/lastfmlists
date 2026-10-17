@@ -213,6 +213,10 @@ async function getGifWorkerScriptUrl() {
     return gifWorkerBlobUrl;
 }
 
+// 20 by 20 is 400 covers; past that the image is too big to share and the
+// cover lookups take minutes.
+const GRID_MAX_SIDE = 20;
+
 // GIFs top out around this many frames before files get too big to share.
 const RACE_GIF_MAX_FRAMES = 400;
 // In-between frames per race step, so the GIF moves like the page does.
@@ -428,8 +432,8 @@ async function exportCurrentListAsGrid() {
         return;
     }
 
-    const gridX = Math.max(1, parseInt(document.getElementById('grid-size-x')?.value, 10) || 1);
-    const gridY = Math.max(1, parseInt(document.getElementById('grid-size-y')?.value, 10) || 1);
+    const gridX = Math.min(GRID_MAX_SIDE, Math.max(1, parseInt(document.getElementById('grid-size-x')?.value, 10) || 1));
+    const gridY = Math.min(GRID_MAX_SIDE, Math.max(1, parseInt(document.getElementById('grid-size-y')?.value, 10) || 1));
     const allowDuplicates = document.getElementById('grid-allow-duplicates')?.checked === true;
     const skipMissingArtwork = document.getElementById('grid-skip-missing-artwork')?.checked === true;
     const showText = document.getElementById('grid-show-text')?.checked === true;

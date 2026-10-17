@@ -46,7 +46,7 @@ const KEYS = new Map([
     ["display-mode", "mode"], ["chart-axis", "axis"], ["chart-scale", "scale"],
     ["race-start-date", "race.from"], ["race-end-date", "race.to"],
     ["race-frequency", "race.step"], ["race-speed-ms", "race.speed"],
-    ["list-length", "len"], ["unfiltered-stats", "unf"], ["max-per-artist", "per.artist"],
+    ["list-length", "len"], ["unfiltered-stats", "unf"], ["max-per-artist", "per.artist"], ["max-per-album", "per.album"],
     ["last-n-days", "days"], ["date-range-start", "from"], ["date-range-end", "to"],
     ["year", "year"], ["month", "month"], ["day-of-month", "dom"], ["weekday", "wd"],
     ["time-of-day-start", "time.from"], ["time-of-day-end", "time.to"],

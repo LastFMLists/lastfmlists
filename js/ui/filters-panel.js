@@ -263,7 +263,8 @@ export function updateActiveFilters() {
         { id: "sorting-basis", label: "Ranked by", isSelect: true },
         { id: "x-value", label: xValueLabel(document.getElementById("sorting-basis")?.value) },
 
-        { id: "max-per-artist", label: "Displayed tracks per artist" },
+        { id: "max-per-artist", label: "Per artist" },
+        { id: "max-per-album", label: "Tracks per album" },
 
         // Artist filters
 

@@ -423,15 +423,19 @@ function syncSortOptions() {
     });
 }
 
-// The per-artist cap only applies to track and scrobble lists.
+// The per-artist cap counts albums in album lists and tracks in track and
+// scrobble lists; the per-album cap only applies to tracks and scrobbles.
 function syncPerArtistVisibility() {
     const type = document.getElementById("entity-type")?.value || "track";
-    const applies = type === "track" || type === "scrobble";
-    const input = document.getElementById("max-per-artist");
-    const card = input?._fcWidget;
-    if (card) card.hidden = !applies;
-    const separator = card?.nextElementSibling;
-    if (separator && separator.classList.contains("separator")) separator.hidden = !applies;
+    const tracks = type === "track" || type === "scrobble";
+    [["max-per-artist", tracks || type === "album"], ["max-per-album", tracks]].forEach(([id, applies]) => {
+        const card = document.getElementById(id)?._fcWidget;
+        if (!card) return;
+        card.hidden = !applies;
+        card._paint?.();
+        const separator = card.nextElementSibling;
+        if (separator && separator.classList.contains("separator")) separator.hidden = !applies;
+    });
 }
 
 // ---- Clearing a single date or time ----
@@ -545,11 +549,20 @@ export function initFilterControls() {
         ]
     });
     const perArtist = document.getElementById("max-per-artist");
+    const albumList = () => document.getElementById("entity-type")?.value === "album";
+    const capPresets = [{ value: "", label: "No limit" }, ...[1, 2, 3, 5].map(count => ({ value: String(count), label: String(count) }))];
     if (perArtist) enhancePresets(perArtist, {
-        title: "Tracks per artist",
+        title: () => (albumList() ? "Albums per artist" : "Tracks per artist"),
+        unit: "rows",
+        presets: capPresets,
+        note: "Shows at most this many by the same artist, so one artist can't fill the list."
+    });
+    const perAlbum = document.getElementById("max-per-album");
+    if (perAlbum) enhancePresets(perAlbum, {
+        title: "Tracks per album",
         unit: "tracks",
-        presets: [{ value: "", label: "No limit" }, ...[1, 2, 3, 5].map(count => ({ value: String(count), label: String(count) }))],
-        note: "Shows at most this many tracks by the same artist."
+        presets: capPresets,
+        note: "Shows at most this many tracks from the same album."
     });
     enhanceXValue();
     addClearButtons();

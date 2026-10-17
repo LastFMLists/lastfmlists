@@ -232,7 +232,7 @@
                     <button class="dropdown-button"><i class="fas fa-microphone" aria-hidden="true"></i><span>Artist</span></button>
                     <div class="dropdown-content">
 
-                        <label for="max-per-artist">Displayed tracks per artist</label>
+                        <label for="max-per-artist">Displayed per artist</label>
                         <input type="number" id="max-per-artist" placeholder="e.g., 1" min="1">
 
                         <hr class="separator">
@@ -336,6 +336,11 @@
                 <div class="dropdown">
                     <button class="dropdown-button"><i class="fas fa-compact-disc" aria-hidden="true"></i><span>Album</span></button>
                     <div class="dropdown-content">
+
+                        <label for="max-per-album">Displayed tracks per album</label>
+                        <input type="number" id="max-per-album" placeholder="e.g., 1" min="1">
+
+                        <hr class="separator">
 
                         <!-- Category 1: Name/Title filters -->
                         <label for="album-name">Album title</label>
@@ -879,10 +884,10 @@
                 </div>
                 <div id="grid-export-options" class="export-options">
                     <label for="grid-size-x">Grid width (columns)</label>
-                    <input type="number" id="grid-size-x" min="1" max="50" value="5">
+                    <input type="number" id="grid-size-x" min="1" max="20" value="5">
 
                     <label for="grid-size-y">Grid height (rows)</label>
-                    <input type="number" id="grid-size-y" min="1" max="50" value="5">
+                    <input type="number" id="grid-size-y" min="1" max="20" value="5">
 
                     <label for="grid-allow-duplicates" class="inline-checkbox">
                         Allow duplicate covers

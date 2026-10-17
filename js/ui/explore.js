@@ -8,7 +8,7 @@
 import { trackEvent } from '../analytics.js';
 import { createArtworkElement } from '../data/artwork.js';
 import { libraryCounts, sortMetricText } from '../data/entity-stats.js';
-import { applyTracksPerEntityFilter, buildEntitiesFromTracks, filterTracks } from '../data/filters.js';
+import { applyEntityCaps, buildEntitiesFromTracks, entityCapsFrom, filterTracks } from '../data/filters.js';
 import { applyEquationPipeline } from '../data/equations.js';
 import { getDefaultXValue } from '../data/metrics.js';
 import { escapeHTML } from '../dom.js';
@@ -140,15 +140,13 @@ function sections(year, milestone) {
 
 function computeEntities(query) {
     const filterList = Object.entries(query.filters)
-        .filter(([id]) => id !== "max-per-artist" && id !== "equations")
+        .filter(([id]) => id !== "max-per-artist" && id !== "max-per-album" && id !== "equations")
         .map(([id, value]) => ({ id, value: String(value) }));
     let tracks = filterList.length ? filterTracks(filterList, state.allTracks) : state.allTracks;
     const x = query.xValue === "" ? getDefaultXValue(query.sortingBasis) : Number(query.xValue);
     if (query.filters.equations) tracks = applyEquationPipeline(tracks, query.filters.equations, { xValue: x }).tracks;
     let entities = buildEntitiesFromTracks(tracks, query.entityType, query.sortingBasis, x);
-    if (query.entityType === "track" && query.filters["max-per-artist"]) {
-        entities = applyTracksPerEntityFilter(entities, Number(query.filters["max-per-artist"]));
-    }
+    entities = applyEntityCaps(entities, query.entityType, entityCapsFrom(query.filters));
     return entities.slice(0, ROWS_EXPANDED).map(entity => ({
         identity: identityOf(query.entityType, entity),
         metric: boxMetric(query.sortingBasis, entity, x)
