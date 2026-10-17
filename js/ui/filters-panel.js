@@ -555,9 +555,9 @@ export function updateActiveFilters() {
             shouldShow = mode === DISPLAY_MODE_BAR_CHART || mode === DISPLAY_MODE_BAR_RACE;
         }
 
+        // The race settings share one chip, added after the loop.
         if (filter.id === "race-start-date" || filter.id === "race-end-date" || filter.id === "race-frequency" || filter.id === "race-speed-ms") {
-            const mode = document.getElementById("display-mode")?.value || DISPLAY_MODE_LIST;
-            shouldShow = mode === DISPLAY_MODE_BAR_RACE && rawValue !== "";
+            shouldShow = false;
         }
 
         if (filter.id === "unfiltered-stats") {
@@ -573,6 +573,20 @@ export function updateActiveFilters() {
             appendFilterLabel(`${filter.label}: ${displayValue}`, filter.id, singleListSteps && isPlayFilter(filter.id));
         }
     });
+
+    appendRaceChip(appendFilterLabel);
+}
+
+// One chip for the race: its dates, step and speed.
+function appendRaceChip(appendFilterLabel) {
+    if ((document.getElementById("display-mode")?.value || DISPLAY_MODE_LIST) !== DISPLAY_MODE_BAR_RACE) return;
+    const from = document.getElementById("race-start-date")?.value;
+    const to = document.getElementById("race-end-date")?.value;
+    if (!from || !to) return;
+    const day = (value) => new Date(`${value}T00:00:00`).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+    const step = { day: "daily", week: "weekly", month: "monthly" }[document.getElementById("race-frequency")?.value] || "daily";
+    const speed = (parseInt(document.getElementById("race-speed-ms")?.value, 10) || 260) / 1000;
+    appendFilterLabel(`Race: ${day(from)} to ${day(to)}, ${step}, ${+speed.toFixed(2)}s per step`, "race-start-date");
 }
 
 // Puts every control back to its default and empties the filter state,

@@ -3116,6 +3116,14 @@ footer a:hover {
         border-radius: 0 12px 12px 0;
     }
 
+    #filters-section.closed + #filters-section-toggle {
+        display: none;
+    }
+
+    .filters-mobile-button {
+        display: inline-flex !important;
+    }
+
     .filters {
         gap: 0.15rem;
     }
@@ -4603,8 +4611,15 @@ button.game-card:hover {
     border-color: var(--primary-accent-color);
 }
 
-.results-action[hidden] {
+.results-action[hidden],
+.filters-mobile-button {
     display: none;
+}
+
+.results-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
 }
 
 .graph-chip.is-active {
@@ -4816,6 +4831,21 @@ button.game-card:hover {
         padding: 10px 8px 8px;
     }
 
+    /* The two round buttons go above the lines, so lines sit two to a row. */
+    .graph-top {
+        flex-wrap: wrap;
+    }
+
+    .graph-actions {
+        order: 1;
+        margin-left: auto;
+    }
+
+    .graph-series {
+        order: 2;
+        flex-basis: 100%;
+    }
+
     .graph-series-chip {
         border-radius: var(--radius-md);
     }
@@ -4874,4 +4904,20 @@ button.game-card:hover {
 .filter-label.is-paused {
     opacity: 0.6;
     text-decoration: line-through;
+}
+
+/* Four tabs with icons don't fit a phone; the words are enough there. */
+@media (max-width: 480px) {
+    .view-tabs {
+        gap: 0.25rem;
+    }
+
+    .view-tab {
+        padding: 0.3rem 0.7rem;
+        font-size: 0.86rem;
+    }
+
+    .view-tab i {
+        display: none;
+    }
 }

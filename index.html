@@ -676,7 +676,10 @@
         <section id="results-section" class="content-block">
             <div class="results-header">
                 <h2>Top Tracks</h2>
-                <button type="button" id="graph-this-list" class="results-action" hidden title="Plot how the top of this list changed over time"><i class="fas fa-chart-line" aria-hidden="true"></i> Graph over time</button>
+                <div class="results-actions">
+                    <button type="button" id="open-filters-mobile" class="results-action filters-mobile-button" aria-controls="filters-section"><i class="fas fa-filter" aria-hidden="true"></i> Filters</button>
+                    <button type="button" id="graph-this-list" class="results-action" hidden title="Plot how the top of this list changed over time"><i class="fas fa-chart-line" aria-hidden="true"></i> Graph over time</button>
+                </div>
             </div>
             <div id="results"></div>
         </section>

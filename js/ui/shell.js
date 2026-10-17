@@ -217,6 +217,13 @@ function openFilterSidebar() {
     syncSidebarLayoutState();
 }
 
+// On phones the edge tab only closes the open panel; this button in the
+// list header opens it, so nothing sits on top of the list.
+document.getElementById("open-filters-mobile")?.addEventListener("click", () => {
+    const sidebar = document.getElementById("filters-section");
+    if (sidebar?.classList.contains("closed")) document.getElementById("filters-section-toggle").click();
+});
+
 document.getElementById("filters-section-toggle").addEventListener("click", function () {
     const sidebar = document.getElementById("filters-section");
     sidebar.classList.toggle("closed");
