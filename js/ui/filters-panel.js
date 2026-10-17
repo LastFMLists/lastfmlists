@@ -185,6 +185,9 @@ export function updateComparisonInteractionState() {
     const comparisonEnabled = isComparisonEnabled();
     const comparisonEditTarget = document.getElementById("comparison-edit-target");
     const rightEquationsInput = document.getElementById("equations-right");
+    // The side switch only takes room in the panel while comparing.
+    const sideSwitch = document.querySelector(".comparison-controls");
+    if (sideSwitch) sideSwitch.hidden = !comparisonEnabled;
 
     if (comparisonEditTarget) {
         comparisonEditTarget.disabled = !comparisonEnabled;

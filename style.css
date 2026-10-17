@@ -1447,6 +1447,18 @@ label.inline-checkbox {
 
 /* ---- Comparison + actions ---- */
 
+.comparison-controls[hidden] {
+    display: none;
+}
+
+.comparison-label {
+    display: block;
+    margin-bottom: 0.35rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--secondary-text-color);
+}
+
 .comparison-controls {
     display: flex;
     flex-direction: column;

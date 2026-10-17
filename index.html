@@ -226,6 +226,11 @@
                             <input type="checkbox" id="unfiltered-stats">
                         </label>
 
+                        <hr class="separator">
+
+                        <span class="comparison-label">Two lists side by side</span>
+                        <button id="comparison-toggle" type="button" data-active="false">Comparison: Off</button>
+
                     </div>
                 </div>
 
@@ -640,8 +645,8 @@
                 </div>
             </div>
 
-            <div class="comparison-controls">
-                <button id="comparison-toggle" type="button" data-active="false">Comparison: Off</button>
+            <!-- Which side the filters change, shown while comparing -->
+            <div class="comparison-controls" hidden>
                 <select id="comparison-edit-target">
                     <option value="left">Editing: Left list</option>
                     <option value="right">Editing: Right list</option>
