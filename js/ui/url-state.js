@@ -1,5 +1,7 @@
-// The list settings and the username live in the address bar, so a link
-// opens the same list for anyone: ?user=name&type=artist&sort=consecutive-days
+// The list settings live in the address bar, so a link gives anyone the same
+// list for their own history: ?type=artist&sort=consecutive-days&year=2024
+// The username stays out: a link to someone else's list would mean
+// downloading their whole history first, and a screenshot does that better.
 //
 // Every control has a short key below. Links are shared, so the keys must
 // never change; a renamed control keeps its old key. Settings at their
@@ -90,7 +92,6 @@ function sideSettings(values, mode, prefix, pairs) {
 
 function currentPairs() {
     const pairs = [];
-    if (state.loadedUsername) pairs.push(["user", state.loadedUsername]);
     if (getActiveView() !== "lists") return pairs;
 
     const mode = document.getElementById("display-mode")?.value || "list";
@@ -120,6 +121,7 @@ function encode(value) {
 }
 
 export function syncUrl() {
+    // Only once a history is on screen; until then a link's settings wait.
     if (!state.loadedUsername || state.historyLoad) return;
     const query = currentPairs().map(([key, value]) => `${key}=${encode(String(value))}`).join("&");
     const next = `${location.pathname}${query ? `?${query}` : ""}${location.hash}`;
@@ -135,11 +137,10 @@ let pending = null;
 
 function readQuery() {
     const params = new URLSearchParams(location.search);
-    const user = (params.get("user") || "").trim().slice(0, 64);
     const settings = { comparison: params.get("cmp") === "1", left: {}, right: {}, globals: {} };
     let any = false;
     params.forEach((value, key) => {
-        if (key === "user" || key === "cmp") return;
+        if (key === "cmp") return;
         const right = key.startsWith("r.");
         const id = idFor(right ? key.slice(2) : key);
         if (!id) return;
@@ -147,22 +148,14 @@ function readQuery() {
         if (GLOBAL_BASE_SETTING_IDS.has(id)) settings.globals[id] = value;
         else (right ? settings.right : settings.left)[id] = value;
     });
-    return { user, settings: any ? settings : null };
+    return any ? settings : null;
 }
 
-// Called once the page is ready. A link with a username loads it straight
-// away; settings wait for the history, from that link or the visitor's own.
+// Called once the page is ready. A link's settings wait until the visitor
+// has loaded their own history, then open that list.
 export function startFromUrl() {
-    const { user, settings } = readQuery();
-    pending = settings;
-    if (settings) trackEvent("link/settings", "Opened a link with list settings");
-    if (!user) return;
-    trackEvent("link/user", "Opened a link with a username");
-    const input = document.getElementById("username");
-    const form = document.getElementById("username-form");
-    if (!input || !form) return;
-    input.value = user;
-    form.requestSubmit();
+    pending = readQuery();
+    if (pending) trackEvent("link/settings", "Opened a link with list settings");
 }
 
 export function takePendingSettings() {
