@@ -58,7 +58,7 @@ function hasDetails(entry) {
 
 // Load Details covers everything played often (over 100 plays for an artist,
 // 10 for an album, 5 for a track) and never less than the top 250 artists,
-// 500 albums and 1,000 tracks. Load All Details covers every top-list entry.
+// 500 albums and 1,000 tracks. Load ALL Details covers every top-list entry.
 function selectDetailCandidates(all) {
     const pick = (list, minPlays, atLeast) => {
         if (all) return list.slice();
@@ -167,8 +167,8 @@ async function loadDetailedMetadata(loadAll = false) {
             ? ` ${skipped.toLocaleString()} more already have details from an earlier run and are skipped.`
             : "";
         confirmMsg = loadAll
-            ? `Load All Details downloads metadata for every artist, album and track you have scrobbled: ${countByKind(jobs)}.${skippedNote} This can take hours. Click Save Data if you have to stop, and the next run continues from there.\n\nContinue?`
-            : `Load Details downloads metadata for ${countByKind(jobs)}: everything you play often, and at least your top 250 artists, 500 albums and 1,000 tracks.${skippedNote} This is enough for most statistics. Use "Load All Details" for metadata on everything you have scrobbled.\n\nContinue?`;
+            ? `Load ALL Details downloads metadata for every artist, album and track you have scrobbled: ${countByKind(jobs)}.${skippedNote} This can take hours. Click Save Data if you have to stop, and the next run continues from there.\n\nContinue?`
+            : `Load Details downloads metadata for ${countByKind(jobs)}: everything you play often, and at least your top 250 artists, 500 albums and 1,000 tracks.${skippedNote} This is enough for most statistics. Use "Load ALL Details" for metadata on everything you have scrobbled.\n\nContinue?`;
     }
     if (!confirm(confirmMsg)) return;
 

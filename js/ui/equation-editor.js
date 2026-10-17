@@ -295,7 +295,9 @@ function setOperand(step, path, value) {
 const EXAMPLES = [
     ["Tracks with at least 10 plays", "filter track-scrobble-count >= 10"],
     ["Tracks with at least 10% of their artist's plays", "filter (track-scrobble-count / artist-scrobble-count) >= 0.1"],
-    ["Last 3 plays per artist, with library rank", "sort scrobble-order desc;\nunique artist-name 3;\nshow artist-rank"],
+    ["Last 3 plays per artist, with library rank", "show artist-rank;\nsort scrobble-order desc;\nunique artist-name 3"],
+    ["Plays of artists with 500 plays in 2023", "filter year = 2023;\nfilter artist-scrobble-count >= 500"],
+    ["2023 plays of artists with 500 plays overall", "filter artist-scrobble-count >= 500;\nfilter year = 2023"],
     ["Top track for each title length, where the artist name is just as long", "filter artist-name-length = track-name-length;\nsort track-scrobble-count desc;\nunique track-name-length 1;\nsort track-name-length asc"]
 ];
 

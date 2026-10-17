@@ -199,7 +199,9 @@ function getAdditionalInfo(sortingBasis, entity) {
         });
 
         showFields.forEach(fieldName => {
-            const fieldValue = getEquationFieldValue(entity, fieldName);
+            const fieldValue = entity.equationPipelineShowValues && fieldName in entity.equationPipelineShowValues
+                ? entity.equationPipelineShowValues[fieldName]
+                : getEquationFieldValue(entity, fieldName);
             if (fieldValue === null || fieldValue === undefined) return;
             const line = `${escapeHTML(formatEquationFieldLabel(fieldName))}: ${escapeHTML(fieldValue)}`;
             if (!seenLines.has(line)) {

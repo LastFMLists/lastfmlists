@@ -5,6 +5,63 @@ import { state } from '../state.js';
 import { getDaysSinceTimestamp, getFirstScrobbleYear } from '../time.js';
 import { getTrackAverageListeningMap } from './metrics.js';
 
+// Play counts, ranks and track counts count the plays that reach the step
+// that asks for them, so the order of the steps matters: a year filter
+// before "artist play count >= 500" means 500 plays in that year, after it
+// means 500 overall. Outside a pipeline (no step plays in the context) they
+// count the whole history.
+const STEP_KEYS = {
+    artist: (item) => (item.Artist || "").toLowerCase(),
+    album: (item) => `${(item.Album || "").toLowerCase()}||${(item.Artist || "").toLowerCase()}`,
+    track: (item) => `${(item.Track || "").toLowerCase()}||${(item.Artist || "").toLowerCase()}`
+};
+
+function stepStats(kind, context) {
+    if (!context?.stepTracks) return null;
+    context.stepStats = context.stepStats || {};
+    if (context.stepStats[kind]) return context.stepStats[kind];
+    const keyOf = STEP_KEYS[kind];
+    const counts = new Map();
+    const tracks = new Map();
+    context.stepTracks.forEach(item => {
+        const key = keyOf(item);
+        counts.set(key, (counts.get(key) || 0) + 1);
+        if (kind === "track") return;
+        if (!tracks.has(key)) tracks.set(key, new Set());
+        tracks.get(key).add(STEP_KEYS.track(item));
+    });
+    const ranks = new Map();
+    [...counts.entries()].sort((a, b) => b[1] - a[1]).forEach(([key], index) => ranks.set(key, index + 1));
+    context.stepStats[kind] = { counts, ranks, tracks };
+    return context.stepStats[kind];
+}
+
+function libraryEntry(kind, item) {
+    const map = kind === "artist" ? state.artistDataMap : kind === "album" ? state.albumDataMap : state.trackDataMap;
+    return map?.[STEP_KEYS[kind](item)];
+}
+
+function playCount(kind) {
+    return (item, context) => {
+        const stats = stepStats(kind, context);
+        return stats ? stats.counts.get(STEP_KEYS[kind](item)) ?? null : libraryEntry(kind, item)?.user_scrobbles ?? null;
+    };
+}
+
+function playRank(kind) {
+    return (item, context) => {
+        const stats = stepStats(kind, context);
+        return stats ? stats.ranks.get(STEP_KEYS[kind](item)) ?? null : libraryEntry(kind, item)?.rank ?? null;
+    };
+}
+
+function trackCount(kind) {
+    return (item, context) => {
+        const stats = stepStats(kind, context);
+        return stats ? stats.tracks.get(STEP_KEYS[kind](item))?.size ?? null : libraryEntry(kind, item)?.track_count ?? null;
+    };
+}
+
 export const equationFieldResolvers = {
     "artist-name": (item) => item.Artist,
     "album-name": (item) => item.Album,
@@ -15,14 +72,14 @@ export const equationFieldResolvers = {
     "artist-word-count": (item) => item.Artist?.trim().split(/\s+/).length ?? null,
     "album-word-count": (item) => item.Album?.trim().split(/\s+/).length ?? null,
     "track-word-count": (item) => item.Track?.trim().split(/\s+/).length ?? null,
-    "artist-scrobble-count": (item) => state.artistDataMap[item.Artist.toLowerCase()]?.user_scrobbles ?? null,
-    "album-scrobble-count": (item) => state.albumDataMap[`${item.Album.toLowerCase()}||${item.Artist.toLowerCase()}`]?.user_scrobbles ?? null,
-    "track-scrobble-count": (item) => state.trackDataMap[`${item.Track.toLowerCase()}||${item.Artist.toLowerCase()}`]?.user_scrobbles ?? null,
-    "artist-rank": (item) => state.artistDataMap[item.Artist.toLowerCase()]?.rank ?? null,
-    "album-rank": (item) => state.albumDataMap[`${item.Album.toLowerCase()}||${item.Artist.toLowerCase()}`]?.rank ?? null,
-    "track-rank": (item) => state.trackDataMap[`${item.Track.toLowerCase()}||${item.Artist.toLowerCase()}`]?.rank ?? null,
-    "artist-track-count": (item) => state.artistDataMap[item.Artist.toLowerCase()]?.track_count ?? null,
-    "album-track-count": (item) => state.albumDataMap[`${item.Album.toLowerCase()}||${item.Artist.toLowerCase()}`]?.track_count ?? null,
+    "artist-scrobble-count": playCount("artist"),
+    "album-scrobble-count": playCount("album"),
+    "track-scrobble-count": playCount("track"),
+    "artist-rank": playRank("artist"),
+    "album-rank": playRank("album"),
+    "track-rank": playRank("track"),
+    "artist-track-count": trackCount("artist"),
+    "album-track-count": trackCount("album"),
     "artist-first-scrobble-year": (item) => getFirstScrobbleYear(state.artistDataMap[item.Artist.toLowerCase()]?.firstscrobble),
     "album-first-scrobble-year": (item) => getFirstScrobbleYear(state.albumDataMap[`${item.Album.toLowerCase()}||${item.Artist.toLowerCase()}`]?.firstscrobble),
     "track-first-scrobble-year": (item) => getFirstScrobbleYear(state.trackDataMap[`${item.Track.toLowerCase()}||${item.Artist.toLowerCase()}`]?.firstscrobble),
@@ -484,12 +541,16 @@ export function applyEquationPipeline(tracks, equationsInput, equationContext = 
         return { usedPipeline: true, hasOrderingStep: false, tracks: [] };
     }
 
-    const workingTracks = tracks.map(track => ({ ...track, equationPipelineSortHistory: [], equationPipelineShowFields: [] }));
+    const workingTracks = tracks.map(track => ({ ...track, equationPipelineSortHistory: [], equationPipelineShowFields: [], equationPipelineShowValues: {} }));
     let hasOrderingStep = false;
     let currentTracks = workingTracks;
     const textSortCollator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+    const outerContext = equationContext;
 
     for (const step of steps) {
+        // Counts and ranks in this step are worked out from the plays it gets.
+        equationContext = { ...outerContext, stepTracks: currentTracks };
+
         if (step.type === "filter") {
             currentTracks = currentTracks.filter(track => step.predicate(track, equationContext));
             continue;
@@ -589,9 +650,12 @@ export function applyEquationPipeline(tracks, equationsInput, equationContext = 
                     return track;
                 }
 
+                // The value is kept as it was at this step, since counts and
+                // ranks depend on where the step is.
                 return {
                     ...track,
-                    equationPipelineShowFields: [...existingShowFields, step.field]
+                    equationPipelineShowFields: [...existingShowFields, step.field],
+                    equationPipelineShowValues: { ...track.equationPipelineShowValues, [step.field]: getEquationFieldValue(track, step.field, equationContext) }
                 };
             });
         }

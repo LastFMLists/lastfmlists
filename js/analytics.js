@@ -127,7 +127,7 @@ document.addEventListener("lists:rendered", (event) => {
 // need no changes. Disabled buttons fire no clicks, so these count real use.
 const BUTTON_EVENTS = {
     "load-detailed-data": ["details/top", "Load Details"],
-    "load-all-details": ["details/all", "Load All Details"],
+    "load-all-details": ["details/all", "Load ALL Details"],
     "save-data": ["save-data", "Save Data"],
     "confirm-export-grid": ["export/grid", "Export grid"],
     "tab-games": ["view/games", "Games tab opened"],
