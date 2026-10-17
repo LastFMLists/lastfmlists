@@ -3375,6 +3375,15 @@ footer a:hover {
     display: none;
 }
 
+/* On phones a sideways-scrolling row hides most chips without showing it
+   can be swiped, so the chips wrap onto a second line instead. */
+@media (max-width: 768px) {
+    .explore-jump {
+        flex-wrap: wrap;
+        overflow-x: visible;
+    }
+}
+
 .explore-chip {
     flex-shrink: 0;
     padding: 0.22rem 0.75rem;
