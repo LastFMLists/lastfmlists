@@ -14,6 +14,7 @@ import { GLOBAL_BASE_SETTING_IDS } from '../config.js';
 import { filterTracks, getManagedFilterElements } from '../data/filters.js';
 import { applySerializedControlValue, serializeControlValue } from '../dom.js';
 import { state } from '../state.js';
+import { applyLinkColors, colorLinkPairs } from './artist-colors.js';
 import { updateRaceControlsVisibility } from './charts.js';
 import {
     isComparisonEnabled,
@@ -112,6 +113,8 @@ function currentPairs() {
         values.equations = document.getElementById("equations")?.value || "";
         sideSettings(values, mode, "", pairs);
     }
+    // Picked colors of the artists on screen, so the link looks the same.
+    if (mode !== "list") pairs.push(...colorLinkPairs());
     return pairs;
 }
 
@@ -140,7 +143,7 @@ function readQuery() {
     const settings = { comparison: params.get("cmp") === "1", left: {}, right: {}, globals: {} };
     let any = false;
     params.forEach((value, key) => {
-        if (key === "cmp") return;
+        if (key === "cmp" || key.startsWith("color")) return;
         const right = key.startsWith("r.");
         const id = idFor(right ? key.slice(2) : key);
         if (!id) return;
@@ -154,6 +157,7 @@ function readQuery() {
 // Called once the page is ready. A link's settings wait until the visitor
 // has loaded their own history, then open that list.
 export function startFromUrl() {
+    applyLinkColors(new URLSearchParams(location.search));
     pending = readQuery();
     if (pending) trackEvent("link/settings", "Opened a link with list settings");
 }
@@ -220,3 +224,5 @@ export function applySettings(settings) {
 // The address bar follows the list on screen and the tab you're on.
 document.addEventListener("list:rendered", syncUrl);
 document.addEventListener("view:changed", syncUrl);
+document.addEventListener("artist-colors:shown", syncUrl);
+document.addEventListener("artist-colors:changed", syncUrl);

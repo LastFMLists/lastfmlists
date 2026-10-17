@@ -172,6 +172,8 @@ async function exportCurrentListAsImage() {
     }
 
     trimExportRows(resultsClone);
+    // The color legend keeps its swatches but not the editing controls.
+    resultsClone.querySelectorAll('.race-legend-tools, .race-legend-reset, .race-swatch input').forEach(el => el.remove());
     captureRoot.appendChild(resultsClone);
 
     document.body.appendChild(captureRoot);

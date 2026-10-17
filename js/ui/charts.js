@@ -12,12 +12,16 @@ import { getDefaultXValue, isRollingWindowSortingBasis } from '../data/metrics.j
 import { getListLengthLimit } from '../dom.js';
 import { state } from '../state.js';
 import { formatDateInputValue, formatDuration } from '../time.js';
+import { assignColors, createColorLegend, setShownNames } from './artist-colors.js';
 import { createRaceChart } from './bar-race.js';
 import { displayEntities, getSelectedDisplayMode } from './lists.js';
 
 export function applyColorsToChartInstances(colors) {
     state.chartInstances.forEach(chart => {
-        if (chart.data.datasets && chart.data.datasets[0]) {
+        if (chart.$recolor) {
+            // Bars colored by artist pick their own colors for the theme.
+            chart.$recolor();
+        } else if (chart.data.datasets && chart.data.datasets[0]) {
             chart.data.datasets[0].backgroundColor = colors.accentFill;
             chart.data.datasets[0].borderColor = colors.accent;
         }
@@ -224,6 +228,8 @@ export function destroyVisualizationState() {
     });
     state.chartInstances = [];
     (state.activeRaceState?.charts || []).forEach(chart => chart.destroy());
+    shownArtists.clear();
+    setShownNames([]);
     state.activeRaceState = null;
     state.raceToolbar = null;
 }
@@ -238,13 +244,17 @@ function getSelectedChartScale() {
     return scale === "logarithmic" ? "logarithmic" : "linear";
 }
 
+const shorten = (text, length = 34) => (text.length > length ? `${text.slice(0, length - 1)}…` : text);
+
+// Tracks and albums get two short lines, the title and then the artist, so
+// labels stay readable without wrapping into each other.
 function getEntityLabel(entity, entityType) {
     if (!entity) return "Unknown";
     if (entityType === "track") {
-        return `${entity.Artist || "Unknown Artist"} - ${entity.Track || "Unknown Track"}`;
+        return [shorten(entity.Track || "Unknown Track"), shorten(entity.Artist || "Unknown Artist")];
     }
     if (entityType === "album") {
-        return `${entity.artist || "Unknown Artist"} - ${entity.name || "Unknown Album"}`;
+        return [shorten(entity.name || "Unknown Album"), shorten(entity.artist || "Unknown Artist")];
     }
     if (entityType === "artist") {
         return entity.name || "Unknown Artist";
@@ -502,10 +512,13 @@ function createBarChartInCanvas(canvas, labels, values, sortingBasis, chartTitle
                 },
                 [labelAxisKey]: {
                     ticks: {
+                        // Every bar keeps its label; the chart is made tall
+                        // enough for them instead.
+                        autoSkip: false,
                         color: chartColors.text,
                         callback: function (_tickValue, tickIndex) {
                             const fullLabel = this?.chart?.data?.labels?.[tickIndex];
-                            return wrapChartLabel(fullLabel, 25);
+                            return Array.isArray(fullLabel) ? fullLabel : wrapChartLabel(fullLabel, 25);
                         }
                     }
                 }
@@ -517,17 +530,50 @@ function createBarChartInCanvas(canvas, labels, values, sortingBasis, chartTitle
     return chart;
 }
 
+// The artists on screen in every chart, for the colors a shared link carries.
+const shownArtists = new Set();
+
+function showArtists(keys) {
+    keys.forEach(key => shownArtists.add(key));
+    setShownNames(shownArtists);
+}
+
+function entityArtist(entity, entityType) {
+    if (entityType === "album") return entity.artist || "";
+    if (entityType === "artist") return entity.name || "";
+    return entity.Artist || "";
+}
+
 export function renderBarChartEntities(entities, entityType, sortingBasis, targetDiv) {
     const listLength = Math.min(getListLengthLimit(), 100);
     const chartRows = (entities || []).slice(0, listLength);
     targetDiv.innerHTML = "";
 
+    // Bars are colored by artist, like the race: the artists with the most
+    // bars get the starting colors unless you picked your own.
+    const barCounts = new Map();
+    const artistNames = new Map();
+    const barArtists = chartRows.map(entity => {
+        const name = entityArtist(entity, entityType);
+        const key = name.toLowerCase();
+        if (!artistNames.has(key)) artistNames.set(key, name);
+        barCounts.set(key, (barCounts.get(key) || 0) + 1);
+        return key;
+    });
+    const order = [...barCounts.keys()].sort((a, b) => barCounts.get(b) - barCounts.get(a));
+    const legend = createColorLegend({
+        otherLabel: entityType === "artist" ? "Everyone else" : "Other artists",
+        known: order.map(key => [key, artistNames.get(key)])
+    });
+    targetDiv.appendChild(legend.el);
+    showArtists(order);
+
     const wrapper = document.createElement("div");
     wrapper.className = "chart-wrapper";
     
-    const minBarThickness = 30;
-    const requiredHeight = Math.max(400, chartRows.length * minBarThickness);
-    wrapper.style.height = requiredHeight + "px";
+    // Room for a two-line label per bar.
+    const rowHeight = getSelectedChartOrientation() === "vertical" ? 30 : 40;
+    wrapper.style.height = Math.max(400, chartRows.length * rowHeight) + "px";
 
     const canvas = document.createElement("canvas");
     wrapper.appendChild(canvas);
@@ -535,7 +581,21 @@ export function renderBarChartEntities(entities, entityType, sortingBasis, targe
 
     const labels = chartRows.map(entity => getEntityLabel(entity, entityType));
     const values = chartRows.map(entity => getEntityMetricValue(entity, sortingBasis));
-    createBarChartInCanvas(canvas, labels, values, sortingBasis, "");
+    const chart = createBarChartInCanvas(canvas, labels, values, sortingBasis, "");
+    if (!chart) return;
+    chart.$recolor = () => {
+        const theme = document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
+        const colors = assignColors(order, artistNames, theme);
+        const dataset = chart.data.datasets[0];
+        dataset.backgroundColor = barArtists.map(key => colors.assigned.get(key) || colors.other);
+        dataset.borderWidth = 0;
+        dataset.borderRadius = 4;
+        dataset.borderSkipped = "start";
+        dataset.maxBarThickness = 24;
+        legend.sync(colors, theme);
+        chart.update("none");
+    };
+    chart.$recolor();
 }
 
 function getRacePeriodStartTimestamp(timestamp, frequency) {
@@ -785,6 +845,7 @@ function setActiveRace(mode, charts, totalFrames) {
         }
     };
     state.activeRaceState = race;
+    showArtists(charts.flatMap(chart => chart.artists));
     race.drawAt(0);
     if (state.raceRenderArmed) {
         startRacePlayback();
@@ -847,9 +908,12 @@ if (displayModeSelect) {
     });
 });
 
-// A picked or reset artist color repaints the race where it is, playing
-// or paused, without rebuilding it.
-document.addEventListener("race-colors:changed", () => state.activeRaceState?.redraw());
+// A picked or reset color repaints the race where it is, playing or paused,
+// and recolors bar charts, without rebuilding either.
+document.addEventListener("artist-colors:changed", () => {
+    state.activeRaceState?.redraw();
+    state.chartInstances.forEach(chart => chart.$recolor?.());
+});
 
 const raceSpeedInput = document.getElementById("race-speed-ms");
 if (raceSpeedInput) {
