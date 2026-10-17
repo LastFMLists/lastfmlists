@@ -2,7 +2,7 @@
 
 Lists, charts, statistics and games made from your Last.fm scrobbles. The site runs in your browser, and your data stays there.
 
-The site counts anonymous visits with [GoatCounter](https://www.goatcounter.com/), which sets no cookies. It records which features are used (list types, filters, games, exports, Explore boxes), which outside sites people follow links to (Reddit, GitHub, Ko-fi, Last.fm), how long visits last in steps of 1, 3, 10, 30 and 60 minutes, the size range of loaded libraries and the visitor's country, but never usernames, filter values, artist, album or track names, scrobbles or full link addresses. See `js/analytics.js`.
+The site counts anonymous visits with [GoatCounter](https://www.goatcounter.com/), which sets no cookies. It records which features are used (list types, filters, games, exports, Explore boxes), which outside sites people follow links to (Reddit, GitHub, Ko-fi, Last.fm), how long visits last in steps of 1, 3, 5, 10, 15, 30 and 60 minutes, the size range of loaded libraries and the visitor's country, but never usernames, filter values, artist, album or track names, scrobbles or full link addresses. See `js/analytics.js`.
 
 ## Project layout
 
@@ -27,8 +27,8 @@ work. Serve the folder over HTTP instead (`python3 -m http.server`).
 
 Unreleased:
 
-- More anonymous counts: clicks on outside links by site (Reddit, GitHub, Ko-fi, Last.fm) and on links to the guide and FAQ, which Explore boxes people open by name or expand, and how long visits last (1, 3, 10, 30 and 60 minutes with the tab visible).
-- Explore: Summer songs (June to August) and Christmas season (25 November to 26 December) in Highlights; Records shows the biggest day, week and month instead of two near-identical day lists; Milestones is its own section with a play-count picker that starts at a count ten of your tracks have reached; One-hit wonders lists the tracks with their artists. The year and milestone pickers match the chips, and the top of the tab is shorter, so the first row of boxes fits on a laptop screen.
+- More anonymous counts: clicks on outside links by site (Reddit, GitHub, Ko-fi, Last.fm) and on links to the guide and FAQ, which Explore boxes people open by name or expand, and how long visits last (1, 3, 5, 10, 15, 30 and 60 minutes with the tab visible).
+- Explore: Summer songs (June to August) and Christmas season (25 November to 26 December) in When you listen; Records shows the biggest day, week and month instead of two near-identical day lists; Milestones is its own section with a play-count picker that starts at a count ten of your tracks have reached; One-hit wonders lists the tracks with their artists. The year and milestone pickers match the chips, and the top of the tab is shorter, so the first row of boxes fits on a laptop screen.
 - Opening the Lists tab opens the filters on wider screens, and the Games tab no longer stands out from Explore and Lists.
 - Explore fits small libraries: empty boxes are left out, sections with nothing left disappear with their chip, and boxes that would repeat another one are skipped (Last 30 days needs more than 60 days of history, Your year more than one year, Where it started more than 2,000 scrobbles).
 - The loading preview no longer freezes on an old page count when downloads pause, and the greyed-out tabs during a load say they are available once loading finishes.

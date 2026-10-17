@@ -164,7 +164,7 @@ document.addEventListener("click", (event) => {
 // with the tab visible counts, so a load left running in the background
 // doesn't. Marks are sent while the page is open, because a request sent as
 // a tab closes is often dropped.
-const TIME_MARKS_MINUTES = [1, 3, 10, 30, 60];
+const TIME_MARKS_MINUTES = [1, 3, 5, 10, 15, 30, 60];
 let visibleMs = 0;
 let visibleSince = document.visibilityState === "visible" ? performance.now() : null;
 

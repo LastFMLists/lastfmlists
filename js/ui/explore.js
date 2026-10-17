@@ -55,11 +55,7 @@ function sections(year, milestone) {
                 box("top-tracks", "Top tracks", "Your most played tracks of all time.", "track"),
                 box("recent-artists", "Last 30 days: artists", "Who you've been listening to lately.", "artist", "scrobbles", { filters: { "last-n-days": "30" }, when: lib => lib.days > 60 }),
                 box("recent-albums", "Last 30 days: albums", "The albums on rotation right now.", "album", "scrobbles", { filters: { "last-n-days": "30" }, when: lib => lib.days > 60 }),
-                box("recent-tracks", "Last 30 days: tracks", "Your songs of the month.", "track", "scrobbles", { filters: { "last-n-days": "30" }, when: lib => lib.days > 60 }),
-                box("summer", "Summer songs", "Tracks played in June, July and August.", "track", "scrobbles", { filters: { month: "6,7,8" } }),
-                // 25 November to 26 December crosses a month, which the menus
-                // can't say, so it is two equation steps on month and day.
-                box("christmas", "Christmas season", "Tracks played from 25 November to 26 December.", "track", "scrobbles", { filters: { equations: CHRISTMAS_SEASON } })
+                box("recent-tracks", "Last 30 days: tracks", "Your songs of the month.", "track", "scrobbles", { filters: { "last-n-days": "30" }, when: lib => lib.days > 60 })
             ]
         },
         {
@@ -116,6 +112,10 @@ function sections(year, milestone) {
                 box("habit-night", "Late at night", "Tracks played between 23:00 and 04:00.", "track", "scrobbles", { filters: { "time-of-day-start": "23:00", "time-of-day-end": "04:00" } }),
                 box("habit-morning", "In the morning", "Tracks played between 06:00 and 10:00.", "track", "scrobbles", { filters: { "time-of-day-start": "06:00", "time-of-day-end": "10:00" } }),
                 box("habit-weekend", "On weekends", "Tracks played on Saturdays and Sundays.", "track", "scrobbles", { filters: { weekday: "6,0" } }),
+                box("summer", "Summer songs", "Tracks played in June, July and August.", "track", "scrobbles", { filters: { month: "6,7,8" } }),
+                // 25 November to 26 December crosses a month, which the menus
+                // can't say, so it is two equation steps on month and day.
+                box("christmas", "Christmas season", "Tracks played from 25 November to 26 December.", "track", "scrobbles", { filters: { equations: CHRISTMAS_SEASON } }),
                 box("habit-session-start", "Session starters", "What you put on first after a break of 6 hours or more.", "track", "scrobbles", { filters: { "session-starter-only": "use-gap" } }),
                 box("habit-day-start", "Day starters", "The first track of the day.", "track", "scrobbles", { filters: { "day-starter-only": "first-day-smart" } }),
                 box("habit-most-days", "Always coming back", "Tracks played on the most different days.", "track", "separate-days")
