@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+	<!-- DRAFT: remove this line once the page is written -->
+	<meta name="robots" content="noindex">
+	<title>Guide · lastfmlists</title>
+	<!-- DRAFT: one sentence, about 150 characters, saying what the guide covers -->
+	<meta name="description" content="">
+	<meta name="theme-color" content="#FFFCF8">
+	<link rel="canonical" href="https://lastfmlists.com/guide/">
+	<meta property="og:type" content="article">
+	<meta property="og:site_name" content="lastfmlists">
+	<meta property="og:url" content="https://lastfmlists.com/guide/">
+	<meta property="og:title" content="Guide · lastfmlists">
+	<!-- DRAFT: same text as the meta description -->
+	<meta property="og:description" content="">
+	<meta property="og:image" content="https://lastfmlists.com/logo.png">
+	<meta name="twitter:card" content="summary">
+	<script>
+		// Runs before the stylesheet paints, so a saved dark theme doesn't flash light.
+		(function () {
+			try {
+				var stored = localStorage.getItem('lastfmlists-theme');
+				var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+				var theme = stored || (prefersDark ? 'dark' : 'light');
+				document.documentElement.setAttribute('data-theme', theme);
+			} catch (e) {
+				document.documentElement.setAttribute('data-theme', 'light');
+			}
+		})();
+	</script>
+	<link rel="icon" type="image/png" href="/logo.png" sizes="32x32">
+	<link rel="apple-touch-icon" href="/logo.png" sizes="180x180">
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+	<link href="https://fonts.googleapis.com/css2?family=Roboto+Flex:opsz,wght@8..144,300..800&display=swap" rel="stylesheet">
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+	<link rel="stylesheet" href="/style.css">
+	<link rel="stylesheet" href="/pages.css">
+</head>
+<body>
+	<header class="page-header">
+		<a class="page-brand" href="/"><img src="/logo.png" alt="">lastfmlists</a>
+		<nav class="page-nav" aria-label="Site">
+			<a href="/guide/" aria-current="page">Guide</a>
+			<a href="/faq/">FAQ</a>
+			<button type="button" id="theme-toggle" aria-label="Toggle theme"><i class="fas fa-moon" aria-hidden="true"></i></button>
+		</nav>
+	</header>
+
+	<main>
+		<article class="page">
+			<h1>How to use lastfmlists</h1>
+			<p class="draft">One or two sentences under the title: who the guide is for and where to start. Rename the title if you like.</p>
+
+			<!--
+				Each section has a short id so the app and the FAQ can link straight to it,
+				e.g. /guide/#equations. Keep the ids even if you rename the headings.
+				Screenshots go in /guide/img/ and are added like this:
+				<figure>
+					<img src="/guide/img/filters.png" alt="What the screenshot shows" width="1200" height="800" loading="lazy">
+					<figcaption>Optional caption</figcaption>
+				</figure>
+				Delete each .draft note once its section is written.
+			-->
+
+			<nav class="page-toc" aria-label="Contents">
+				<ol>
+					<li><a href="#getting-started">Getting started</a></li>
+					<li><a href="#lists">Reading a list</a></li>
+					<li><a href="#sorts">Sorts</a></li>
+					<li><a href="#filters">Filters</a></li>
+					<li><a href="#recipes">Recipes</a></li>
+					<li><a href="#details">Load Details and Load All Details</a></li>
+					<li><a href="#charts">Charts and the bar chart race</a></li>
+					<li><a href="#comparison">Comparison mode</a></li>
+					<li><a href="#equations">Equations</a></li>
+					<li><a href="#entity-pages">Artist, album and track pages</a></li>
+					<li><a href="#exporting">Exporting</a></li>
+					<li><a href="#games">Games</a></li>
+					<li><a href="#saving">Saving and privacy</a></li>
+				</ol>
+			</nav>
+
+			<section id="getting-started">
+				<h2>Getting started</h2>
+				<p class="draft">What happens after you type a username: what gets downloaded, the live preview while loading, why big libraries take a while, the progress in the tab title and "Notify me".</p>
+			</section>
+
+			<section id="lists">
+				<h2>Reading a list</h2>
+				<p class="draft">List type (tracks, albums, artists, scrobbles), list length, the numbers in parentheses ("Show unfiltered stats in parentheses"), and clicking a row to open its page.</p>
+			</section>
+
+			<section id="sorts">
+				<h2>Sorts</h2>
+				<p class="draft">Group the sorts instead of listing all 23: plain counts; spread (different days, weeks, months); streaks; records in a time window (single day, week, month, X hours); firsts and speed (first to X, fastest to X); average listening time; time spent and share of global scrobbles. Then explain X once, since its meaning changes with the sort.</p>
+			</section>
+
+			<section id="filters">
+				<h2>Filters</h2>
+				<p class="draft">One short part per panel group (Artist, Album, Track, Time, session and day starters). Apply Filters versus Reset, and the chips above the list. Use h3 headings for the groups if it gets long.</p>
+			</section>
+
+			<section id="recipes">
+				<h2>Recipes</h2>
+				<p class="draft">5 to 8 "How do I see…" examples you'd actually use, each with its exact settings. Ideas: top albums of one summer, songs mostly played after midnight, artists you binged and dropped, your longest daily streak, your first 100 scrobbles. Give each one an h3 and its own id (e.g. id="recipe-summer") so it can be linked, and later get a "try it" link.</p>
+			</section>
+
+			<section id="details">
+				<h2>Load Details and Load All Details</h2>
+				<p class="draft">What each one downloads, roughly how long it takes, which filters and sorts it unlocks, and which one most people need.</p>
+			</section>
+
+			<section id="charts">
+				<h2>Charts and the bar chart race</h2>
+				<p class="draft">Chart orientation and scale, the race settings (start and end date, update frequency, speed), and GIF export.</p>
+			</section>
+
+			<section id="comparison">
+				<h2>Comparison mode</h2>
+				<p class="draft">What it's for, the left and right editing switch, and one good use, such as this year against last year.</p>
+			</section>
+
+			<section id="equations">
+				<h2>Equations</h2>
+				<p class="draft">Mark this as advanced. The three commands (filter, sort, unique), how fields and operators combine, and two or three worked pipelines explained line by line. Put pipelines in &lt;pre&gt;&lt;code&gt; blocks. The placeholder in the Equations box is a good first example.</p>
+			</section>
+
+			<section id="entity-pages">
+				<h2>Artist, album and track pages</h2>
+				<p class="draft">What's on them, "Show all lists", and how clicking a ranking jumps to the highlighted row.</p>
+			</section>
+
+			<section id="exporting">
+				<h2>Exporting</h2>
+				<p class="draft">PNG of a list, the album cover grid, and the GIF from a race.</p>
+			</section>
+
+			<section id="games">
+				<h2>Games</h2>
+				<p class="draft">One or two lines each for Higher or Lower, Fill the List and Put Them In Order, plus where your records are kept.</p>
+			</section>
+
+			<section id="saving">
+				<h2>Saving and privacy</h2>
+				<p class="draft">What Save Data does, that everything stays in the browser, and what GoatCounter counts.</p>
+			</section>
+
+			<div class="page-cta">
+				<a href="/">Open lastfmlists <i class="fas fa-arrow-right" aria-hidden="true"></i></a>
+			</div>
+		</article>
+	</main>
+
+	<footer>
+		<p>created by <a href="https://www.reddit.com/user/Alet404/" target="_blank" rel="noopener">u/Alet404</a></p>
+	</footer>
+	<script data-goatcounter="https://lastfmlists.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
+	<script src="/js/page-theme.js"></script>
+</body>
+</html>

@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+	<!-- DRAFT: remove this line once the page is written -->
+	<meta name="robots" content="noindex">
+	<title>FAQ · lastfmlists</title>
+	<!-- DRAFT: one sentence, about 150 characters, saying what the FAQ answers -->
+	<meta name="description" content="">
+	<meta name="theme-color" content="#FFFCF8">
+	<link rel="canonical" href="https://lastfmlists.com/faq/">
+	<meta property="og:type" content="article">
+	<meta property="og:site_name" content="lastfmlists">
+	<meta property="og:url" content="https://lastfmlists.com/faq/">
+	<meta property="og:title" content="FAQ · lastfmlists">
+	<!-- DRAFT: same text as the meta description -->
+	<meta property="og:description" content="">
+	<meta property="og:image" content="https://lastfmlists.com/logo.png">
+	<meta name="twitter:card" content="summary">
+	<!-- FAQPage structured data goes here, built from the finished questions and answers -->
+	<script>
+		// Runs before the stylesheet paints, so a saved dark theme doesn't flash light.
+		(function () {
+			try {
+				var stored = localStorage.getItem('lastfmlists-theme');
+				var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+				var theme = stored || (prefersDark ? 'dark' : 'light');
+				document.documentElement.setAttribute('data-theme', theme);
+			} catch (e) {
+				document.documentElement.setAttribute('data-theme', 'light');
+			}
+		})();
+	</script>
+	<link rel="icon" type="image/png" href="/logo.png" sizes="32x32">
+	<link rel="apple-touch-icon" href="/logo.png" sizes="180x180">
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+	<link href="https://fonts.googleapis.com/css2?family=Roboto+Flex:opsz,wght@8..144,300..800&display=swap" rel="stylesheet">
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+	<link rel="stylesheet" href="/style.css">
+	<link rel="stylesheet" href="/pages.css">
+</head>
+<body>
+	<header class="page-header">
+		<a class="page-brand" href="/"><img src="/logo.png" alt="">lastfmlists</a>
+		<nav class="page-nav" aria-label="Site">
+			<a href="/guide/">Guide</a>
+			<a href="/faq/" aria-current="page">FAQ</a>
+			<button type="button" id="theme-toggle" aria-label="Toggle theme"><i class="fas fa-moon" aria-hidden="true"></i></button>
+		</nav>
+	</header>
+
+	<main>
+		<article class="page">
+			<h1>Frequently asked questions</h1>
+			<p class="draft">Optional line under the title, e.g. pointing to the guide for longer explanations.</p>
+
+			<!--
+				One section per question. The h2 is the question, phrased the way someone
+				would type it into a search box. Answer it in the first sentence, keep it to
+				two to four sentences, and link to the guide (/guide/#details etc.) for more.
+				The questions below are placeholders: reword, drop or add as you like, and keep
+				the ids stable so the app can link to them.
+				Delete each .draft note once its answer is written.
+			-->
+
+			<section id="free">
+				<h2>Is it free? Do I need to log in or give my password?</h2>
+				<p class="draft">Answer here.</p>
+			</section>
+
+			<section id="data">
+				<h2>Where is my data stored? Does anything get sent to a server?</h2>
+				<p class="draft">Answer here.</p>
+			</section>
+
+			<section id="loading-time">
+				<h2>Why does loading take so long?</h2>
+				<p class="draft">Answer here.</p>
+			</section>
+
+			<section id="details">
+				<h2>What's the difference between Load Details and Load All Details?</h2>
+				<p class="draft">Answer here, then link to /guide/#details.</p>
+			</section>
+
+			<section id="greyed-out">
+				<h2>Why are some filters greyed out?</h2>
+				<p class="draft">Answer here.</p>
+			</section>
+
+			<section id="streaming-services">
+				<h2>Does it work with Spotify, Apple Music or YouTube Music?</h2>
+				<p class="draft">Answer here.</p>
+			</section>
+
+			<section id="friends">
+				<h2>Can I look at a friend's stats?</h2>
+				<p class="draft">Answer here.</p>
+			</section>
+
+			<section id="hidden-profile">
+				<h2>What if a profile hides its recent listening?</h2>
+				<p class="draft">Check what the site actually does before writing this one. I didn't find any special handling in the code.</p>
+			</section>
+
+			<section id="streaks">
+				<h2>How do I find my longest listening streak?</h2>
+				<p class="draft">Answer here.</p>
+			</section>
+
+			<section id="collage">
+				<h2>How do I make an album collage, like a 3x3 or 5x5?</h2>
+				<p class="draft">Answer here.</p>
+			</section>
+
+			<section id="race-gif">
+				<h2>How do I make a bar chart race GIF?</h2>
+				<p class="draft">Answer here.</p>
+			</section>
+
+			<section id="numbers-differ">
+				<h2>Why are my numbers different from what Last.fm shows?</h2>
+				<p class="draft">Only keep this one if you know the real reasons.</p>
+			</section>
+
+			<section id="refresh">
+				<h2>Do I lose everything when I refresh?</h2>
+				<p class="draft">Answer here.</p>
+			</section>
+
+			<section id="mobile">
+				<h2>Is there a mobile app?</h2>
+				<p class="draft">Answer here.</p>
+			</section>
+
+			<section id="contact">
+				<h2>How do I report a bug or support the site?</h2>
+				<p class="draft">Answer here.</p>
+			</section>
+
+			<div class="page-cta">
+				<a href="/">Open lastfmlists <i class="fas fa-arrow-right" aria-hidden="true"></i></a>
+			</div>
+		</article>
+	</main>
+
+	<footer>
+		<p>created by <a href="https://www.reddit.com/user/Alet404/" target="_blank" rel="noopener">u/Alet404</a></p>
+	</footer>
+	<script data-goatcounter="https://lastfmlists.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
+	<script src="/js/page-theme.js"></script>
+</body>
+</html>
