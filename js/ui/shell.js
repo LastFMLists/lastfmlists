@@ -27,6 +27,27 @@ export function setAppLoadedState(username) {
     }
 }
 
+// While a history load runs the list on screen is only a preview, so the
+// controls that would rebuild it wait until the load is done. Filters can
+// still be set up meanwhile; they apply when the load finishes.
+const LIST_CONTROLS_LOCKED_WHILE_LOADING = ["apply-filters", "reset-filters", "display-mode", "comparison-toggle"];
+const WAIT_FOR_LOAD_MSG = "Available once your data has finished loading";
+
+export function setListControlsLocked(locked) {
+    LIST_CONTROLS_LOCKED_WHILE_LOADING.forEach(id => {
+        const control = document.getElementById(id);
+        if (!control) return;
+        if (locked) {
+            if (control.dataset.titleBeforeLoad === undefined) control.dataset.titleBeforeLoad = control.title;
+            control.title = WAIT_FOR_LOAD_MSG;
+        } else if (control.dataset.titleBeforeLoad !== undefined) {
+            control.title = control.dataset.titleBeforeLoad;
+            delete control.dataset.titleBeforeLoad;
+        }
+        control.disabled = locked;
+    });
+}
+
 // Undo setAppLoadedState so a failed load returns to the welcome screen
 // instead of stranding the user on an empty app shell.
 export function clearAppLoadedState() {

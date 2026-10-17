@@ -18,6 +18,17 @@ export const state = {
     topAlbums: [],
     topTracks: [],
 
+    // The account the lists on screen belong to
+    loadedUsername: null,
+
+    // The history load in progress, if any: { username, phase, snapshot() }.
+    // phase is "history" while scrobbles download and "finishing" while the
+    // lists are built; snapshot() returns what has fully arrived so far.
+    historyLoad: null,
+    // Set when a load finished with pages it couldn't download: the range and
+    // pages still missing, so a saved copy can be completed later.
+    historyProgress: null,
+
     // Album cover URLs keyed "album||artist" (lowercase). "" marks an album
     // Last.fm has no cover for. Saved with the rest of the dataset.
     albumArt: {},

@@ -27,6 +27,11 @@ work. Serve the folder over HTTP instead (`python3 -m http.server`).
 
 Unreleased:
 
+- Save Data works while your history is still loading. It saves the pages that have finished downloading, and loading the same username again continues from there instead of starting over.
+- Pages that fail to download are tried again at the end of the load. If they still fail, the lists say how many scrobbles are missing, and a saved copy fills the gap on the next load. Failed pages used to be skipped without a word.
+- Scrobbles you make while a load runs no longer shift its pages, which could skip or double scrobbles at the page edges. They are picked up on the next load.
+- Fixed Save Data during the check for new scrobbles, which replaced the saved history with an empty one.
+- Apply Filters, Reset, the display mode and comparison wait until loading finishes, since the list on screen is only a preview until then. Filters set up during the load apply when it finishes.
 - Search engines and link previews: a robots.txt, a sitemap, link preview tags for Reddit, Discord and other sites, and a description of the site's features that search engines can read.
 - Refreshing the page resets the filters, instead of showing old filters the list wasn't using.
 - Long loads can run in another tab. The tab title shows the loading progress and "✓ Ready" when your lists are done, and after 10 seconds a "Notify me when it's done" button can send a browser notification when loading finishes or fails. The browser asks for permission only when you click it.

@@ -582,6 +582,17 @@ body.app-loaded #session-panel {
     margin: 0;
 }
 
+/* A finished load with pages missing: a note, not a spinner */
+#loading-stats:has(.load-incomplete) {
+    border-radius: var(--radius-md);
+    border-color: var(--primary-accent-color);
+    color: var(--primary-text-color);
+}
+
+#loading-stats:has(.load-incomplete)::before {
+    display: none;
+}
+
 /* ==========================================================================
    Filter sidebar
    ========================================================================== */
