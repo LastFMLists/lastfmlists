@@ -575,6 +575,9 @@ function buildSeries() {
             open.dataset.focus = "add-open";
             open.innerHTML = '<i class="fas fa-plus" aria-hidden="true"></i> Add';
             open.addEventListener("click", () => {
+                // Start on the kind of item already on the graph (the last
+                // line added), so a graph of tracks offers tracks.
+                addType = graph.series[graph.series.length - 1]?.type || addType;
                 adding = true;
                 renderSeries();
                 section.querySelector(".graph-add input")?.focus();
@@ -924,6 +927,7 @@ function openFromList() {
     graph.from = "";
     graph.to = "";
     built = true;
+    adding = false;
     renderSeries();
     renderSource();
     renderControls();
@@ -950,6 +954,7 @@ function openEntity({ type, name, artist }) {
     graph.from = "";
     graph.to = "";
     built = true;
+    adding = false;
     renderSeries();
     renderSource();
     renderControls();
@@ -1030,6 +1035,7 @@ export function openGraphFromLink(params) {
     graph.source = list ? { label: list.title, tracks: list.tracks } : null;
     sortedCache = { from: null, plays: [] };
     built = true;
+    adding = false;
     renderSeries();
     renderSource();
     renderControls();
