@@ -5,7 +5,9 @@
 // for the whole race. The same drawing code makes the GIF export, so the
 // file looks like the page.
 
+import { trackEventOnce } from '../analytics.js';
 import { formatDuration } from '../time.js';
+import { autoColorsOn, clearCustomColor, customColor, setAutoColors, setCustomColor } from './race-colors.js';
 
 // Bars reorder all the time, so any two colors can end up side by side.
 // Only these four hues pass every pairing (normal and colorblind vision)
@@ -17,6 +19,14 @@ const PALETTE = {
     dark: ["#3987e5", "#c98500", "#d55181", "#008300"]
 };
 const OTHER = { light: "#bdbab0", dark: "#4b5568" };
+// Offered when someone adds an artist and the starting colors are taken.
+const EXTRA_SUGGESTIONS = ["#8a5cd1", "#00a3a3", "#d1495b", "#7a4a1f", "#5c6bc0", "#c2185b"];
+// Starting colors that look like a picked one are skipped, so two artists
+// never seem to share a color by accident: too close overall (OKLab
+// distance), or the same hue family, like a pink next to a light pink.
+const CLOSE_COLORS = 0.15;
+const SAME_HUE_DEGREES = 30;
+const GRAYISH_CHROMA = 0.04;
 
 // Share of each step that rank changes take.
 const RANK_MOVE_SHARE = 0.55;
@@ -30,6 +40,35 @@ function themeName() {
 function cssVar(name, fallback) {
     return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
 }
+
+function toOklab(hex) {
+    const channel = (index) => {
+        const value = parseInt(hex.slice(index, index + 2), 16) / 255;
+        return value <= 0.04045 ? value / 12.92 : Math.pow((value + 0.055) / 1.055, 2.4);
+    };
+    const r = channel(1);
+    const g = channel(3);
+    const b = channel(5);
+    const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
+    const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
+    const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
+    return [
+        0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * s,
+        1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s,
+        0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s
+    ];
+}
+
+function looksAlike(a, b) {
+    const p = toOklab(a);
+    const q = toOklab(b);
+    if (Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]) < CLOSE_COLORS) return true;
+    if (Math.hypot(p[1], p[2]) < GRAYISH_CHROMA || Math.hypot(q[1], q[2]) < GRAYISH_CHROMA) return false;
+    const turn = Math.abs(Math.atan2(p[2], p[1]) - Math.atan2(q[2], q[1])) * 180 / Math.PI;
+    return Math.min(turn, 360 - turn) < SAME_HUE_DEGREES;
+}
+
+let raceCount = 0;
 
 function shortDate(timestamp) {
     return new Date(timestamp).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
@@ -110,19 +149,17 @@ export function createRaceChart(container, frames, { slots, sortingBasis, entity
     const details = new Map();
     frames.forEach(frame => frame.rows.forEach(row => details.set(row.key, row)));
 
-    // Colors go to the artists with the most time on screen, once for the
-    // whole race, so a bar keeps its color as it moves.
+    // Artists by time on screen, most first, with their names as written.
     const screenTime = new Map();
-    frames.forEach(frame => frame.rows.slice(0, slots).forEach(row => {
-        const artist = (row.artist || row.name || "").toLowerCase();
-        screenTime.set(artist, (screenTime.get(artist) || 0) + 1);
+    const artistNames = new Map();
+    frames.forEach(frame => frame.rows.forEach((row, rank) => {
+        const name = row.artist || row.name || "";
+        const artist = name.toLowerCase();
+        if (!artistNames.has(artist)) artistNames.set(artist, name);
+        if (rank < slots) screenTime.set(artist, (screenTime.get(artist) || 0) + 1);
     }));
-    const ranked = [...screenTime.entries()].sort((a, b) => b[1] - a[1]).slice(0, PALETTE.light.length);
-    const artistSlot = new Map(ranked.map(([artist], index) => [artist, index]));
-    const legend = ranked.map(([artist], index) => {
-        const sample = [...details.values()].find(row => (row.artist || row.name || "").toLowerCase() === artist);
-        return { label: sample ? (sample.artist || sample.name) : artist, slot: index };
-    });
+    const artistOrder = [...screenTime.entries()].sort((a, b) => b[1] - a[1]).map(([artist]) => artist);
+    const otherLabel = showArtist ? "Other artists" : "Everyone else";
 
     // Theme colors are read on every draw, so switching themes mid-race
     // repaints with the dark steps instead of keeping the light ones.
@@ -137,13 +174,51 @@ export function createRaceChart(container, frames, { slots, sortingBasis, entity
             surface: cssVar("--background-color", "#FFFCF8")
         };
     }
-    const slotColor = (slot) => slot === undefined || slot < 0 ? OTHER[theme] : PALETTE[theme][slot];
-    const colorOf = (row) => slotColor(artistSlot.get((row.artist || row.name || "").toLowerCase()));
 
+    // Picked colors come first. With automatic colors on, the starting
+    // colors then go to the most-shown artists left, once for the whole
+    // race, so a bar keeps its color as it moves.
+    let colors = { assigned: new Map(), legend: [] };
+    function assignColors() {
+        const assigned = new Map();
+        const picked = [];
+        artistOrder.forEach(artist => {
+            const color = customColor(artist);
+            if (!color) return;
+            assigned.set(artist, color);
+            picked.push(color);
+        });
+        if (autoColorsOn()) {
+            const free = PALETTE[theme].filter(hex => picked.every(color => !looksAlike(hex, color)));
+            let next = 0;
+            for (const artist of artistOrder) {
+                if (next >= free.length) break;
+                if (!assigned.has(artist)) assigned.set(artist, free[next++]);
+            }
+        }
+        const legend = artistOrder.filter(artist => assigned.has(artist)).map(artist => ({
+            artist,
+            label: artistNames.get(artist),
+            color: assigned.get(artist),
+            custom: Boolean(customColor(artist))
+        }));
+        colors = { assigned, legend };
+    }
+    const colorOf = (row) => {
+        const artist = (row.artist || row.name || "").toLowerCase();
+        return colors.assigned.get(artist) || customColor(artist) || OTHER[theme];
+    };
+
+    const id = ++raceCount;
+    const legendBox = document.createElement("div");
+    legendBox.className = "race-legend";
+    const stage = document.createElement("div");
+    stage.className = "race-stage";
     const canvas = document.createElement("canvas");
     canvas.className = "race-canvas";
     canvas.setAttribute("role", "img");
-    container.appendChild(canvas);
+    stage.appendChild(canvas);
+    container.append(legendBox, stage);
 
     const rowHeight = slots <= 12 ? 36 : slots <= 20 ? 30 : 24;
     const barHeight = Math.min(24, rowHeight - 10);
@@ -178,7 +253,7 @@ export function createRaceChart(container, frames, { slots, sortingBasis, entity
     // The header holds the title and legend on the left and the date on the
     // right, or the date under the legend when the chart is too narrow for
     // both. Keeping the date out of the plot means no bar ever runs into it.
-    function layout(ctx, totalWidth) {
+    function layout(ctx, totalWidth, withLegend) {
         const dateSize = Math.round(Math.min(36, Math.max(22, totalWidth / 26)));
         const dateWidth = widestDate(ctx, dateSize);
         const dateBeside = totalWidth - dateWidth - 24 >= 300;
@@ -188,8 +263,8 @@ export function createRaceChart(container, frames, { slots, sortingBasis, entity
         const legendRows = [];
         let line = [];
         let lineWidth = 0;
-        if (legend.length > 1 || showArtist) {
-            const items = [...legend, { label: showArtist ? "Other artists" : "Everyone else", slot: -1 }];
+        if (withLegend && colors.legend.length) {
+            const items = [...colors.legend, { label: otherLabel, color: OTHER[theme] }];
             items.forEach(item => {
                 const itemWidth = 16 + ctx.measureText(item.label).width + 18;
                 if (line.length && lineWidth + itemWidth > legendWidth) {
@@ -214,8 +289,9 @@ export function createRaceChart(container, frames, { slots, sortingBasis, entity
 
     // Draws the race at a fractional step: 3.4 is 40% of the way from step
     // 3 to step 4.
-    function renderTo(ctx, totalWidth, at) {
+    function renderTo(ctx, totalWidth, at, withLegend) {
         readTheme();
+        assignColors();
         const last = frames.length - 1;
         const clamped = Math.max(0, Math.min(last, at));
         const step = Math.min(Math.floor(clamped), Math.max(0, last - 1));
@@ -223,7 +299,7 @@ export function createRaceChart(container, frames, { slots, sortingBasis, entity
         const a = indexed[step];
         const b = indexed[Math.min(step + 1, last)];
         const frame = frames[t < 0.5 ? step : Math.min(step + 1, last)];
-        const box = layout(ctx, totalWidth);
+        const box = layout(ctx, totalWidth, withLegend);
         const plotTop = box.headerHeight + box.axisHeight;
         const plotLeft = box.labelWidth + 12;
         const valueRoom = valueWidth(ctx) + 10;
@@ -251,7 +327,7 @@ export function createRaceChart(container, frames, { slots, sortingBasis, entity
         box.legendRows.forEach((row, index) => {
             const y = 26 + index * 20 + 8;
             row.forEach(item => {
-                ctx.fillStyle = slotColor(item.slot);
+                ctx.fillStyle = item.color;
                 roundedBar(ctx, item.x, y - 5, 12, 10, 3);
                 ctx.fillStyle = ink.secondary;
                 ctx.fillText(item.label, item.x + 16, y + 4);
@@ -354,10 +430,13 @@ export function createRaceChart(container, frames, { slots, sortingBasis, entity
 
     function draw(at = position) {
         position = at;
-        const nextWidth = Math.max(320, Math.floor(container.clientWidth || 640));
+        const nextWidth = Math.max(280, Math.floor(stage.clientWidth || 640));
         const ratio = window.devicePixelRatio || 1;
+        readTheme();
+        assignColors();
+        syncLegend();
         const probe = canvas.getContext("2d");
-        const height = layout(probe, nextWidth).height;
+        const height = layout(probe, nextWidth, false).height;
         if (nextWidth !== width || canvas.height !== Math.round(height * ratio)) {
             width = nextWidth;
             canvas.width = Math.round(width * ratio);
@@ -368,7 +447,7 @@ export function createRaceChart(container, frames, { slots, sortingBasis, entity
         const ctx = canvas.getContext("2d");
         ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
         ctx.clearRect(0, 0, width, height);
-        renderTo(ctx, width, at);
+        renderTo(ctx, width, at, false);
         const frame = frames[Math.round(Math.max(0, Math.min(frames.length - 1, at)))];
         canvas.setAttribute("aria-label", `${title}, ${frame.label}: ${frame.rows.slice(0, slots).map(row => `${row.name} ${formatRaceValue(row.value, sortingBasis)}`).join(", ")}`);
     }
@@ -377,21 +456,172 @@ export function createRaceChart(container, frames, { slots, sortingBasis, entity
     // no transparency.
     function snapshot(at) {
         readTheme();
+        assignColors();
         const out = document.createElement("canvas");
         const probe = out.getContext("2d");
-        const height = layout(probe, width).height;
+        const height = layout(probe, width, true).height;
         out.width = width + 24;
         out.height = height + 24;
         const ctx = out.getContext("2d");
         ctx.fillStyle = ink.surface;
         ctx.fillRect(0, 0, out.width, out.height);
         ctx.translate(12, 12);
-        renderTo(ctx, width, at);
+        renderTo(ctx, width, at, true);
         return out;
     }
 
+    // The legend on the page is also where colors are changed: a swatch per
+    // colored artist opens a color picker, x goes back to the automatic
+    // color, and any artist can be added by name. (The GIF draws its own
+    // legend on the canvas.)
+    const items = document.createElement("div");
+    items.className = "race-legend-items";
+    const other = document.createElement("span");
+    other.className = "race-legend-item race-legend-other";
+    const otherSwatch = document.createElement("span");
+    otherSwatch.className = "race-swatch";
+    other.append(otherSwatch, Object.assign(document.createElement("span"), { className: "race-legend-name", textContent: otherLabel }));
+
+    const tools = document.createElement("div");
+    tools.className = "race-legend-tools";
+    const addButton = document.createElement("button");
+    addButton.type = "button";
+    addButton.className = "race-legend-add";
+    addButton.innerHTML = '<i class="fas fa-palette" aria-hidden="true"></i> Color an artist';
+    const form = document.createElement("form");
+    form.className = "race-legend-form";
+    form.hidden = true;
+    const field = document.createElement("input");
+    field.type = "text";
+    field.placeholder = "Artist name";
+    field.setAttribute("aria-label", "Artist to color");
+    field.setAttribute("list", `race-artists-${id}`);
+    field.autocomplete = "off";
+    const options = document.createElement("datalist");
+    options.id = `race-artists-${id}`;
+    const known = [...artistOrder, ...[...artistNames.keys()].filter(artist => !screenTime.has(artist))];
+    known.forEach(artist => options.appendChild(Object.assign(document.createElement("option"), { value: artistNames.get(artist) })));
+    const submit = Object.assign(document.createElement("button"), { type: "submit", textContent: "Add" });
+    const cancel = Object.assign(document.createElement("button"), { type: "button", textContent: "Cancel" });
+    form.append(field, options, submit, cancel);
+    const autoLabel = document.createElement("label");
+    autoLabel.className = "race-legend-auto";
+    const autoBox = document.createElement("input");
+    autoBox.type = "checkbox";
+    autoLabel.append(autoBox, document.createTextNode(" Color the top artists for me"));
+    const note = document.createElement("span");
+    note.className = "race-legend-note";
+    note.setAttribute("role", "status");
+    tools.append(addButton, form, autoLabel, note);
+    legendBox.append(items, tools);
+
+    const closeForm = () => {
+        form.hidden = true;
+        addButton.hidden = false;
+        field.value = "";
+    };
+    addButton.addEventListener("click", () => {
+        form.hidden = false;
+        addButton.hidden = true;
+        note.textContent = "";
+        field.focus();
+    });
+    cancel.addEventListener("click", closeForm);
+    form.addEventListener("submit", (event) => {
+        event.preventDefault();
+        const typed = field.value.trim();
+        if (!typed) return;
+        const artist = typed.toLowerCase();
+        const name = artistNames.get(artist) || typed;
+        const taken = [...colors.assigned.values()];
+        const color = colors.assigned.get(artist)
+            || [...PALETTE[theme], ...EXTRA_SUGGESTIONS].find(hex => taken.every(used => !looksAlike(hex, used)))
+            || EXTRA_SUGGESTIONS[0];
+        closeForm();
+        setCustomColor(name, color);
+        trackEventOnce("race/color", "Race: picked an artist color");
+        const chip = chips.get(artist);
+        if (chip) {
+            chip.open();
+        } else {
+            note.textContent = `Saved. ${name} will have this color in any race they show up in.`;
+        }
+    });
+    autoBox.addEventListener("change", () => setAutoColors(autoBox.checked));
+
+    const chips = new Map();
+    function makeChip(item) {
+        const el = document.createElement("span");
+        el.className = "race-legend-item";
+        const swatch = document.createElement("label");
+        swatch.className = "race-swatch";
+        const picker = document.createElement("input");
+        picker.type = "color";
+        swatch.appendChild(picker);
+        const name = document.createElement("span");
+        name.className = "race-legend-name";
+        name.textContent = item.label;
+        const reset = document.createElement("button");
+        reset.type = "button";
+        reset.className = "race-legend-reset";
+        reset.textContent = "×";
+        el.append(swatch, name, reset);
+        picker.addEventListener("input", () => {
+            setCustomColor(item.label, picker.value);
+            trackEventOnce("race/color", "Race: picked an artist color");
+        });
+        reset.addEventListener("click", () => clearCustomColor(item.label));
+        return {
+            el,
+            update(next) {
+                swatch.style.background = next.color;
+                // Leave the picker alone while it is open, or it would jump.
+                if (document.activeElement !== picker) picker.value = next.color;
+                picker.setAttribute("aria-label", `Color for ${next.label}`);
+                swatch.title = `Change the color for ${next.label}`;
+                reset.hidden = !next.custom;
+                reset.setAttribute("aria-label", `Use the automatic color for ${next.label}`);
+                reset.title = "Use the automatic color";
+                el.classList.toggle("is-custom", next.custom);
+            },
+            open() {
+                try {
+                    picker.click();
+                } catch (e) {
+                    picker.focus();
+                }
+            }
+        };
+    }
+
+    let legendSignature = "";
+    function syncLegend() {
+        const signature = `${theme}|${autoColorsOn()}|${colors.legend.map(item => `${item.artist}:${item.color}:${item.custom}`).join("|")}`;
+        if (signature === legendSignature) return;
+        legendSignature = signature;
+        const keep = new Set();
+        colors.legend.forEach((item, index) => {
+            let chip = chips.get(item.artist);
+            if (!chip) {
+                chip = makeChip(item);
+                chips.set(item.artist, chip);
+            }
+            keep.add(item.artist);
+            chip.update(item);
+            if (items.children[index] !== chip.el) items.insertBefore(chip.el, items.children[index] || null);
+        });
+        chips.forEach((chip, artist) => {
+            if (keep.has(artist)) return;
+            chip.el.remove();
+            chips.delete(artist);
+        });
+        otherSwatch.style.background = OTHER[theme];
+        items.appendChild(other);
+        autoBox.checked = autoColorsOn();
+    }
+
     const resize = typeof ResizeObserver !== "undefined" ? new ResizeObserver(() => draw()) : null;
-    if (resize) resize.observe(container);
+    if (resize) resize.observe(stage);
 
     draw(0);
     return {

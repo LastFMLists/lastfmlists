@@ -850,6 +850,10 @@ if (displayModeSelect) {
     });
 });
 
+// A picked or reset artist color repaints the race where it is, playing
+// or paused, without rebuilding it.
+document.addEventListener("race-colors:changed", () => state.activeRaceState?.redraw());
+
 const raceSpeedInput = document.getElementById("race-speed-ms");
 if (raceSpeedInput) {
     raceSpeedInput.addEventListener("change", syncRacePlaybackSpeedFromInput);

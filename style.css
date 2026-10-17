@@ -1798,7 +1798,139 @@ label.inline-checkbox {
 
 .race-canvas {
     display: block;
+}
+
+.race-legend {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem 1rem;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.65rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.race-legend-items,
+.race-legend-tools {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem 0.9rem;
+}
+
+.race-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--secondary-text-color);
+}
+
+.race-legend-item.is-custom .race-legend-name {
+    color: var(--primary-text-color);
+}
+
+.race-swatch {
+    position: relative;
+    width: 18px;
+    height: 18px;
+    flex: none;
+    border-radius: 5px;
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
+}
+
+label.race-swatch {
+    cursor: pointer;
+}
+
+label.race-swatch:hover,
+label.race-swatch:focus-within {
+    outline: 2px solid var(--primary-accent-color);
+    outline-offset: 2px;
+}
+
+/* The native color input sits invisibly on top of the swatch, so a tap
+   anywhere on it opens the picker. */
+.race-swatch input[type="color"] {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    opacity: 0;
+    cursor: pointer;
+}
+
+.race-legend-reset {
+    padding: 0 0.15rem;
+    border: 0;
+    background: none;
+    color: var(--secondary-text-color);
+    font-size: 1.05rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.race-legend-reset:hover {
+    color: var(--primary-text-color);
+}
+
+.race-legend-add,
+.race-legend-form button {
+    padding: 0.3rem 0.7rem;
+    border: 1px solid var(--border-color);
+    border-radius: 999px;
+    background-color: var(--sidebar-color);
+    color: var(--primary-text-color);
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.race-legend-add:hover,
+.race-legend-form button:hover {
+    border-color: var(--primary-accent-color);
+}
+
+.race-legend-form {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.race-legend-form[hidden],
+.race-legend-add[hidden],
+.race-legend-reset[hidden] {
+    display: none;
+}
+
+.race-legend-form input[type="text"] {
+    width: 12rem;
     max-width: 100%;
+    padding: 0.3rem 0.6rem;
+    border: 1px solid var(--border-color);
+    border-radius: 999px;
+    background-color: var(--background-color);
+    color: var(--primary-text-color);
+    font-size: 0.82rem;
+}
+
+.race-legend-auto {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.8rem;
+    color: var(--secondary-text-color);
+    cursor: pointer;
+}
+
+.race-legend-note {
+    font-size: 0.8rem;
+    color: var(--secondary-text-color);
 }
 
 .race-playback-toolbar {
