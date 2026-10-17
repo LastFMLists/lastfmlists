@@ -4,8 +4,48 @@
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 	<title>lastfmlists: lists and statistics for Last.fm</title>
-	<meta name="description" content="Make lists, charts and statistics from your Last.fm scrobbles.">
+	<meta name="description" content="Free Last.fm stats: bar chart races, graphs over time, listening streaks, ready-made lists, album collages and games. No login, runs in your browser.">
 	<meta name="theme-color" content="#FFFCF8">
+	<link rel="canonical" href="https://lastfmlists.com/">
+	<!-- Link previews on Reddit, Discord and other sites -->
+	<meta property="og:type" content="website">
+	<meta property="og:site_name" content="lastfmlists">
+	<meta property="og:url" content="https://lastfmlists.com/">
+	<meta property="og:title" content="lastfmlists: lists and statistics for Last.fm">
+	<meta property="og:description" content="Free Last.fm stats: bar chart races, graphs over time, listening streaks, ready-made lists, album collages and games. No login, runs in your browser.">
+	<meta property="og:image" content="https://lastfmlists.com/og-image.png">
+	<meta property="og:image:width" content="1200">
+	<meta property="og:image:height" content="630">
+	<meta property="og:image:alt" content="lastfmlists: a bar chart race and a graph of plays per month from a Last.fm library">
+	<meta name="twitter:card" content="summary_large_image">
+	<!-- What search engines read about the site -->
+	<script type="application/ld+json">
+	{
+		"@context": "https://schema.org",
+		"@type": "WebApplication",
+		"name": "lastfmlists",
+		"url": "https://lastfmlists.com/",
+		"description": "Lists, charts, statistics and games made from your Last.fm scrobbles. The site runs in your browser, and your data stays there.",
+		"applicationCategory": "MultimediaApplication",
+		"operatingSystem": "Any web browser",
+		"isAccessibleForFree": true,
+		"offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+		"featureList": [
+			"Top track, album and artist lists from your Last.fm history, sorted by scrobbles, streaks, records and more",
+			"Listening streaks by day, week and month",
+			"Most scrobbles in a single day, week, month or any number of hours",
+			"Filters by date, year, month, weekday, time of day, name, tag, track length and more",
+			"Ready-made lists in the Explore tab: highlights, your year, streaks, records, milestones and more",
+			"Bar charts and animated bar chart races with your own artist colors, exportable as PNG and GIF",
+			"Graphs of artists, albums and tracks over time, as play counts or ranks",
+			"Album cover collage grids",
+			"Side-by-side comparison of two lists",
+			"A page for every artist, album and track with your ranks and play history",
+			"Games: Higher or Lower, Fill the List and Put Them In Order"
+		],
+		"sameAs": ["https://github.com/LastFMLists/lastfmlists"]
+	}
+	</script>
 	<script>
 		// Runs before the stylesheet paints, so a saved dark theme doesn't flash light.
 		(function () {
@@ -48,6 +88,7 @@
                 <p id="load-error" class="load-error" role="alert" hidden></p>
 
                 <div class="top-links">
+                    <a href="/guide/" aria-label="Guide" title="How to use this site"><i class="fas fa-circle-question"></i></a>
                     <a href="https://github.com/LastFMLists/lastfmlists" target="_blank" rel="noopener" aria-label="GitHub" title="GitHub"><i class="fab fa-github"></i></a>
                     <a href="https://www.reddit.com/user/Alet404/" target="_blank" rel="noopener" aria-label="Reddit" title="Reddit"><i class="fab fa-reddit"></i></a>
                     <a href="https://ko-fi.com/lastfmlists" target="_blank" rel="noopener" aria-label="Ko-fi" title="Support on Ko-fi"><i class="fas fa-mug-hot"></i></a>
@@ -66,14 +107,15 @@
                 </div>
             </div>
             <div class="session-actions">
-                <button type="button" id="load-detailed-data" disabled aria-label="Load details" title="Downloads Last.fm metadata for your top artists, albums and tracks: track length, genre and country tags, and global listener and play counts. This unlocks the duration, tag and global-stats filters and the “Time spent listening” and “Percentage of global scrobbles” sorts. It covers most uses and takes less time than “Load All Details”. Load your data first to use this."><i class="fas fa-circle-down" aria-hidden="true"></i><span class="btn-label">Load Details</span></button>
-                <button type="button" id="load-all-details" disabled aria-label="Load all details" title="Downloads the same metadata for every track you have scrobbled, including tracks outside your top lists. This makes thousands of requests and can take hours. Load your data first to use this."><i class="fas fa-cloud-arrow-down" aria-hidden="true"></i><span class="btn-label">Load All Details</span></button>
+                <button type="button" id="load-detailed-data" disabled aria-label="Load details" title="Downloads Last.fm metadata for your top artists, albums and tracks: track length, genre and country tags, and global listener and play counts. This unlocks the duration, tag and global-stats filters and the “Time spent listening” and “Percentage of global scrobbles” sorts. It covers most uses and takes less time than “Load ALL Details”. Load your data first to use this."><i class="fas fa-circle-down" aria-hidden="true"></i><span class="btn-label">Load Details</span></button>
+                <button type="button" id="load-all-details" disabled aria-label="Load ALL details" title="Downloads the same metadata for every artist, album and track you have scrobbled, including the ones outside your top lists. This makes thousands of requests and can take hours. Load your data first to use this."><i class="fas fa-cloud-arrow-down" aria-hidden="true"></i><span class="btn-label">Load ALL Details</span></button>
                 <button type="button" id="save-data" aria-label="Save data" title="Save your loaded data to this browser"><i class="fas fa-floppy-disk" aria-hidden="true"></i><span class="btn-label">Save Data</span></button>
                 <button type="button" id="open-export-options" aria-label="Export as image" title="Export the current list as a PNG image"><i class="fas fa-image" aria-hidden="true"></i><span class="btn-label">Export Image</span></button>
                 <button type="button" id="open-grid-export" aria-label="Export as grid" title="Export album artwork as a collage grid"><i class="fas fa-table-cells" aria-hidden="true"></i><span class="btn-label">Export Grid</span></button>
             </div>
             <div class="session-socials">
                 <button type="button" id="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark theme"><i class="fas fa-moon"></i></button>
+                <a href="/guide/" aria-label="Guide" title="How to use this site"><i class="fas fa-circle-question"></i></a>
                 <a href="https://github.com/LastFMLists/lastfmlists" target="_blank" rel="noopener" aria-label="GitHub" title="GitHub"><i class="fab fa-github"></i></a>
                 <a href="https://www.reddit.com/user/Alet404/" target="_blank" rel="noopener" aria-label="Reddit" title="Reddit"><i class="fab fa-reddit"></i></a>
                 <a href="https://ko-fi.com/lastfmlists" target="_blank" rel="noopener" aria-label="Ko-fi" title="Support on Ko-fi"><i class="fas fa-mug-hot"></i></a>
@@ -81,8 +123,10 @@
         </section>
 
         <nav id="view-tabs" class="view-tabs" aria-label="Switch view">
+            <button type="button" id="tab-explore" class="view-tab" data-view="explore" aria-pressed="false" disabled title="Available once your data has loaded"><i class="fas fa-compass" aria-hidden="true"></i><span>Explore</span></button>
             <button type="button" id="tab-lists" class="view-tab is-active" data-view="lists" aria-pressed="true"><i class="fas fa-list" aria-hidden="true"></i><span>Lists</span></button>
-            <button type="button" id="tab-games" class="view-tab" data-view="games" aria-pressed="false" disabled title="Load your data first to play"><i class="fas fa-gamepad" aria-hidden="true"></i><span>Games</span></button>
+            <button type="button" id="tab-graphs" class="view-tab" data-view="graphs" aria-pressed="false" disabled title="Available once your data has loaded"><i class="fas fa-chart-line" aria-hidden="true"></i><span>Graphs</span></button>
+            <button type="button" id="tab-games" class="view-tab" data-view="games" aria-pressed="false" disabled title="Available once your data has loaded"><i class="fas fa-gamepad" aria-hidden="true"></i><span>Games</span></button>
         </nav>
 
         <div id="loading-stats" class="content-block"></div>
@@ -107,25 +151,25 @@
                         <label for="sorting-basis">Sort lists by</label>
                         <select id="sorting-basis">
                             <option value="scrobbles">Scrobble count</option>
-                            <option value="separate-days">Scrobbled on different days</option>
-                            <option value="separate-weeks">Scrobbled on different weeks</option>
-                            <option value="separate-months">Scrobbled on different months</option>
-                            <option value="consecutive-scrobbles">Max consecutive scrobbles</option>
-                            <option value="consecutive-days">Max listening streak (days)</option>
-                            <option value="consecutive-weeks">Max listening streak (weeks)</option>
-                            <option value="consecutive-months">Max listening streak (months)</option>
+                            <option value="separate-days">Number of days played</option>
+                            <option value="separate-weeks">Number of weeks played</option>
+                            <option value="separate-months">Number of months played</option>
+                            <option value="consecutive-scrobbles">Most plays in a row</option>
+                            <option value="consecutive-days">Most days in a row</option>
+                            <option value="consecutive-weeks">Most weeks in a row</option>
+                            <option value="consecutive-months">Most months in a row</option>
                             <option value="first-n-scrobbles">First to X scrobbles</option>
                             <option value="fastest-n-scrobbles">Fastest to X scrobbles</option>
-                            <option value="oldest-average-listening-time">Oldest average listening time (X+ scrobbles)</option>
-                            <option value="newest-average-listening-time">Newest average listening time (X+ scrobbles)</option>
+                            <option value="oldest-average-listening-time">Oldest average play date (X+ scrobbles)</option>
+                            <option value="newest-average-listening-time">Newest average play date (X+ scrobbles)</option>
                             <option value="max-single-day">Most scrobbles in a single day</option>
                             <option value="max-single-week">Most scrobbles in a single week</option>
                             <option value="max-single-month">Most scrobbles in a single month</option>
                             <option value="max-rolling-xh">Most scrobbles within X hours</option>
                             <option value="max-rolling-24h">Most scrobbles within 24 hours</option>
-                            <option value="max-rolling-168h">Most scrobbles within 168 hours</option>
-                            <option value="earliest-to-latest">Earliest to latest (scrobbles only)</option>
-                            <option value="latest-to-earliest">Latest to earliest (scrobbles only)</option>
+                            <option value="max-rolling-168h">Most scrobbles within 7 days (rolling)</option>
+                            <option value="earliest-to-latest">Oldest first</option>
+                            <option value="latest-to-earliest">Newest first</option>
                             <hr class="separator">
                             <option value="time-spent-listening">Time spent listening</option>
                             <option value="highest-listening-percentage">Percentage of global scrobbles</option>
@@ -184,14 +228,21 @@
                             <input type="checkbox" id="unfiltered-stats">
                         </label>
 
+                        <hr class="separator">
+
+                        <span class="comparison-label">Two lists side by side</span>
+                        <button id="comparison-toggle" type="button" data-active="false">Comparison: Off</button>
+
                     </div>
                 </div>
 
-                <div class="dropdown">
+                <div class="dropdown" data-pausable>
                     <button class="dropdown-button"><i class="fas fa-microphone" aria-hidden="true"></i><span>Artist</span></button>
                     <div class="dropdown-content">
+                        <p class="paused-note">Paused while Equations has steps: a list with steps is built from your whole history, and the steps are its filters. Add these conditions as steps, or clear the steps to use this menu again.</p>
 
-                        <label for="max-per-artist">Displayed tracks per artist</label>
+
+                        <label for="max-per-artist">Displayed per artist</label>
                         <input type="number" id="max-per-artist" placeholder="e.g., 1" min="1">
 
                         <hr class="separator">
@@ -292,9 +343,16 @@
 
 
                 <!-- Album Filters -->
-                <div class="dropdown">
+                <div class="dropdown" data-pausable>
                     <button class="dropdown-button"><i class="fas fa-compact-disc" aria-hidden="true"></i><span>Album</span></button>
                     <div class="dropdown-content">
+                        <p class="paused-note">Paused while Equations has steps: a list with steps is built from your whole history, and the steps are its filters. Add these conditions as steps, or clear the steps to use this menu again.</p>
+
+
+                        <label for="max-per-album">Displayed tracks per album</label>
+                        <input type="number" id="max-per-album" placeholder="e.g., 1" min="1">
+
+                        <hr class="separator">
 
                         <!-- Category 1: Name/Title filters -->
                         <label for="album-name">Album title</label>
@@ -386,9 +444,11 @@
                 </div>
 
                 <!-- Track Filters -->
-                <div class="dropdown">
+                <div class="dropdown" data-pausable>
                     <button class="dropdown-button"><i class="fas fa-music" aria-hidden="true"></i><span>Track</span></button>
                     <div class="dropdown-content">
+                        <p class="paused-note">Paused while Equations has steps: a list with steps is built from your whole history, and the steps are its filters. Add these conditions as steps, or clear the steps to use this menu again.</p>
+
                         <!-- Category 1: Title filters -->
                         <label for="track-name">Track title</label>
                         <input type="text" id="track-name" placeholder="e.g., Yesterday">
@@ -479,9 +539,11 @@
                 </div>
 
                 <!-- Time Filters -->
-                <div class="dropdown">
+                <div class="dropdown" data-pausable>
                     <button class="dropdown-button"><i class="fas fa-clock" aria-hidden="true"></i><span>Time</span></button>
                     <div class="dropdown-content">
+                        <p class="paused-note">Paused while Equations has steps: a list with steps is built from your whole history, and the steps are its filters. Add these conditions as steps, or clear the steps to use this menu again.</p>
+
 
                         <label for="last-n-days">Last X days</label>
                         <input type="number" id="last-n-days" placeholder="e.g., 30">
@@ -564,13 +626,18 @@
                 <div class="dropdown">
                     <button class="dropdown-button"><i class="fas fa-square-root-variable" aria-hidden="true"></i><span>Equations</span></button>
                     <div class="dropdown-content equation-dropdown-content">
-                        <div class="equation-editor-layout">
+                        <!-- js/ui/equation-editor.js builds the step editor; the text boxes hold the result -->
+                        <div class="equation-editor-layout is-visual">
                             <div class="equation-editor-pane">
-                                <label for="equations">Left list pipeline</label>
-                                <textarea id="equations" rows="5" placeholder="e.g., artist-name-length = track-name-length; sort track-scrobble-count desc; unique track-name-length 1; sort track-name-length asc"></textarea>
-
-                                <label for="equations-right">Right list pipeline</label>
-                                <textarea id="equations-right" rows="5" placeholder="e.g., artist-name-length = track-name-length; sort track-scrobble-count desc; unique track-name-length 1; sort track-name-length asc"></textarea>
+                                <p class="eq-intro">Steps run from top to bottom on your whole history, before the list is grouped and ranked. While there are steps, they are the list's filters: the Artist, Album, Track and Time menus are paused. Play counts and ranks count the plays kept by the filter steps above, so the order of the steps matters.</p>
+                                <div class="eq-side" data-side="left">
+                                    <label for="equations" class="eq-side-title">Left list</label>
+                                    <textarea id="equations" rows="5" spellcheck="false" placeholder="e.g., artist-name-length = track-name-length; sort track-scrobble-count desc; unique track-name-length 1; sort track-name-length asc"></textarea>
+                                </div>
+                                <div class="eq-side" data-side="right">
+                                    <label for="equations-right" class="eq-side-title">Right list</label>
+                                    <textarea id="equations-right" rows="5" spellcheck="false" placeholder="e.g., artist-name-length = track-name-length; sort track-scrobble-count desc; unique track-name-length 1; sort track-name-length asc"></textarea>
+                                </div>
                             </div>
 
                             <div class="equation-helper-pane">
@@ -588,8 +655,8 @@
                 </div>
             </div>
 
-            <div class="comparison-controls">
-                <button id="comparison-toggle" type="button" data-active="false">Comparison: Off</button>
+            <!-- Which side the filters change, shown while comparing -->
+            <div class="comparison-controls" hidden>
                 <select id="comparison-edit-target">
                     <option value="left">Editing: Left list</option>
                     <option value="right">Editing: Right list</option>
@@ -609,11 +676,44 @@
         <div id="active-filters" class="active-filters content-block"></div>
 
         <section id="results-section" class="content-block">
-            <h2>Top Tracks</h2>
+            <div class="results-header">
+                <h2>Top Tracks</h2>
+                <div class="results-actions">
+                    <button type="button" id="open-filters-mobile" class="results-action filters-mobile-button" aria-controls="filters-section"><i class="fas fa-filter" aria-hidden="true"></i> Filters</button>
+                    <button type="button" id="graph-this-list" class="results-action" hidden title="Plot how the top of this list changed over time"><i class="fas fa-chart-line" aria-hidden="true"></i> Graph over time</button>
+                </div>
+            </div>
             <div id="results"></div>
         </section>
 
+        <section id="explore-section" class="content-block" aria-labelledby="explore-title">
+            <h2 id="explore-title" class="visually-hidden">Explore</h2>
+            <div class="explore-bar">
+                <nav class="explore-jump" aria-label="Explore sections"></nav>
+                <p class="explore-hint">Click a name for its stats, or open a list to change its filters.</p>
+            </div>
+            <div id="explore-body"></div>
+        </section>
+
         <section id="entity-section" class="content-block" hidden></section>
+
+        <section id="graphs-section" class="content-block" aria-labelledby="graphs-title">
+            <h2 id="graphs-title" class="visually-hidden">Graphs</h2>
+            <div class="graph-top">
+                <div class="graph-series"></div>
+                <div class="graph-actions">
+                    <button type="button" class="graph-icon graph-reset" title="Start over with your top 5 artists" aria-label="Reset the graph"><i class="fas fa-rotate-left" aria-hidden="true"></i></button>
+                    <button type="button" class="graph-icon graph-download" title="Download as PNG" aria-label="Download the graph as PNG"><i class="fas fa-download" aria-hidden="true"></i></button>
+                </div>
+            </div>
+            <div class="graph-source" hidden></div>
+            <div class="graph-stage">
+                <canvas id="graph-canvas" role="img" aria-label="Graph"></canvas>
+            </div>
+            <p class="graph-status" role="status"></p>
+            <div class="graph-main-settings"></div>
+            <div class="graph-controls" hidden></div>
+        </section>
 
         <section id="games-section" class="content-block">
             <div id="games-home" class="games-home">
@@ -824,10 +924,10 @@
                 </div>
                 <div id="grid-export-options" class="export-options">
                     <label for="grid-size-x">Grid width (columns)</label>
-                    <input type="number" id="grid-size-x" min="1" max="50" value="5">
+                    <input type="number" id="grid-size-x" min="1" max="20" value="5">
 
                     <label for="grid-size-y">Grid height (rows)</label>
-                    <input type="number" id="grid-size-y" min="1" max="50" value="5">
+                    <input type="number" id="grid-size-y" min="1" max="20" value="5">
 
                     <label for="grid-allow-duplicates" class="inline-checkbox">
                         Allow duplicate covers
@@ -858,6 +958,11 @@
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
     <script type="module" src="js/main.js"></script>
     <!-- Anonymous visit and feature counts; see js/analytics.js -->
+    <script>
+        // Page views count the path only. The address bar holds the username
+        // and list settings, which must never reach the counter.
+        window.goatcounter = { path: function () { return location.pathname || "/"; } };
+    </script>
     <script id="goatcounter-script" data-goatcounter="https://lastfmlists.goatcounter.com/count"
             async src="https://gc.zgo.at/count.js"></script>
 

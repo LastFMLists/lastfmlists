@@ -2,9 +2,9 @@
 // including the live preview shown while pages arrive.
 
 import {
-    fetchAllAlbumDetails,
-    fetchAllArtistDetails,
-    fetchAllTrackDetails,
+    fetchAlbumDetails,
+    fetchArtistDetails,
+    fetchTrackDetails,
     getLastfmErrorMessage,
     mapRecentTrack
 } from '../api/lastfm.js';
@@ -23,10 +23,9 @@ import { escapeHTML, getListLengthLimit, loadingDiv, mapWithConcurrency } from '
 import { state } from '../state.js';
 import { getLocalDayKeyFromTimestamp } from '../time.js';
 import { displayEntities } from '../ui/lists.js';
-import { setLoadProgress } from '../ui/load-notice.js';
+import { finishLoadNotice, setLoadProgress, startLoadNotice } from '../ui/load-notice.js';
 import { updateExtendedDataUI } from '../ui/shell.js';
 import { filterTracks } from './filters.js';
-import { mergeData } from './storage.js';
 
 export function buildHistoryContextMaps() {
     state.previousScrobbleTimestampByOrder = {};
@@ -51,101 +50,184 @@ export function buildHistoryContextMaps() {
     }
 }
 
+// Whether an entry already has its Last.fm details. Saves made before the
+// detailsLoaded marker existed are recognised by the listener count.
+function hasDetails(entry) {
+    return Boolean(entry) && (entry.detailsLoaded === true || typeof entry.listeners === "number");
+}
+
+// Load Details covers everything played often (over 100 plays for an artist,
+// 10 for an album, 5 for a track) and never less than the top 250 artists,
+// 500 albums and 1,000 tracks. Load ALL Details covers every top-list entry.
+function selectDetailCandidates(all) {
+    const pick = (list, minPlays, atLeast) => {
+        if (all) return list.slice();
+        const playedOften = list.filter(entry => (parseInt(entry.user_scrobbles, 10) || 0) > minPlays);
+        return playedOften.length < atLeast ? list.slice(0, atLeast) : playedOften;
+    };
+    return {
+        artists: pick(state.topArtists, 100, state.artistLimit),
+        albums: pick(state.topAlbums, 10, state.albumLimit),
+        tracks: pick(state.topTracks, 5, state.trackLimit)
+    };
+}
+
+// One job per artist, album and track. Each result is written into the
+// dataset as soon as it arrives, so Save Data keeps what has loaded and the
+// next run only fetches the rest.
+function buildDetailJobs(candidates) {
+    const kinds = [
+        {
+            label: "artists",
+            list: candidates.artists,
+            data: () => state.artistsData,
+            key: entry => entry.name.trim().toLowerCase(),
+            mapKey: entry => entry.name.toLowerCase(),
+            map: () => state.artistDataMap,
+            base: entry => ({ name: entry.name }),
+            fetch: entry => fetchArtistDetails(entry.name)
+        },
+        {
+            label: "albums",
+            list: candidates.albums,
+            data: () => state.albumsData,
+            key: entry => `${entry.name.trim().toLowerCase()}_${entry.artist.trim().toLowerCase()}`,
+            mapKey: entry => `${entry.name.toLowerCase()}||${entry.artist.toLowerCase()}`,
+            map: () => state.albumDataMap,
+            base: entry => ({ name: entry.name, artist: entry.artist }),
+            fetch: entry => fetchAlbumDetails(entry.name, entry.artist)
+        },
+        {
+            label: "tracks",
+            list: candidates.tracks,
+            data: () => state.tracksData,
+            key: entry => `${entry.name.trim().toLowerCase()}_${entry.artist.trim().toLowerCase()}`,
+            mapKey: entry => `${entry.name.toLowerCase()}||${entry.artist.toLowerCase()}`,
+            map: () => state.trackDataMap,
+            base: entry => ({ name: entry.name, artist: entry.artist }),
+            fetch: entry => fetchTrackDetails(entry.name, entry.artist)
+        }
+    ];
+
+    const jobs = [];
+    for (const kind of kinds) {
+        const index = new Map(kind.data().map(entry => [kind.key(entry), entry]));
+        for (const candidate of kind.list) {
+            const key = kind.key(candidate);
+            jobs.push({ kind, candidate, key, index, done: hasDetails(index.get(key)) });
+        }
+    }
+    return jobs;
+}
+
+function storeDetails(job, result) {
+    const { kind, candidate, key, index } = job;
+    let entry = index.get(key);
+    if (!entry) {
+        entry = kind.base(candidate);
+        kind.data().push(entry);
+        index.set(key, entry);
+        kind.map()[kind.mapKey(candidate)] = entry;
+    }
+    if (result.found) {
+        const { found, ...details } = result;
+        Object.assign(entry, details);
+    }
+    // Marked even when Last.fm doesn't know the item, so it isn't asked again.
+    entry.detailsLoaded = true;
+}
+
+let detailsLoading = false;
+
 async function loadDetailedMetadata(loadAll = false) {
-    const selectCandidates = (all) => {
-        const selectedArtists = all
-            ? state.topArtists.slice()
-            : (() => {
-                const preferred = state.topArtists.filter(artist => artist.playcount > 100);
-                return preferred.length < state.artistLimit ? state.topArtists.slice(0, state.artistLimit) : preferred;
-            })();
+    if (detailsLoading) return;
 
-        const selectedAlbums = all
-            ? state.topAlbums.slice()
-            : (() => {
-                const preferred = state.topAlbums.filter(album => album.playcount > 10);
-                return preferred.length < state.albumLimit ? state.topAlbums.slice(0, state.albumLimit) : preferred;
-            })();
-
-        const selectedTracks = all
-            ? state.topTracks.slice()
-            : (() => {
-                const preferred = state.topTracks.filter(track => track.playcount > 5);
-                return preferred.length < state.trackLimit ? state.topTracks.slice(0, state.trackLimit) : preferred;
-            })();
-
-        return { selectedArtists, selectedAlbums, selectedTracks };
+    const allJobs = buildDetailJobs(selectDetailCandidates(loadAll));
+    let jobs = allJobs.filter(job => !job.done);
+    // "12 artists, 3 albums and 1 track", leaving out kinds with none.
+    const countByKind = (list) => {
+        const parts = [["artist", "artists"], ["album", "albums"], ["track", "tracks"]]
+            .map(([one, many]) => {
+                const count = list.filter(job => job.kind.label === many).length;
+                return count ? `${count.toLocaleString()} ${count === 1 ? one : many}` : null;
+            })
+            .filter(Boolean);
+        return parts.length > 1 ? `${parts.slice(0, -1).join(", ")} and ${parts.at(-1)}` : parts.join("");
     };
 
-    const { selectedArtists, selectedAlbums, selectedTracks } = selectCandidates(loadAll);
-
-    const counts = `${selectedArtists.length} artists, ${selectedAlbums.length} albums and ${selectedTracks.length} tracks`;
-    const confirmMsg = loadAll
-        ? `Load All Details downloads metadata for every artist, album and track you have scrobbled: ${counts}. This can take hours.\n\nContinue?`
-        : `Load Details downloads metadata for ${counts}. This is enough for most statistics. Use "Load All Details" for metadata on everything you have scrobbled.\n\nContinue?`;
+    let confirmMsg;
+    if (jobs.length === 0) {
+        // Everything already has details: offer to download them again, since
+        // listener and play counts on Last.fm keep changing.
+        confirmMsg = `Details are already downloaded for all ${countByKind(allJobs)}. Download them again to update the listener and play counts?`;
+        jobs = allJobs;
+    } else {
+        const skipped = allJobs.length - jobs.length;
+        const skippedNote = skipped
+            ? ` ${skipped.toLocaleString()} more already have details from an earlier run and are skipped.`
+            : "";
+        confirmMsg = loadAll
+            ? `Load ALL Details downloads metadata for every artist, album and track you have scrobbled: ${countByKind(jobs)}.${skippedNote} This can take hours. Click Save Data if you have to stop, and the next run continues from there.\n\nContinue?`
+            : `Load Details downloads metadata for ${countByKind(jobs)}: everything you play often, and at least your top 250 artists, 500 albums and 1,000 tracks.${skippedNote} This is enough for most statistics. Use "Load ALL Details" for metadata on everything you have scrobbled.\n\nContinue?`;
+    }
     if (!confirm(confirmMsg)) return;
 
-    const username = document.getElementById("username").value.trim();
-    if (!username) return;
+    const buttons = ["load-detailed-data", "load-all-details"].map(id => document.getElementById(id)).filter(Boolean);
+    detailsLoading = true;
+    buttons.forEach(button => { button.disabled = true; });
+    startLoadNotice();
 
-    const activeArtistLimit = loadAll ? Infinity : state.artistLimit;
-    const activeAlbumLimit = loadAll ? Infinity : state.albumLimit;
-    const activeTrackLimit = loadAll ? Infinity : state.trackLimit;
+    let finished = 0;
+    let failed = 0;
+    // At most one repaint per 250 ms; an update inside that window is painted
+    // when it ends, so a pause in the requests never leaves a stale count.
+    let paintTimer = null;
+    const paint = () => {
+        paintTimer = null;
+        loadingDiv.innerHTML = `<p>Loading details... ${finished.toLocaleString()} of ${jobs.length.toLocaleString()}</p>`;
+        setLoadProgress(finished / jobs.length);
+    };
+    const paintProgress = (force = false) => {
+        if (force) {
+            clearTimeout(paintTimer);
+            paint();
+        } else if (paintTimer === null) {
+            paintTimer = setTimeout(paint, 250);
+        }
+    };
 
-    const fetchedArtists = await fetchAllArtistDetails(selectedArtists, activeArtistLimit);
-    console.log("Fetched artist details:", fetchedArtists);
+    try {
+        paintProgress(true);
+        await mapWithConcurrency(jobs, async (job) => {
+            const result = await job.kind.fetch(job.candidate);
+            if (result) storeDetails(job, result);
+            else failed += 1;
+            finished += 1;
+            paintProgress();
+        }, 4);
+    } finally {
+        clearTimeout(paintTimer);
+        detailsLoading = false;
+        buttons.forEach(button => { button.disabled = false; });
+    }
 
-    const fetchedAlbums = await fetchAllAlbumDetails(selectedAlbums, activeAlbumLimit);
-    console.log("Fetched album details:", fetchedAlbums);
+    debugLogDataset("Merged artistsData:", state.artistsData);
+    debugLogDataset("Merged albumsData:", state.albumsData);
+    debugLogDataset("Merged tracksData:", state.tracksData);
 
-    const fetchedTracks = await fetchAllTrackDetails(selectedTracks, activeTrackLimit);
-    console.log("Fetched track details:", fetchedTracks);
+    // Detailed metadata is now available: unlock the gated filters/sorts.
+    state.extendedDataLoaded = true;
+    updateExtendedDataUI();
+    finishLoadNotice("Your details are loaded.");
 
-	// Process fetched data and format it before merging
-	const newArtistsData = fetchedArtists.map(artist => ({
-        ...artist,
-        name: artist.name,
-        listeners: parseInt(artist.listeners, 10) || 0,
-        playcount: parseInt(artist.playcount, 10) || 0,
-        tags: artist.tags || []
-    }));
-    
-    const newAlbumsData = fetchedAlbums.map(album => ({
-        ...album,
-        name: album.name,
-        artist: album.artist,
-        listeners: parseInt(album.listeners, 10) || 0,
-        playcount: parseInt(album.playcount, 10) || 0,
-    }));
-    
-    const newTracksData = fetchedTracks.map(track => ({
-        ...track,
-        name: track.name,
-        artist: track.artist?.name || track.artist,
-        duration: parseInt(track.duration, 10) || 0,
-        listeners: parseInt(track.listeners, 10) || 0,
-        playcount: parseInt(track.playcount, 10) || 0
-    }));
-
-	// Merge the new data into existing global arrays while keeping firstscrobble, user_scrobbles, and rank
-    state.artistsData = mergeData(state.artistsData, newArtistsData, item => item.name.trim().toLowerCase());
-    state.albumsData = mergeData(state.albumsData, newAlbumsData, 
-        item => `${item.name.trim().toLowerCase()}_${item.artist.trim().toLowerCase()}`);
-    state.tracksData = mergeData(state.tracksData, newTracksData, 
-        item => `${item.name.trim().toLowerCase()}_${item.artist.trim().toLowerCase()}`);
-
-	debugLogDataset("Merged artistsData:", state.artistsData);
-	debugLogDataset("Merged albumsData:", state.albumsData);
-	debugLogDataset("Merged tracksData:", state.tracksData);
-
-	// Detailed metadata is now available: unlock the gated filters/sorts.
-	state.extendedDataLoaded = true;
-	updateExtendedDataUI();
-
-	// Update display, filters, etc.
-	loadingDiv.innerHTML = ""; // Clear loading message
-	filterTracks();
+    // Items that failed have no marker, so the next run picks them up.
+    loadingDiv.innerHTML = failed
+        ? `<p class="load-incomplete">Details for ${failed.toLocaleString()} ${failed === 1 ? "item" : "items"} couldn't be downloaded. Click Save Data, then load details again later to fetch just those.</p>`
+        : "";
+    filterTracks();
     displayEntities();
+    // Explore shows boxes that need details once they are there.
+    document.dispatchEvent(new CustomEvent("data:changed"));
 }
 
 const loadDetailedButton = document.getElementById("load-detailed-data");
@@ -242,55 +324,194 @@ export function renderLoadingPreview({ artistTally, trackTally, headingText, not
     results.appendChild(fragment);
 }
 
-export async function fetchListeningHistory(username, onPreview = null) {
-    // Reset adaptive throttling for a fresh load.
+// ---- Downloading the history ----
+//
+// A load walks user.getRecentTracks page by page over a fixed range. `to` is
+// pinned just past the newest scrobble that existed when the walk began, so
+// scrobbles made while it runs can't shift the pages. That keeps the page
+// numbers valid after a refresh too, which is what lets a half-finished load
+// be saved and continued later. A range is:
+//   from        newest scrobble already covered (seconds), or null for a whole history
+//   anchor      newest scrobble in the range (seconds); requests use to = anchor + 1
+//   limit       the page size requested
+//   total       scrobbles Last.fm counted in the range when the walk began
+//   totalPages  derived from total and the page size the server actually used
+//   done        page numbers fully downloaded
+
+function recentTracksUrl(username, { limit, page, from = null, to = null }) {
+    let url = `https://ws.audioscrobbler.com/2.0/?method=user.getrecenttracks&user=${encodeURIComponent(username)}&api_key=${API_KEY}&format=json&extended=1&limit=${limit}&autocorrect=0&page=${page}`;
+    if (from !== null) url += `&from=${from}`;
+    if (to !== null) url += `&to=${to}`;
+    return url;
+}
+
+// The scrobbles in a response, or null if the request failed. Last.fm sends a
+// lone scrobble as an object rather than a one-item array.
+function recentTrackList(data) {
+    if (!data || !data.recenttracks) return null;
+    const list = data.recenttracks.track;
+    if (Array.isArray(list)) return list;
+    return list ? [list] : [];
+}
+
+// The scrobbles on a page that belong to the range. "Now playing" has no date,
+// and Last.fm may or may not count `from` itself as inside the range, so
+// anything at or before it is dropped here.
+function rangeTracks(list, from) {
+    const fromMs = from === null ? -Infinity : from * 1000;
+    return list
+        .filter(track => track && track.date && track.date.uts)
+        .map(mapRecentTrack)
+        .filter(track => track.Date > fromMs);
+}
+
+function serializeRange(range) {
+    return { ...range, done: [...range.done].sort((a, b) => a - b) };
+}
+
+// Newest scrobble on the account (seconds), or null if it has none.
+async function fetchNewestScrobbleTime(username) {
+    const data = await fetchJsonWithRetry(recentTracksUrl(username, { limit: 10, page: 1 }));
+    const apiError = getLastfmErrorMessage(data);
+    if (apiError) throw new Error(apiError);
+    const list = recentTrackList(data);
+    if (!list) throw new Error("Couldn't reach Last.fm. Check your connection and try again.");
+    const newest = list.find(track => track && track.date && track.date.uts);
+    return newest ? parseInt(newest.date.uts, 10) : null;
+}
+
+async function openRange(username, from, anchor) {
+    const to = anchor + 1;
+    // Try a large page size first and fall back to the known-good one if the
+    // API rejects it. The page count comes from what the server actually
+    // returns, so a silently capped limit can't drop scrobbles either way.
+    let limit = HISTORY_PAGE_SIZE_LARGE;
+    let data = await fetchJsonWithRetry(recentTracksUrl(username, { limit, page: 1, from, to }), 1);
+    if (!recentTrackList(data)?.length) {
+        limit = HISTORY_PAGE_SIZE_SAFE;
+        data = await fetchJsonWithRetry(recentTracksUrl(username, { limit, page: 1, from, to }));
+    }
+
+    const apiError = getLastfmErrorMessage(data);
+    if (apiError) throw new Error(apiError);
+    const list = recentTrackList(data);
+    if (!list) throw new Error("Couldn't reach Last.fm. Check your connection and try again.");
+
+    const total = parseInt(data.recenttracks["@attr"]?.total, 10) || 0;
+    const servedPageSize = Math.max(1, list.filter(track => track && track.date && track.date.uts).length);
+    const totalPages = total > 0 ? Math.max(1, Math.ceil(total / servedPageSize)) : 1;
+    console.log(`History range: ${total} scrobbles, page size ${servedPageSize}, ${totalPages} pages.`);
+
+    return {
+        range: { from, anchor, limit, total, totalPages, done: new Set([1]) },
+        firstPage: rangeTracks(list, from)
+    };
+}
+
+// A saved range can only be continued if Last.fm still counts the same
+// scrobbles in it. A deleted or back-dated scrobble would move every later
+// page, so a changed total means starting the range again.
+async function rangeStillMatches(username, range) {
+    const data = await fetchJsonWithRetry(recentTracksUrl(username, {
+        limit: range.limit, page: 1, from: range.from, to: range.anchor + 1
+    }));
+    const apiError = getLastfmErrorMessage(data);
+    if (apiError) throw new Error(apiError);
+    if (!recentTrackList(data)) throw new Error("Couldn't reach Last.fm. Check your connection and try again.");
+    return (parseInt(data.recenttracks["@attr"]?.total, 10) || 0) === range.total;
+}
+
+// Downloads every page of the range not yet in `pages`. Pages that fail are
+// tried once more at the end; returns whether every page arrived.
+async function walkRange(username, range, pages, onPage) {
+    const missingPages = () => {
+        const missing = [];
+        for (let page = 1; page <= range.totalPages; page++) {
+            if (!range.done.has(page)) missing.push(page);
+        }
+        return missing;
+    };
+
+    const fetchPage = async (page) => {
+        const data = await fetchJsonWithRetry(recentTracksUrl(username, {
+            limit: range.limit, page, from: range.from, to: range.anchor + 1
+        }));
+        const list = recentTrackList(data);
+        // Only the last page may come back empty; an empty page in the middle
+        // is a failed request.
+        if (!list || (list.length === 0 && page < range.totalPages)) {
+            console.warn(`Page ${page} of ${range.totalPages} failed; it will be tried again.`);
+            return;
+        }
+        const tracks = rangeTracks(list, range.from);
+        pages.set(page, tracks);
+        range.done.add(page);
+        onPage(tracks);
+    };
+
+    await mapWithConcurrency(missingPages(), fetchPage, getFetchConcurrency());
+    for (const page of missingPages()) {
+        await fetchPage(page);
+    }
+    return missingPages().length === 0;
+}
+
+// Downloads everything the saved data doesn't have yet: the whole history for
+// a new user, the missing pages of a load that was saved part-way, and what
+// was scrobbled since. While it runs, state.historyLoad.snapshot() returns
+// what has fully arrived, for Save Data. `progress` in the result is set when
+// some pages still couldn't be downloaded; `missing` counts their scrobbles.
+export async function loadHistory(username, saved, onPreview = null) {
     resetFetchThrottle();
 
-    const buildUrl = (limit, page) =>
-        `https://ws.audioscrobbler.com/2.0/?method=user.getrecenttracks&user=${encodeURIComponent(username)}&api_key=${API_KEY}&format=json&extended=1&limit=${limit}&autocorrect=0&page=${page}`;
-
-    // Try a large page size first; if the API rejects it (empty/invalid page 1),
-    // transparently fall back to the known-good size. Either way the real page
-    // count is derived below from what the server actually returns, so a
-    // silently capped limit can never drop scrobbles. The probe uses a single
-    // quick retry so a rejected large limit falls back fast.
-    let pageSize = HISTORY_PAGE_SIZE_LARGE;
-    let firstData = await fetchJsonWithRetry(buildUrl(pageSize, 1), 1);
-    if (!firstData || !firstData.recenttracks || !Array.isArray(firstData.recenttracks.track) || firstData.recenttracks.track.length === 0) {
-        console.warn(`Large page size (${pageSize}) returned no usable data; falling back to ${HISTORY_PAGE_SIZE_SAFE}.`);
-        pageSize = HISTORY_PAGE_SIZE_SAFE;
-        firstData = await fetchJsonWithRetry(buildUrl(pageSize, 1));
+    const savedTracks = Array.isArray(saved?.allTracks) ? saved.allTracks.filter(track => track && track.Date) : [];
+    let base = savedTracks;
+    let range = null;
+    let from = null;
+    if (saved?.historyProgress) {
+        range = { ...saved.historyProgress, done: new Set(saved.historyProgress.done) };
+        from = range.from;
+    } else if (savedTracks.length) {
+        let newest = 0;
+        for (const track of savedTracks) {
+            const ts = parseInt(track.Date, 10);
+            if (ts > newest) newest = ts;
+        }
+        from = Math.floor(newest / 1000);
     }
 
-    const apiError = getLastfmErrorMessage(firstData);
-    if (apiError) throw new Error(apiError);
+    const pages = new Map();
+    let fetchedAnything = false;
+    state.historyLoad = {
+        username,
+        phase: "history",
+        snapshot: () => ({
+            allTracks: base.concat(...pages.values()),
+            historyProgress: range ? serializeRange(range) : null
+        })
+    };
 
-    if (!firstData || !firstData.recenttracks || !Array.isArray(firstData.recenttracks.track)) {
-        throw new Error("Couldn't reach Last.fm. Check your connection and try again.");
-    }
-
-    if (firstData.recenttracks.track.length === 0) {
+    loadingDiv.innerHTML = savedTracks.length ? `<p>Checking for new scrobbles...</p>` : `<p>Loading data...</p>`;
+    const newest = await fetchNewestScrobbleTime(username);
+    if (newest === null && !base.length) {
         throw new Error("That account has no scrobbles yet, so there's nothing to build a list from.");
     }
 
-    const attr = firstData.recenttracks["@attr"] || {};
-    const totalScrobbles = parseInt(attr.total, 10) || 0;
+    if (range) {
+        loadingDiv.innerHTML = `<p>Continuing your saved load...</p>`;
+        if (await rangeStillMatches(username, range)) {
+            fetchedAnything = true;
+        } else {
+            console.warn("The saved part of the history changed on Last.fm since it was saved; loading that part again.");
+            base = range.from === null ? [] : base.filter(track => parseInt(track.Date, 10) <= range.from * 1000);
+            range = null;
+            fetchedAnything = true;
+        }
+    }
 
-    const firstPageTracks = firstData.recenttracks.track.map(mapRecentTrack);
-    // "Now playing" tracks have no date and don't count toward pagination.
-    const datedOnFirstPage = firstPageTracks.filter(t => t.Date !== null).length || firstPageTracks.length;
-    // Derive page count from the server's ACTUAL per-page size, not the requested
-    // limit, so it stays correct whether the limit was honoured or capped.
-    const effectivePageSize = Math.max(1, datedOnFirstPage);
-    const totalPages = totalScrobbles > 0
-        ? Math.max(1, Math.ceil(totalScrobbles / effectivePageSize))
-        : (parseInt(attr.totalPages, 10) || 1);
-
-    console.log(`History fetch: ${totalScrobbles} scrobbles, page size ${effectivePageSize}, ${totalPages} pages, concurrency ${getFetchConcurrency()}.`);
-
-    const lastfmData = [...firstPageTracks];
-
-    // Running tally that powers the live "building your lists" preview.
+    // A whole history being built shows its top lists as pages arrive; a
+    // sync shows the saved lists, which are almost complete already.
+    const buildingWholeHistory = from === null;
     const artistTally = new Map();
     const trackTally = new Map();
     const addToTally = (tracks) => {
@@ -301,103 +522,90 @@ export async function fetchListeningHistory(username, onPreview = null) {
             trackTally.set(trackKey, (trackTally.get(trackKey) || 0) + 1);
         }
     };
-    addToTally(firstPageTracks);
-
-    let pagesLoaded = 1;
-    let lastPreviewAt = 0;
-    const emitPreview = (force = false) => {
-        if (typeof onPreview !== "function") return;
-        const now = Date.now();
-        if (!force && now - lastPreviewAt < 400) return; // throttle DOM work
-        lastPreviewAt = now;
+    let scrobbleCount = base.length;
+    // At most one repaint per 400 ms; a page that arrives inside that window
+    // is painted when it ends, so a pause never leaves an old count up. A
+    // late paint is dropped once the download is over, so it can't cover the
+    // finished list.
+    let previewTimer = null;
+    const paintPreview = () => {
+        previewTimer = null;
+        if (!range || state.historyLoad?.phase !== "history") return;
         onPreview({
             artistTally,
             trackTally,
-            headingText: label => `Building your top ${label}… ${lastfmData.length.toLocaleString()} scrobbles (page ${pagesLoaded}/${totalPages})`,
+            headingText: label => `Building your top ${label}… ${scrobbleCount.toLocaleString()} scrobbles (page ${range.done.size}/${range.totalPages})`,
             noteText: "Live preview, still loading. Ranked by scrobble count, and your filters apply once loading finishes.",
             countLabel: "Scrobbles so far"
         });
     };
+    const emitPreview = (force = false) => {
+        if (!buildingWholeHistory || typeof onPreview !== "function" || !range) return;
+        if (force) {
+            clearTimeout(previewTimer);
+            paintPreview();
+        } else if (previewTimer === null) {
+            previewTimer = setTimeout(paintPreview, 400);
+        }
+    };
+    const showPageProgress = () => {
+        loadingDiv.innerHTML = buildingWholeHistory
+            ? `<p>Loading data... Page ${range.done.size} of ${range.totalPages} (${scrobbleCount.toLocaleString()} scrobbles)</p>`
+            : `<p>Fetching new scrobbles... page ${range.done.size} of ${range.totalPages}</p>`;
+        setLoadProgress(range.done.size / range.totalPages);
+    };
 
-    loadingDiv.innerHTML = `<p>Loading data... Page 1 of ${totalPages}</p>`;
-    setLoadProgress(1 / totalPages);
-    emitPreview(true);
+    if (buildingWholeHistory) addToTally(base);
+    else renderSavedDataPreview(base);
 
-    if (totalPages > 1) {
-        const pageNumbers = Array.from({ length: totalPages - 1 }, (_, idx) => idx + 2);
-        await mapWithConcurrency(pageNumbers, async (page) => {
-            const data = await fetchJsonWithRetry(buildUrl(pageSize, page));
-            if (data && data.recenttracks && Array.isArray(data.recenttracks.track)) {
-                const pageTracks = data.recenttracks.track.map(mapRecentTrack);
-                lastfmData.push(...pageTracks);
-                addToTally(pageTracks);
-            } else {
-                console.warn(`Skipping page ${page} after multiple failed attempts.`);
-            }
-            pagesLoaded += 1;
-            loadingDiv.innerHTML = `<p>Loading data... Page ${pagesLoaded} of ${totalPages} (${lastfmData.length.toLocaleString()} scrobbles)</p>`;
-            setLoadProgress(pagesLoaded / totalPages);
+    let complete = true;
+    while (true) {
+        if (!range) {
+            if (newest === null || (from !== null && newest <= from)) break;
+            const opened = await openRange(username, from, newest);
+            range = opened.range;
+            pages.set(1, opened.firstPage);
+            addToTally(opened.firstPage);
+            scrobbleCount += opened.firstPage.length;
+            fetchedAnything = true;
+        }
+        showPageProgress();
+        emitPreview(true);
+
+        complete = await walkRange(username, range, pages, (pageTracks) => {
+            addToTally(pageTracks);
+            scrobbleCount += pageTracks.length;
+            showPageProgress();
             emitPreview();
-        }, getFetchConcurrency());
+        });
+        if (!complete) break;
+
+        // This range is done; anything scrobbled after it (a saved load that
+        // is being continued days later) goes into the next one.
+        base = base.concat(...pages.values());
+        pages.clear();
+        from = range.anchor;
+        range = null;
     }
 
     emitPreview(true);
+    clearTimeout(previewTimer);
     // The top lists and rankings still have to be built, so drop the percentage
     // rather than sit at 100% while that runs.
     setLoadProgress(null);
-    console.log(`Fetch complete. Total tracks: ${lastfmData.length}`);
-    return lastfmData;
-}
 
-export async function fetchRecentTracksSince(username, latestTimestamp) {
-    const baseUrl = `https://ws.audioscrobbler.com/2.0/?method=user.getrecenttracks&user=${encodeURIComponent(username)}&api_key=${API_KEY}&format=json&extended=1&limit=200&autocorrect=0`;
-    let newTracks = [];
-    let page = 1;
-    let totalPages = 1;
-    let keepFetching = true;
-
-    while (keepFetching && page <= totalPages) {
-        const data = await fetchJsonWithRetry(`${baseUrl}&page=${page}`);
-
-        const syncError = getLastfmErrorMessage(data);
-        if (syncError && page === 1) throw new Error(syncError);
-
-        if (!data || !data.recenttracks || !Array.isArray(data.recenttracks.track)) {
-            if (page === 1) {
-                throw new Error("Couldn't reach Last.fm to sync new scrobbles. Check your connection and try again.");
-            }
-            console.error(`Sync Error: No tracks found on page ${page}.`);
-            break;
-        }
-
-        if (page === 1 && data.recenttracks['@attr'] && data.recenttracks['@attr'].totalPages) {
-            // The page count for the WHOLE history: only an upper bound for the
-            // loop, since the walk stops at the first already-known scrobble.
-            totalPages = parseInt(data.recenttracks['@attr'].totalPages, 10);
-        }
-
-        // Don't show that upper bound: a sync almost always reads one page, and
-        // announcing "page 1 of 1580" makes a quick check look like a full reload.
-        loadingDiv.innerHTML = page === 1
-            ? `<p>Checking for new scrobbles...</p>`
-            : `<p>Fetching new scrobbles... page ${page} (${newTracks.length.toLocaleString()} so far)</p>`;
-
-        for (const track of data.recenttracks.track) {
-            if (!track.date || !track.date.uts) continue;
-            const ts = parseInt(track.date.uts, 10) * 1000;
-
-            if (ts > latestTimestamp) {
-                newTracks.push(mapRecentTrack(track));
-            } else {
-                keepFetching = false;
-                break;
-            }
-        }
-
-        if (page % 10 === 0) await new Promise(resolve => setTimeout(resolve, 100));
-        page++;
+    const { allTracks: tracks } = state.historyLoad.snapshot();
+    let missing = 0;
+    if (!complete) {
+        const fromMs = range.from === null ? -Infinity : range.from * 1000;
+        const inRange = tracks.reduce((count, track) => count + (parseInt(track.Date, 10) > fromMs ? 1 : 0), 0);
+        missing = Math.max(0, range.total - inRange);
     }
-
-    console.log(`Sync complete after ${page - 1} page(s). Found ${newTracks.length} new tracks.`);
-    return newTracks;
+    console.log(`History loaded: ${tracks.length} scrobbles${complete ? "" : `, about ${missing} still missing`}.`);
+    return {
+        tracks,
+        progress: complete ? null : serializeRange(range),
+        missing,
+        changed: fetchedAnything
+    };
 }

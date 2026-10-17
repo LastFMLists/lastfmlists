@@ -67,6 +67,11 @@ function shortDate(date) {
     return date.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
 }
 
+// Pages opened from Explore go back there; the rest go back to the list.
+function backLabel() {
+    return document.body.classList.contains("view-explore") ? "Back to Explore" : "Back to list";
+}
+
 function plays(count) {
     return `${(count || 0).toLocaleString()} ${count === 1 ? "play" : "plays"}`;
 }
@@ -195,7 +200,7 @@ function renderPage(entity, restored = null) {
     const info = overview(entity);
     if (info.first === null) {
         section.innerHTML = `<div class="entity-page">
-            <button type="button" class="entity-back" data-action="back"><i class="fas fa-arrow-left" aria-hidden="true"></i>Back to list</button>
+            <button type="button" class="entity-back" data-action="back"><i class="fas fa-arrow-left" aria-hidden="true"></i>${backLabel()}</button>
             <p class="entity-empty">This ${ENTITY_NOUNS[entity.type].one} is not in the loaded history.</p>
         </div>`;
         page = { entity, links: [], openSections: new Set() };
@@ -318,7 +323,7 @@ function paint() {
         : [];
 
     section.innerHTML = `<div class="entity-page">
-        <button type="button" class="entity-back" data-action="back"><i class="fas fa-arrow-left" aria-hidden="true"></i>Back to list</button>
+        <button type="button" class="entity-back" data-action="back"><i class="fas fa-arrow-left" aria-hidden="true"></i>${backLabel()}</button>
 
         <header class="entity-header">
             <div class="entity-header-art"></div>
@@ -326,7 +331,10 @@ function paint() {
                 <span class="entity-kicker">${TYPE_TITLES[entity.type]}</span>
                 <h2>${escapeHTML(entity.name)}</h2>
                 ${byline.length ? `<p class="entity-byline">${byline.join(" ")}</p>` : ""}
-                <a class="entity-lastfm" href="${escapeHTML(lastfmUrl(entity))}" target="_blank" rel="noopener"><i class="fab fa-lastfm" aria-hidden="true"></i>Open on Last.fm</a>
+                <div class="entity-header-links">
+                    <a class="entity-lastfm" href="${escapeHTML(lastfmUrl(entity))}" target="_blank" rel="noopener"><i class="fab fa-lastfm" aria-hidden="true"></i>Open on Last.fm</a>
+                    <button type="button" class="entity-lastfm entity-graph" data-action="graph" title="Your all-time rank for this ${entity.type} over the years, in the Graphs tab"><i class="fas fa-chart-line" aria-hidden="true"></i>Graph its rank over time</button>
+                </div>
             </div>
         </header>
 
@@ -568,6 +576,14 @@ if (section) {
         const target = event.target;
 
         if (target.closest('[data-action="back"]')) { backToList(); return; }
+        if (target.closest('[data-action="graph"]')) {
+            const { type, name, artist } = page.entity;
+            // A history entry of its own, like going back to a list, so
+            // Back returns to this page.
+            leaveForList();
+            document.dispatchEvent(new CustomEvent("graphs:open-entity", { detail: { type, name, artist } }));
+            return;
+        }
 
         const linkButton = target.closest("[data-link]");
         if (linkButton) { openLink(page.links[Number(linkButton.dataset.link)]); return; }

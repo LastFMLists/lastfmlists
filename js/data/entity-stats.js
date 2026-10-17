@@ -307,13 +307,13 @@ export const OTHER_SORTS = [
 const DEFAULT_SORT_X = 10;
 
 const SORT_LABELS = {
-    "separate-days": "Different days played",
-    "separate-weeks": "Different weeks played",
-    "separate-months": "Different months played",
-    "consecutive-scrobbles": "Longest run of plays in a row",
-    "consecutive-days": "Longest streak of days",
-    "consecutive-weeks": "Longest streak of weeks",
-    "consecutive-months": "Longest streak of months",
+    "separate-days": "Number of days played",
+    "separate-weeks": "Number of weeks played",
+    "separate-months": "Number of months played",
+    "consecutive-scrobbles": "Most plays in a row",
+    "consecutive-days": "Most days in a row",
+    "consecutive-weeks": "Most weeks in a row",
+    "consecutive-months": "Most months in a row",
     "first-n-scrobbles": "First to X plays",
     "fastest-n-scrobbles": "Fastest to X plays",
     "oldest-average-listening-time": "Oldest average play date (X+ plays)",
@@ -323,7 +323,7 @@ const SORT_LABELS = {
     "max-single-month": "Most plays in one month",
     "max-rolling-xh": "Most plays within X hours",
     "max-rolling-24h": "Most plays within 24 hours",
-    "max-rolling-168h": "Most plays within 168 hours",
+    "max-rolling-168h": "Most plays within 7 days (rolling)",
     "time-spent-listening": "Time spent listening",
     "highest-listening-percentage": "Share of all Last.fm plays"
 };

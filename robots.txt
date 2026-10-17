@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://lastfmlists.com/sitemap.xml

@@ -2,7 +2,7 @@
 // artwork as a collage grid.
 
 import { fetchAlbumCoverUrl } from '../api/lastfm.js';
-import { DISPLAY_MODE_BAR_RACE, EXPORT_MAX_ROWS_PER_COLUMN } from '../config.js';
+import { EXPORT_MAX_ROWS_PER_COLUMN } from '../config.js';
 import {
     closeExportModalButton,
     closeGridExportModalButton,
@@ -22,10 +22,9 @@ import { state } from '../state.js';
 import {
     applyColorsToChartInstances,
     getChartThemeColors,
-    hasRaceSettingsReady
+    stopRacePlayback
 } from './charts.js';
 import { getComparisonEditTarget } from './filters-panel.js';
-import { getSelectedDisplayMode } from './lists.js';
 
 let gifWorkerBlobUrl = null;
 
@@ -68,13 +67,19 @@ function copyCanvasBitmaps(sourceRoot, clonedRoot) {
 }
 
 async function exportCurrentListAsImage() {
-    if (typeof html2canvas === 'undefined') {
-        alert('Export library is not loaded. Please refresh and try again.');
+    // A race on screen exports as a GIF; anything else (a list, or the bar
+    // chart shown until a race is applied) as a PNG.
+    if (state.raceBuilding) {
+        alert('The race is still being built. Try again in a moment.');
+        return;
+    }
+    if (state.activeRaceState) {
+        await exportCurrentRaceAsGif();
         return;
     }
 
-    if (getSelectedDisplayMode() === DISPLAY_MODE_BAR_RACE && hasRaceSettingsReady()) {
-        await exportCurrentRaceAsGif();
+    if (typeof html2canvas === 'undefined') {
+        alert('Export library is not loaded. Please refresh and try again.');
         return;
     }
 
@@ -171,6 +176,8 @@ async function exportCurrentListAsImage() {
     }
 
     trimExportRows(resultsClone);
+    // The color legend keeps its swatches but not the editing controls.
+    resultsClone.querySelectorAll('.race-legend-tools, .race-legend-reset, .race-swatch input').forEach(el => el.remove());
     captureRoot.appendChild(resultsClone);
 
     document.body.appendChild(captureRoot);
@@ -212,59 +219,99 @@ async function getGifWorkerScriptUrl() {
     return gifWorkerBlobUrl;
 }
 
-async function exportCurrentRaceAsGif() {
-    if (typeof html2canvas === 'undefined') {
-        alert('Export library is not loaded. Please refresh and try again.');
-        return;
-    }
+// 20 by 20 is 400 covers; past that the image is too big to share and the
+// cover lookups take minutes.
+const GRID_MAX_SIDE = 20;
 
+// GIFs top out around this many frames before files get too big to share.
+const RACE_GIF_MAX_FRAMES = 400;
+// In-between frames per race step, so the GIF moves like the page does.
+const RACE_GIF_SUBSTEPS = 6;
+
+// Runs fn with the page set to the export theme. It all happens before the
+// browser paints again, so the page never visibly flips.
+function withExportTheme(fn) {
+    const exportTheme = document.getElementById('export-theme')?.value || 'current';
+    const pageTheme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+    const theme = exportTheme === 'current' ? pageTheme : exportTheme;
+    if (theme === pageTheme) return fn();
+    document.documentElement.setAttribute('data-theme', theme);
+    document.body.setAttribute('data-theme', theme);
+    try {
+        return fn();
+    } finally {
+        document.documentElement.setAttribute('data-theme', pageTheme);
+        document.body.setAttribute('data-theme', pageTheme);
+    }
+}
+
+// One GIF frame: the race chart (two side by side when comparing) on the
+// page background, with the site name underneath.
+function composeRaceFrame(race, position) {
+    return withExportTheme(() => {
+        const parts = race.charts.map(chart => chart.snapshot(position));
+        const gap = 12;
+        const footer = 26;
+        const width = parts.reduce((sum, part) => sum + part.width, 0) + gap * (parts.length - 1);
+        const height = Math.max(...parts.map(part => part.height)) + footer;
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        const styles = getComputedStyle(document.documentElement);
+        ctx.fillStyle = styles.getPropertyValue('--background-color').trim() || '#FFFCF8';
+        ctx.fillRect(0, 0, width, height);
+        let x = 0;
+        parts.forEach(part => {
+            ctx.drawImage(part, x, 0);
+            x += part.width + gap;
+        });
+        ctx.fillStyle = styles.getPropertyValue('--secondary-text-color').trim() || '#6C5A4B';
+        ctx.font = `500 12px ${getComputedStyle(document.body).fontFamily || 'sans-serif'}`;
+        ctx.textAlign = 'right';
+        ctx.fillText('created with lastfmlists.com', width - 12, height - 10);
+        return canvas;
+    });
+}
+
+async function exportCurrentRaceAsGif() {
     if (typeof GIF === 'undefined') {
         alert('GIF export library is not loaded. Please refresh and try again.');
         return;
     }
 
-    if (!state.activeRaceState || state.activeRaceState.totalFrames <= 0 || typeof state.activeRaceState.updateFrame !== 'function') {
+    const race = state.activeRaceState;
+    if (!race || race.totalFrames <= 0 || !Array.isArray(race.charts)) {
         alert('Race frames are not ready yet. Apply filters in Bar Chart Race mode first.');
         return;
     }
 
-    const captureTarget = document.getElementById('results-section');
-    if (!captureTarget) {
-        alert('Could not find chart section to export.');
-        return;
-    }
+    stopRacePlayback();
+    const startPosition = race.position || 0;
+    const steps = Math.max(0, race.totalFrames - 1);
+    const frameCount = Math.max(1, Math.min(RACE_GIF_MAX_FRAMES, steps * RACE_GIF_SUBSTEPS + 1));
+    const speedMs = state.racePlaybackSpeedMs || 260;
+    // GIF delays below 20ms get slowed down by most viewers, so a long race
+    // plays faster by dropping in-between frames rather than shortening them.
+    const delay = Math.max(20, Math.round((speedMs * steps) / Math.max(1, frameCount - 1) / 10) * 10);
 
-    const frameDelayMs = 260;
-    const originalFrameIndex = state.activeRaceState.frameIndex || 0;
-
-    if (state.racePlaybackTimerId !== null) {
-        clearInterval(state.racePlaybackTimerId);
-        state.racePlaybackTimerId = null;
-    }
-
-    const bounds = captureTarget.getBoundingClientRect();
+    const first = composeRaceFrame(race, 0);
     const workerScriptUrl = await getGifWorkerScriptUrl();
-
     const gif = new GIF({
         workers: 2,
         quality: 10,
-        width: Math.max(320, Math.ceil(bounds.width)),
-        height: Math.max(240, Math.ceil(bounds.height)),
+        width: first.width,
+        height: first.height,
         workerScript: workerScriptUrl
     });
 
     try {
-        for (let frameIndex = 0; frameIndex < state.activeRaceState.totalFrames; frameIndex++) {
-            state.activeRaceState.updateFrame(frameIndex);
-            await waitForNextPaint();
-
-            const frameCanvas = await html2canvas(captureTarget, {
-                scale: 1,
-                useCORS: true,
-                backgroundColor: null
-            });
-
-            gif.addFrame(frameCanvas, { copy: true, delay: frameDelayMs });
+        for (let index = 0; index < frameCount; index++) {
+            const position = frameCount === 1 ? steps : (index * steps) / (frameCount - 1);
+            const frame = index === 0 ? first : composeRaceFrame(race, position);
+            // Hold the last frame so the final standings can be read.
+            gif.addFrame(frame, { copy: true, delay: index === frameCount - 1 ? 3000 : delay });
+            if (index % 40 === 39) await waitForNextPaint();
         }
 
         const gifBlob = await new Promise((resolve, reject) => {
@@ -283,9 +330,7 @@ async function exportCurrentRaceAsGif() {
         console.error('GIF export failed:', error);
         alert('GIF export failed. Please try again.');
     } finally {
-        if (state.activeRaceState && typeof state.activeRaceState.updateFrame === 'function') {
-            state.activeRaceState.updateFrame(originalFrameIndex);
-        }
+        if (state.activeRaceState === race) race.drawAt(startPosition);
     }
 }
 
@@ -393,8 +438,8 @@ async function exportCurrentListAsGrid() {
         return;
     }
 
-    const gridX = Math.max(1, parseInt(document.getElementById('grid-size-x')?.value, 10) || 1);
-    const gridY = Math.max(1, parseInt(document.getElementById('grid-size-y')?.value, 10) || 1);
+    const gridX = Math.min(GRID_MAX_SIDE, Math.max(1, parseInt(document.getElementById('grid-size-x')?.value, 10) || 1));
+    const gridY = Math.min(GRID_MAX_SIDE, Math.max(1, parseInt(document.getElementById('grid-size-y')?.value, 10) || 1));
     const allowDuplicates = document.getElementById('grid-allow-duplicates')?.checked === true;
     const skipMissingArtwork = document.getElementById('grid-skip-missing-artwork')?.checked === true;
     const showText = document.getElementById('grid-show-text')?.checked === true;

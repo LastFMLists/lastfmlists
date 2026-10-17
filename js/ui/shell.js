@@ -27,6 +27,27 @@ export function setAppLoadedState(username) {
     }
 }
 
+// While a history load runs the list on screen is only a preview, so the
+// controls that would rebuild it wait until the load is done. Filters can
+// still be set up meanwhile; they apply when the load finishes.
+const LIST_CONTROLS_LOCKED_WHILE_LOADING = ["apply-filters", "reset-filters", "display-mode", "comparison-toggle", "graph-this-list"];
+const WAIT_FOR_LOAD_MSG = "Available once your data has finished loading";
+
+export function setListControlsLocked(locked) {
+    LIST_CONTROLS_LOCKED_WHILE_LOADING.forEach(id => {
+        const control = document.getElementById(id);
+        if (!control) return;
+        if (locked) {
+            if (control.dataset.titleBeforeLoad === undefined) control.dataset.titleBeforeLoad = control.title;
+            control.title = WAIT_FOR_LOAD_MSG;
+        } else if (control.dataset.titleBeforeLoad !== undefined) {
+            control.title = control.dataset.titleBeforeLoad;
+            delete control.dataset.titleBeforeLoad;
+        }
+        control.disabled = locked;
+    });
+}
+
 // Undo setAppLoadedState so a failed load returns to the welcome screen
 // instead of stranding the user on an empty app shell.
 export function clearAppLoadedState() {
@@ -100,37 +121,84 @@ if (themeToggleButton) {
     themeToggleButton.addEventListener("click", () => {
         setTimeout(() => {
             const mode = getSelectedDisplayMode();
-            if (mode === DISPLAY_MODE_BAR_CHART || mode === DISPLAY_MODE_BAR_RACE) {
+            if (mode === DISPLAY_MODE_BAR_RACE && (state.activeRaceState || state.raceBuilding)) {
+                // The race reads its colors on every draw, so a repaint is
+                // enough and it keeps its place. One still being built picks
+                // up the theme when it appears.
+                state.activeRaceState?.redraw();
+            } else if (mode === DISPLAY_MODE_BAR_CHART || mode === DISPLAY_MODE_BAR_RACE) {
                 displayEntities();
             }
         }, 0);
     });
 }
 
-// ---- View switching (Lists / Games) ----
-export function setActiveView(view) {
-    const games = view === "games";
-    document.body.classList.toggle("view-games", games);
-    const listsTab = document.getElementById("tab-lists");
-    const gamesTab = document.getElementById("tab-games");
-    if (listsTab) {
-        listsTab.classList.toggle("is-active", !games);
-        listsTab.setAttribute("aria-pressed", String(!games));
+// ---- View switching (Explore / Lists / Graphs / Games) ----
+const VIEWS = ["explore", "lists", "graphs", "games"];
+const VIEW_STORAGE_KEY = "lastfmlists-view";
+
+// The tab used last, so a returning visitor lands where they left off.
+export function rememberedView() {
+    try {
+        const view = localStorage.getItem(VIEW_STORAGE_KEY);
+        return VIEWS.includes(view) ? view : null;
+    } catch (e) {
+        return null;
     }
-    if (gamesTab) {
-        gamesTab.classList.toggle("is-active", games);
-        gamesTab.setAttribute("aria-pressed", String(games));
-    }
-    if (games) hlShowHome();
-    else hlClearTimer();
 }
 
-// The Games tab is only usable once a library has actually loaded.
+export function getActiveView() {
+    if (document.body.classList.contains("view-games")) return "games";
+    if (document.body.classList.contains("view-explore")) return "explore";
+    if (document.body.classList.contains("view-graphs")) return "graphs";
+    return "lists";
+}
+
+export function setActiveView(view) {
+    const previous = getActiveView();
+    const games = view === "games";
+    document.body.classList.toggle("view-games", games);
+    document.body.classList.toggle("view-explore", view === "explore");
+    document.body.classList.toggle("view-graphs", view === "graphs");
+    VIEWS.forEach(name => {
+        const tab = document.getElementById(`tab-${name}`);
+        if (!tab) return;
+        tab.classList.toggle("is-active", name === view);
+        tab.setAttribute("aria-pressed", String(name === view));
+    });
+    if (games) hlShowHome();
+    else hlClearTimer();
+    // Coming to Lists opens the filters; on phones the drawer would cover
+    // the list, so it stays as it was there.
+    if (view === "lists" && previous !== "lists" && !window.matchMedia("(max-width: 768px)").matches) {
+        openFilterSidebar();
+    }
+    if (document.body.classList.contains("app-loaded")) {
+        try {
+            localStorage.setItem(VIEW_STORAGE_KEY, view);
+        } catch (e) {
+            // Storage blocked: the next visit starts on Explore.
+        }
+    }
+    document.dispatchEvent(new CustomEvent("view:changed", { detail: { view } }));
+}
+
+// The Explore, Graphs and Games tabs are only usable once a library has loaded.
 export function enableGamesTab() {
+    const graphsTab = document.getElementById("tab-graphs");
+    if (graphsTab) {
+        graphsTab.disabled = false;
+        graphsTab.title = "Plot your listening over time";
+    }
     const gamesTab = document.getElementById("tab-games");
     if (gamesTab) {
         gamesTab.disabled = false;
         gamesTab.title = "Play games with your listening data";
+    }
+    const exploreTab = document.getElementById("tab-explore");
+    if (exploreTab) {
+        exploreTab.disabled = false;
+        exploreTab.title = "Ready-made lists from your history";
     }
 }
 
@@ -139,6 +207,22 @@ function syncSidebarLayoutState() {
     if (!sidebar) return;
     document.body.classList.toggle("sidebar-collapsed", sidebar.classList.contains("closed"));
 }
+
+function openFilterSidebar() {
+    const sidebar = document.getElementById("filters-section");
+    const toggle = document.getElementById("filters-section-toggle");
+    if (!sidebar || !sidebar.classList.contains("closed")) return;
+    sidebar.classList.remove("closed");
+    if (toggle) toggle.innerHTML = "&#10094;";
+    syncSidebarLayoutState();
+}
+
+// On phones the edge tab only closes the open panel; this button in the
+// list header opens it, so nothing sits on top of the list.
+document.getElementById("open-filters-mobile")?.addEventListener("click", () => {
+    const sidebar = document.getElementById("filters-section");
+    if (sidebar?.classList.contains("closed")) document.getElementById("filters-section-toggle").click();
+});
 
 document.getElementById("filters-section-toggle").addEventListener("click", function () {
     const sidebar = document.getElementById("filters-section");

@@ -7,16 +7,21 @@ import {
     SCROBBLE_SORT_ASC,
     SCROBBLE_SORT_DESC
 } from '../config.js';
-import { applyTracksPerEntityFilter, buildEntitiesFromTracks } from '../data/filters.js';
+import { applyEntityCaps, buildEntitiesFromTracks, currentEntityCaps } from '../data/filters.js';
 import { getDefaultXValue, isRollingWindowSortingBasis } from '../data/metrics.js';
 import { getListLengthLimit } from '../dom.js';
 import { state } from '../state.js';
-import { formatDateInputValue, formatDuration, getWeekNumber } from '../time.js';
+import { formatDateInputValue, formatDuration } from '../time.js';
+import { assignColors, createColorLegend, setShownNames } from './artist-colors.js';
+import { createRaceChart } from './bar-race.js';
 import { displayEntities, getSelectedDisplayMode } from './lists.js';
 
 export function applyColorsToChartInstances(colors) {
     state.chartInstances.forEach(chart => {
-        if (chart.data.datasets && chart.data.datasets[0]) {
+        if (chart.$recolor) {
+            // Bars colored by artist pick their own colors for the theme.
+            chart.$recolor();
+        } else if (chart.data.datasets && chart.data.datasets[0]) {
             chart.data.datasets[0].backgroundColor = colors.accentFill;
             chart.data.datasets[0].borderColor = colors.accent;
         }
@@ -35,6 +40,7 @@ export function applyColorsToChartInstances(colors) {
         
         chart.update("none");
     });
+    state.activeRaceState?.redraw?.();
 }
 
 export function updateRaceControlsVisibility() {
@@ -55,86 +61,110 @@ export function updateRaceControlsVisibility() {
     }
 }
 
-function stopRacePlayback() {
+// Playback moves a fractional position through the steps on every animation
+// frame, so bars glide between steps instead of jumping once per step.
+export function stopRacePlayback() {
     if (state.racePlaybackTimerId !== null) {
-        clearInterval(state.racePlaybackTimerId);
+        cancelAnimationFrame(state.racePlaybackTimerId);
         state.racePlaybackTimerId = null;
     }
+    syncRaceToolbar();
 }
 
 function getRacePlaybackSpeedFromInput() {
     return Math.max(50, parseInt(document.getElementById("race-speed-ms")?.value, 10) || state.racePlaybackSpeedMs || 260);
 }
 
+function raceStepName() {
+    const frequency = (document.getElementById("race-frequency")?.value || "day").toLowerCase();
+    return frequency === "month" ? "month" : frequency === "week" ? "week" : "day";
+}
+
 function syncRacePlaybackSpeedFromInput() {
     state.racePlaybackSpeedMs = getRacePlaybackSpeedFromInput();
     if (state.raceSpeedReadoutElement) {
-        state.raceSpeedReadoutElement.textContent = `${state.racePlaybackSpeedMs}ms/frame`;
+        const seconds = state.racePlaybackSpeedMs / 1000;
+        state.raceSpeedReadoutElement.textContent = `${+seconds.toFixed(2)}s per ${raceStepName()}`;
+    }
+}
+
+function syncRaceToolbar() {
+    const toolbar = state.raceToolbar;
+    const race = state.activeRaceState;
+    if (!toolbar) return;
+    const playing = state.racePlaybackTimerId !== null;
+    toolbar.play.innerHTML = playing ? '<i class="fas fa-pause" aria-hidden="true"></i>' : '<i class="fas fa-play" aria-hidden="true"></i>';
+    toolbar.play.setAttribute("aria-label", playing ? "Pause" : "Play");
+    toolbar.play.title = playing ? "Pause" : "Play";
+    if (race) {
+        toolbar.scrubber.max = String(Math.max(0, race.totalFrames - 1));
+        toolbar.scrubber.value = String(race.position);
+        toolbar.scrubber.disabled = race.totalFrames <= 1;
     }
 }
 
 function startRacePlayback() {
-    if (!state.activeRaceState || state.activeRaceState.totalFrames <= 1 || typeof state.activeRaceState.updateFrame !== "function") {
-        return;
-    }
+    const race = state.activeRaceState;
+    if (!race || race.totalFrames <= 1 || typeof race.drawAt !== "function") return;
 
     stopRacePlayback();
     syncRacePlaybackSpeedFromInput();
-    state.racePlaybackTimerId = setInterval(() => {
-        if (!state.activeRaceState || typeof state.activeRaceState.updateFrame !== "function") {
-            stopRacePlayback();
+    if (race.position >= race.totalFrames - 1) race.drawAt(0);
+
+    let last = null;
+    const tick = (now) => {
+        const current = state.activeRaceState;
+        if (!current || current !== race) {
+            state.racePlaybackTimerId = null;
             return;
         }
-
-        const nextIndex = state.activeRaceState.frameIndex + 1;
-        if (nextIndex >= state.activeRaceState.totalFrames) {
-            stopRacePlayback();
+        // Cap the step after a hidden tab or a slow frame, so the race
+        // picks up where it was instead of skipping ahead.
+        const elapsed = last === null ? 0 : Math.min(100, now - last);
+        last = now;
+        const next = Math.min(race.totalFrames - 1, race.position + elapsed / state.racePlaybackSpeedMs);
+        race.drawAt(next);
+        if (next >= race.totalFrames - 1) {
+            state.racePlaybackTimerId = null;
+            syncRaceToolbar();
             return;
         }
+        state.racePlaybackTimerId = requestAnimationFrame(tick);
+    };
+    state.racePlaybackTimerId = requestAnimationFrame(tick);
+    syncRaceToolbar();
+}
 
-        state.activeRaceState.updateFrame(nextIndex);
-    }, state.racePlaybackSpeedMs);
+function toggleRacePlayback() {
+    if (state.racePlaybackTimerId !== null) stopRacePlayback();
+    else startRacePlayback();
 }
 
 function jumpToRaceFrame(target) {
-    if (!state.activeRaceState || typeof state.activeRaceState.updateFrame !== "function") return;
-    if (target === "first") {
-        state.activeRaceState.updateFrame(0);
-        return;
-    }
-    if (target === "last") {
-        state.activeRaceState.updateFrame(Math.max(0, state.activeRaceState.totalFrames - 1));
-    }
+    const race = state.activeRaceState;
+    if (!race || typeof race.drawAt !== "function") return;
+    stopRacePlayback();
+    race.drawAt(target === "first" ? 0 : Math.max(0, race.totalFrames - 1));
 }
 
 function adjustRacePlaybackSpeed(multiplier) {
     const current = getRacePlaybackSpeedFromInput();
-    const next = Math.max(50, Math.min(5000, Math.round(current * multiplier)));
+    const next = Math.max(50, Math.min(5000, Math.round(current * multiplier / 10) * 10));
     const speedInput = document.getElementById("race-speed-ms");
     if (speedInput) {
         speedInput.value = String(next);
     }
     syncRacePlaybackSpeedFromInput();
+}
 
-    if (state.racePlaybackTimerId !== null) {
-        const currentFrame = state.activeRaceState?.frameIndex || 0;
-        stopRacePlayback();
-        if (state.activeRaceState) {
-            state.activeRaceState.updateFrame(currentFrame);
-            state.racePlaybackTimerId = setInterval(() => {
-                if (!state.activeRaceState || typeof state.activeRaceState.updateFrame !== "function") {
-                    stopRacePlayback();
-                    return;
-                }
-                const nextIndex = state.activeRaceState.frameIndex + 1;
-                if (nextIndex >= state.activeRaceState.totalFrames) {
-                    stopRacePlayback();
-                    return;
-                }
-                state.activeRaceState.updateFrame(nextIndex);
-            }, state.racePlaybackSpeedMs);
-        }
-    }
+function toolbarButton(icon, label, onClick) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.innerHTML = `<i class="fas ${icon}" aria-hidden="true"></i>`;
+    button.title = label;
+    button.setAttribute("aria-label", label);
+    button.addEventListener("click", onClick);
+    return button;
 }
 
 export function insertRacePlaybackToolbar(targetDiv) {
@@ -142,38 +172,55 @@ export function insertRacePlaybackToolbar(targetDiv) {
 
     const toolbar = document.createElement("div");
     toolbar.className = "race-playback-toolbar";
-    state.raceSpeedReadoutElement = null;
 
-    const buttonConfigs = [
-        { label: "⏮", title: "First frame", onClick: () => jumpToRaceFrame("first") },
-        { label: "▶", title: "Play", onClick: () => startRacePlayback() },
-        { label: "⏸", title: "Pause", onClick: () => stopRacePlayback() },
-        { label: "⏭", title: "Last frame", onClick: () => jumpToRaceFrame("last") },
-        { label: "⏪", title: "Slower", onClick: () => adjustRacePlaybackSpeed(1.25) },
-        { label: "⏩", title: "Faster", onClick: () => adjustRacePlaybackSpeed(0.8) }
-    ];
+    const transport = document.createElement("div");
+    transport.className = "race-transport";
+    const play = toolbarButton("fa-play", "Play", toggleRacePlayback);
+    play.classList.add("race-play");
+    transport.append(
+        toolbarButton("fa-backward-step", "Back to the start", () => jumpToRaceFrame("first")),
+        play,
+        toolbarButton("fa-forward-step", "Skip to the end", () => jumpToRaceFrame("last"))
+    );
 
-    buttonConfigs.forEach(config => {
-        const button = document.createElement("button");
-        button.type = "button";
-        button.textContent = config.label;
-        button.title = config.title;
-        button.setAttribute("aria-label", config.title);
-        button.addEventListener("click", config.onClick);
-        toolbar.appendChild(button);
+    const scrubber = document.createElement("input");
+    scrubber.type = "range";
+    scrubber.className = "race-scrubber";
+    scrubber.min = "0";
+    scrubber.max = "0";
+    scrubber.step = "any";
+    scrubber.value = "0";
+    scrubber.setAttribute("aria-label", "Race position");
+    scrubber.addEventListener("input", () => {
+        const race = state.activeRaceState;
+        if (!race) return;
+        if (state.racePlaybackTimerId !== null) stopRacePlayback();
+        race.drawAt(parseFloat(scrubber.value) || 0);
     });
 
-    const speedReadout = document.createElement("span");
-    speedReadout.className = "race-speed-readout";
-    speedReadout.textContent = `${getRacePlaybackSpeedFromInput()}ms/frame`;
-    toolbar.appendChild(speedReadout);
-    state.raceSpeedReadoutElement = speedReadout;
+    const speed = document.createElement("div");
+    speed.className = "race-speed";
+    const readout = document.createElement("span");
+    readout.className = "race-speed-readout";
+    speed.append(
+        toolbarButton("fa-minus", "Slower", () => adjustRacePlaybackSpeed(1.25)),
+        readout,
+        toolbarButton("fa-plus", "Faster", () => adjustRacePlaybackSpeed(0.8))
+    );
 
-    targetDiv.appendChild(toolbar);
+    toolbar.append(transport, scrubber, speed);
+    targetDiv.prepend(toolbar);
+
+    state.raceSpeedReadoutElement = readout;
+    state.raceToolbar = { play, scrubber };
+    syncRacePlaybackSpeedFromInput();
+    syncRaceToolbar();
 }
 
 export function destroyVisualizationState() {
     stopRacePlayback();
+    raceBuild += 1;
+    state.raceBuilding = false;
     state.chartInstances.forEach(chart => {
         try {
             chart.destroy();
@@ -182,7 +229,11 @@ export function destroyVisualizationState() {
         }
     });
     state.chartInstances = [];
+    (state.activeRaceState?.charts || []).forEach(chart => chart.destroy());
+    shownArtists.clear();
+    setShownNames([]);
     state.activeRaceState = null;
+    state.raceToolbar = null;
 }
 
 function getSelectedChartOrientation() {
@@ -195,13 +246,17 @@ function getSelectedChartScale() {
     return scale === "logarithmic" ? "logarithmic" : "linear";
 }
 
+const shorten = (text, length = 34) => (text.length > length ? `${text.slice(0, length - 1)}…` : text);
+
+// Tracks and albums get two short lines, the title and then the artist, so
+// labels stay readable without wrapping into each other.
 function getEntityLabel(entity, entityType) {
     if (!entity) return "Unknown";
     if (entityType === "track") {
-        return `${entity.Artist || "Unknown Artist"} - ${entity.Track || "Unknown Track"}`;
+        return [shorten(entity.Track || "Unknown Track"), shorten(entity.Artist || "Unknown Artist")];
     }
     if (entityType === "album") {
-        return `${entity.artist || "Unknown Artist"} - ${entity.name || "Unknown Album"}`;
+        return [shorten(entity.name || "Unknown Album"), shorten(entity.artist || "Unknown Artist")];
     }
     if (entityType === "artist") {
         return entity.name || "Unknown Artist";
@@ -210,7 +265,7 @@ function getEntityLabel(entity, entityType) {
     return `${entity.Artist || "Unknown Artist"} - ${entity.Track || "Unknown Track"} (${scrobbleDate})`;
 }
 
-function getEntityMetricValue(entity, sortingBasis) {
+export function getEntityMetricValue(entity, sortingBasis) {
     if (!entity) return 0;
 
     if (["scrobbles", "separate-days", "separate-weeks", "separate-months", "max-single-day", "max-single-week", "max-single-month"].includes(sortingBasis)
@@ -459,10 +514,14 @@ function createBarChartInCanvas(canvas, labels, values, sortingBasis, chartTitle
                 },
                 [labelAxisKey]: {
                     ticks: {
+                        // Every bar keeps its label on horizontal charts,
+                        // which are made tall enough for them. Vertical ones
+                        // don't grow sideways, so there labels may thin out.
+                        autoSkip: orientation === "vertical",
                         color: chartColors.text,
                         callback: function (_tickValue, tickIndex) {
                             const fullLabel = this?.chart?.data?.labels?.[tickIndex];
-                            return wrapChartLabel(fullLabel, 25);
+                            return Array.isArray(fullLabel) ? fullLabel : wrapChartLabel(fullLabel, 25);
                         }
                     }
                 }
@@ -474,17 +533,50 @@ function createBarChartInCanvas(canvas, labels, values, sortingBasis, chartTitle
     return chart;
 }
 
+// The artists on screen in every chart, for the colors a shared link carries.
+const shownArtists = new Set();
+
+function showArtists(keys) {
+    keys.forEach(key => shownArtists.add(key));
+    setShownNames(shownArtists);
+}
+
+function entityArtist(entity, entityType) {
+    if (entityType === "album") return entity.artist || "";
+    if (entityType === "artist") return entity.name || "";
+    return entity.Artist || "";
+}
+
 export function renderBarChartEntities(entities, entityType, sortingBasis, targetDiv) {
     const listLength = Math.min(getListLengthLimit(), 100);
     const chartRows = (entities || []).slice(0, listLength);
     targetDiv.innerHTML = "";
 
+    // Bars are colored by artist, like the race: the artists with the most
+    // bars get the starting colors unless you picked your own.
+    const barCounts = new Map();
+    const artistNames = new Map();
+    const barArtists = chartRows.map(entity => {
+        const name = entityArtist(entity, entityType);
+        const key = name.toLowerCase();
+        if (!artistNames.has(key)) artistNames.set(key, name);
+        barCounts.set(key, (barCounts.get(key) || 0) + 1);
+        return key;
+    });
+    const order = [...barCounts.keys()].sort((a, b) => barCounts.get(b) - barCounts.get(a));
+    const legend = createColorLegend({
+        otherLabel: entityType === "artist" ? "Everyone else" : "Other artists",
+        known: order.map(key => [key, artistNames.get(key)])
+    });
+    targetDiv.appendChild(legend.el);
+    showArtists(order);
+
     const wrapper = document.createElement("div");
     wrapper.className = "chart-wrapper";
     
-    const minBarThickness = 30;
-    const requiredHeight = Math.max(400, chartRows.length * minBarThickness);
-    wrapper.style.height = requiredHeight + "px";
+    // Room for a two-line label per bar.
+    const rowHeight = getSelectedChartOrientation() === "vertical" ? 30 : 40;
+    wrapper.style.height = Math.max(400, chartRows.length * rowHeight) + "px";
 
     const canvas = document.createElement("canvas");
     wrapper.appendChild(canvas);
@@ -492,7 +584,21 @@ export function renderBarChartEntities(entities, entityType, sortingBasis, targe
 
     const labels = chartRows.map(entity => getEntityLabel(entity, entityType));
     const values = chartRows.map(entity => getEntityMetricValue(entity, sortingBasis));
-    createBarChartInCanvas(canvas, labels, values, sortingBasis, "");
+    const chart = createBarChartInCanvas(canvas, labels, values, sortingBasis, "");
+    if (!chart) return;
+    chart.$recolor = () => {
+        const theme = document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
+        const colors = assignColors(order, artistNames, theme);
+        const dataset = chart.data.datasets[0];
+        dataset.backgroundColor = barArtists.map(key => colors.assigned.get(key) || colors.other);
+        dataset.borderWidth = 0;
+        dataset.borderRadius = 4;
+        dataset.borderSkipped = "start";
+        dataset.maxBarThickness = 24;
+        legend.sync(colors, theme);
+        chart.update("none");
+    };
+    chart.$recolor();
 }
 
 function getRacePeriodStartTimestamp(timestamp, frequency) {
@@ -516,35 +622,10 @@ function getRacePeriodStartTimestamp(timestamp, frequency) {
 function formatRacePeriodLabel(periodStart, frequency) {
     const date = new Date(periodStart);
     if (frequency === "month") {
-        const month = String(date.getMonth() + 1).padStart(2, "0");
-        return `${date.getFullYear()}-${month}`;
+        return date.toLocaleDateString(undefined, { month: "long", year: "numeric" });
     }
-    if (frequency === "week") {
-        const week = String(getWeekNumber(date)).padStart(2, "0");
-        return `${date.getFullYear()}-W${week}`;
-    }
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-    return `${date.getFullYear()}-${month}-${day}`;
-}
-
-function getRaceEntityKeyAndLabel(track, entityType) {
-    if (entityType === "album") {
-        return {
-            key: `${(track.Album || "").toLowerCase()}||${(track.Artist || "").toLowerCase()}`,
-            label: `${track.Album || "Unknown Album"} by ${track.Artist || "Unknown Artist"}`
-        };
-    }
-    if (entityType === "artist") {
-        return {
-            key: (track.Artist || "").toLowerCase(),
-            label: track.Artist || "Unknown Artist"
-        };
-    }
-    return {
-        key: `${(track.Track || "").toLowerCase()}||${(track.Artist || "").toLowerCase()}`,
-        label: `${track.Track || "Unknown Track"} by ${track.Artist || "Unknown Artist"}`
-    };
+    const day = date.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+    return frequency === "week" ? `Week of ${day}` : day;
 }
 
 function parseRaceBoundaryDate(dateValue, isEndBoundary) {
@@ -629,6 +710,18 @@ export function ensureRaceDateDefaults(force = false) {
     if (force || !raceEndInput.value) {
         raceEndInput.value = endDefault;
     }
+
+    // Until someone picks a step, it follows the span: days for a short
+    // history, weeks or months for longer ones, so the race stays a few
+    // hundred steps long instead of thousands.
+    // Set once per load (or reset); a step picked by hand or from a link
+    // stays.
+    const frequency = document.getElementById("race-frequency");
+    if (frequency && (force || !frequency.dataset.defaulted)) {
+        const years = (Date.now() - (firstScrobbleTimestamp || Date.now())) / (365.25 * 86400000);
+        frequency.value = years > 4 ? "month" : years > 1 ? "week" : "day";
+        frequency.dataset.defaulted = "true";
+    }
 }
 
 function buildRaceTimeline(startTimestamp, endTimestamp, frequency) {
@@ -653,9 +746,57 @@ function buildRaceTimeline(startTimestamp, endTimestamp, frequency) {
     return timeline;
 }
 
-function buildBarRaceFramesFromTracks(tracks, entityType, sortingBasis, xValue, maxPerArtist, timeline, frequency, endTimestamp) {
-    const listLength = Math.min(getListLengthLimit(), 100);
-    const frames = [];
+// How many bars a race shows: the list length, up to 20, since a race with
+// more bars than that is too small to read.
+const RACE_MAX_BARS = 20;
+// Rows kept below the visible bars, so a bar that climbs into view slides
+// up from under the chart instead of appearing out of nowhere.
+const RACE_SPARE_ROWS = 3;
+
+function getRaceSlots() {
+    return Math.max(1, Math.min(getListLengthLimit(), RACE_MAX_BARS));
+}
+
+function getRaceRow(entity, entityType) {
+    if (entityType === "track") {
+        const name = entity.Track || "Unknown track";
+        const artist = entity.Artist || "Unknown artist";
+        return { key: `${name.toLowerCase()}||${artist.toLowerCase()}`, name, artist };
+    }
+    if (entityType === "album") {
+        const name = entity.name || "Unknown album";
+        const artist = entity.artist || "Unknown artist";
+        return { key: `${name.toLowerCase()}||${artist.toLowerCase()}`, name, artist };
+    }
+    const name = entity.name || "Unknown artist";
+    return { key: name.toLowerCase(), name, artist: "" };
+}
+
+function getRaceTitle(entityType, sortingBasis) {
+    const option = document.querySelector(`#sorting-basis option[value="${sortingBasis}"]`);
+    const plural = { track: "Tracks", album: "Albums", artist: "Artists" }[entityType] || "Results";
+    return option ? `${plural} by ${option.textContent.trim().toLowerCase()}` : plural;
+}
+
+// More steps than this make a race nobody would sit through, and building
+// them takes long on a big library.
+const MAX_RACE_STEPS = 2000;
+
+const pauseForPaint = () => new Promise(resolve => setTimeout(resolve, 0));
+
+function raceRowFromPlay(play, entityType) {
+    if (entityType === "artist") return getRaceRow({ name: play.Artist }, "artist");
+    if (entityType === "album") return getRaceRow({ name: play.Album, artist: play.Artist }, "album");
+    return getRaceRow(play, "track");
+}
+
+// Builds the race's steps a slice at a time, pausing so the page stays
+// responsive. Returns the frames, { error }, or null when cancelled.
+async function buildRaceFrames(tracks, entityType, sortingBasis, xValue, caps, timeline, frequency, endTimestamp, { onProgress, cancelled }) {
+    if (timeline.length > MAX_RACE_STEPS) {
+        return { error: `That race has ${timeline.length.toLocaleString()} steps. Pick weeks or months, or a shorter date range, to keep it under ${MAX_RACE_STEPS.toLocaleString()}.` };
+    }
+    const rowCount = getRaceSlots() + RACE_SPARE_ROWS;
     const sortedTracks = [...(tracks || [])]
         .filter(track => {
             const timestamp = parseInt(track.Date, 10);
@@ -663,195 +804,195 @@ function buildBarRaceFramesFromTracks(tracks, entityType, sortingBasis, xValue, 
         })
         .sort((a, b) => (parseInt(a.Date, 10) || 0) - (parseInt(b.Date, 10) || 0));
 
-    let pointer = 0;
-    const cumulativeTracks = [];
+    // Play counts only ever go up, so the top of the race can be kept up to
+    // date play by play instead of re-ranking the whole library every step.
+    // Only caps that apply to this list type rule out the quick path:
+    // artist lists ignore both, album lists ignore the album cap.
+    const capped = entityType !== "artist" && (caps.perArtist !== Infinity || (entityType === "track" && caps.perAlbum !== Infinity));
+    const incremental = sortingBasis === "scrobbles" && !capped;
+    const entries = new Map();
+    let top = [];
+    const ahead = (a, b) => b.count - a.count || a.order - b.order;
+    const bump = (play) => {
+        const row = raceRowFromPlay(play, entityType);
+        let entry = entries.get(row.key);
+        if (!entry) {
+            entry = { row, count: 0, order: entries.size };
+            entries.set(row.key, entry);
+        }
+        entry.count += 1;
+        let index = top.indexOf(entry);
+        if (index < 0) {
+            if (top.length < rowCount) index = top.push(entry) - 1;
+            else if (ahead(top[top.length - 1], entry) > 0) index = top.length - 1, top[index] = entry;
+            else return;
+        }
+        while (index > 0 && ahead(top[index - 1], entry) > 0) {
+            top[index] = top[index - 1];
+            top[index - 1] = entry;
+            index -= 1;
+        }
+    };
 
-    timeline.forEach(periodStart => {
-        while (pointer < sortedTracks.length) {
-            const candidate = sortedTracks[pointer];
-            const timestamp = parseInt(candidate.Date, 10);
-            const candidatePeriodStart = getRacePeriodStartTimestamp(timestamp, frequency);
-            if (candidatePeriodStart > periodStart) break;
-            cumulativeTracks.push(candidate);
+    const frames = [];
+    let pointer = 0;
+    let lastPause = performance.now();
+    for (let step = 0; step < timeline.length; step++) {
+        const periodStart = timeline[step];
+        const from = pointer;
+        while (pointer < sortedTracks.length && getRacePeriodStartTimestamp(parseInt(sortedTracks[pointer].Date, 10), frequency) <= periodStart) {
+            if (incremental) bump(sortedTracks[pointer]);
             pointer += 1;
         }
-
-        let entities = buildEntitiesFromTracks(cumulativeTracks, entityType, sortingBasis, xValue);
-        if (entityType === "track") {
-            entities = applyTracksPerEntityFilter(entities, maxPerArtist);
+        let rows;
+        if (incremental) {
+            rows = top.map(entry => ({ ...entry.row, value: entry.count }));
+        } else if (step > 0 && pointer === from) {
+            rows = frames[step - 1].rows;
+        } else {
+            const entities = applyEntityCaps(buildEntitiesFromTracks(sortedTracks.slice(0, pointer), entityType, sortingBasis, xValue), entityType, caps);
+            // Some sorts keep "Song" and "song" apart while the race matches
+            // names regardless of case; the first (higher) one wins.
+            const seen = new Set();
+            rows = [];
+            for (const entity of entities) {
+                const row = getRaceRow(entity, entityType);
+                if (seen.has(row.key)) continue;
+                seen.add(row.key);
+                rows.push({ ...row, value: getEntityMetricValue(entity, sortingBasis) });
+                if (rows.length >= rowCount) break;
+            }
         }
+        frames.push({ label: formatRacePeriodLabel(periodStart, frequency), total: pointer, rows });
 
-        const chartRows = entities.slice(0, listLength);
-
-        frames.push({
-            periodStart,
-            periodLabel: formatRacePeriodLabel(periodStart, frequency),
-            labels: chartRows.map(entity => getEntityLabel(entity, entityType)),
-            values: chartRows.map(entity => getEntityMetricValue(entity, sortingBasis))
-        });
-    });
+        if (performance.now() - lastPause > 30) {
+            onProgress(step / timeline.length);
+            await pauseForPaint();
+            if (cancelled()) return null;
+            lastPause = performance.now();
+        }
+    }
 
     if (!frames.length) {
         frames.push({
-            periodStart: timeline[0] || Date.now(),
-            periodLabel: timeline[0] ? formatRacePeriodLabel(timeline[0], frequency) : "N/A",
-            labels: [],
-            values: []
+            label: timeline[0] ? formatRacePeriodLabel(timeline[0], frequency) : "No dates",
+            total: 0,
+            rows: []
         });
     }
 
     return frames;
 }
 
-function updateChartScaleForFrame(chart, sortingBasis) {
-    if (!chart?.options?.scales) return;
-
-    const orientation = chart.options.indexAxis === "x" ? "vertical" : "horizontal";
-    const valueAxisKey = orientation === "vertical" ? "y" : "x";
-    const valueAxis = chart.options.scales[valueAxisKey];
-    if (!valueAxis) return;
-
-    const dataValues = Array.isArray(chart.data?.datasets?.[0]?.data)
-        ? chart.data.datasets[0].data.map(value => Number(value)).filter(Number.isFinite)
-        : [];
-
-    if (dataValues.length === 0) {
-        valueAxis.min = undefined;
-        valueAxis.max = undefined;
-        return;
-    }
-
-    if (isDateMetricSorting(sortingBasis)) {
-        const minValue = Math.min(...dataValues);
-        const maxValue = Math.max(...dataValues);
-        const datePadding = Math.max(24 * 60 * 60 * 1000, Math.round((maxValue - minValue) * 0.03));
-        valueAxis.min = minValue - datePadding;
-        valueAxis.max = maxValue + datePadding;
-        valueAxis.beginAtZero = false;
-        return;
-    }
-
-    valueAxis.min = undefined;
-    valueAxis.max = undefined;
-}
-
-function applyRaceFrameToChart(chart, frame, labelElement, sortingBasis) {
-    if (!chart || !frame) return;
-    
-    chart.data.labels = frame.labels;
-    chart.data.datasets[0].data = frame.values;
-    updateChartScaleForFrame(chart, sortingBasis);
-    
-    const wrapper = chart.canvas.parentNode;
-    if (wrapper && wrapper.classList.contains("chart-wrapper")) {
-        const minBarThickness = 30;
-        const requiredHeight = Math.max(400, frame.labels.length * minBarThickness);
-        wrapper.style.height = requiredHeight + "px";
-    }
-
-    chart.update();
-    if (labelElement) {
-        labelElement.textContent = `Period: ${frame.periodLabel}`;
-    }
-}
-
-function mountRaceChart(targetDiv, titleText, initialFrame, sortingBasis) {
+function showRaceNote(targetDiv, text) {
     targetDiv.innerHTML = "";
-
-    const wrapper = document.createElement("div");
-    wrapper.className = "chart-wrapper";
-
-    const minBarThickness = 30;
-    const requiredHeight = Math.max(400, (initialFrame?.labels?.length || 0) * minBarThickness);
-    wrapper.style.height = requiredHeight + "px";
-
-    const frameLabel = document.createElement("div");
-    frameLabel.className = "race-frame-label";
-    frameLabel.textContent = initialFrame ? `Period: ${initialFrame.periodLabel}` : "Period: N/A";
-    wrapper.appendChild(frameLabel);
-
-    const canvas = document.createElement("canvas");
-    wrapper.appendChild(canvas);
-    targetDiv.appendChild(wrapper);
-
-    const chart = createBarChartInCanvas(canvas, initialFrame?.labels || [], initialFrame?.values || [], sortingBasis, titleText || "");
-
-    return { chart, frameLabel };
+    const note = document.createElement("p");
+    note.className = "race-note";
+    note.setAttribute("role", "status");
+    note.textContent = text;
+    targetDiv.appendChild(note);
 }
 
-export function renderBarRaceSingle(tracks, entityType, targetDiv, sortingBasis) {
-    const frequency = (document.getElementById("race-frequency")?.value || "day").toLowerCase();
-    const xValue = parseInt(document.getElementById("x-value")?.value, 10) || getDefaultXValue(sortingBasis);
-    const maxPerArtist = parseInt(document.getElementById("max-per-artist")?.value, 10) || Infinity;
-    const bounds = resolveRaceTimeBounds([tracks]);
-    const timeline = buildRaceTimeline(bounds.start, bounds.end, frequency);
-    const frames = buildBarRaceFramesFromTracks(tracks, entityType, sortingBasis, xValue, maxPerArtist, timeline, frequency, bounds.end);
-    const initialFrame = frames[0] || {
-        periodLabel: "N/A",
-        labels: [],
-        values: []
-    };
-    const mounted = mountRaceChart(targetDiv, `Bar Chart Race (${sortingBasis})`, initialFrame, sortingBasis);
+function mountRace(targetDiv, frames, entityType, sortingBasis) {
+    targetDiv.innerHTML = "";
+    const wrapper = document.createElement("div");
+    wrapper.className = "race-wrapper";
+    targetDiv.appendChild(wrapper);
+    return createRaceChart(wrapper, frames, {
+        slots: getRaceSlots(),
+        sortingBasis,
+        entityType,
+        title: getRaceTitle(entityType, sortingBasis)
+    });
+}
 
-    state.activeRaceState = {
-        mode: "single",
+// One race state for the toolbar, the GIF export and theme changes, whether
+// one chart or two side by side are running.
+function setActiveRace(mode, charts, totalFrames) {
+    const race = {
+        mode,
+        charts,
+        totalFrames,
+        position: 0,
         frameIndex: 0,
-        totalFrames: frames.length,
-        updateFrame: (frameIndex) => {
-            const safeIndex = Math.max(0, Math.min(frames.length - 1, frameIndex));
-            state.activeRaceState.frameIndex = safeIndex;
-            applyRaceFrameToChart(mounted.chart, frames[safeIndex], mounted.frameLabel, sortingBasis);
+        drawAt(position) {
+            race.position = Math.max(0, Math.min(totalFrames - 1, position));
+            race.frameIndex = Math.round(race.position);
+            charts.forEach(chart => chart.draw(race.position));
+            syncRaceToolbar();
+        },
+        updateFrame(frameIndex) {
+            race.drawAt(frameIndex);
+        },
+        redraw() {
+            race.drawAt(race.position);
         }
     };
-
-    state.activeRaceState.updateFrame(0);
+    state.activeRaceState = race;
+    showArtists(charts.flatMap(chart => chart.artists));
+    race.drawAt(0);
     if (state.raceRenderArmed) {
         startRacePlayback();
     }
 }
 
-export function renderBarRaceComparison(leftTracks, rightTracks, leftEntityType, rightEntityType, leftSortingBasis, rightSortingBasis, leftXValue, rightXValue, leftMaxPerArtist, rightMaxPerArtist, leftTargetDiv, rightTargetDiv) {
+// Each new race cancels one still being built.
+let raceBuild = 0;
+
+function raceBuilt(run) {
+    if (run === raceBuild) state.raceBuilding = false;
+}
+
+export async function renderBarRaceSingle(tracks, entityType, targetDiv, sortingBasis) {
+    const run = ++raceBuild;
+    state.raceBuilding = true;
+    const frequency = (document.getElementById("race-frequency")?.value || "day").toLowerCase();
+    const xValue = parseInt(document.getElementById("x-value")?.value, 10) || getDefaultXValue(sortingBasis);
+    const caps = currentEntityCaps();
+    const bounds = resolveRaceTimeBounds([tracks]);
+    const timeline = buildRaceTimeline(bounds.start, bounds.end, frequency);
+    showRaceNote(targetDiv, "Building the race…");
+    const frames = await buildRaceFrames(tracks, entityType, sortingBasis, xValue, caps, timeline, frequency, bounds.end, {
+        onProgress: (done) => showRaceNote(targetDiv, `Building the race… ${Math.round(done * 100)}%`),
+        cancelled: () => run !== raceBuild
+    });
+    if (!frames || run !== raceBuild) return;
+    raceBuilt(run);
+    if (frames.error) {
+        showRaceNote(targetDiv, frames.error);
+        return;
+    }
+    const chart = mountRace(targetDiv, frames, entityType, sortingBasis);
+    setActiveRace("single", [chart], frames.length);
+}
+
+export async function renderBarRaceComparison(leftTracks, rightTracks, leftEntityType, rightEntityType, leftSortingBasis, rightSortingBasis, leftXValue, rightXValue, leftCaps, rightCaps, leftTargetDiv, rightTargetDiv) {
+    const run = ++raceBuild;
+    state.raceBuilding = true;
     const frequency = (document.getElementById("race-frequency")?.value || "day").toLowerCase();
     const bounds = resolveRaceTimeBounds([leftTracks, rightTracks]);
     const timeline = buildRaceTimeline(bounds.start, bounds.end, frequency);
-    const leftFrames = buildBarRaceFramesFromTracks(leftTracks, leftEntityType, leftSortingBasis, leftXValue, leftMaxPerArtist, timeline, frequency, bounds.end);
-    const rightFrames = buildBarRaceFramesFromTracks(rightTracks, rightEntityType, rightSortingBasis, rightXValue, rightMaxPerArtist, timeline, frequency, bounds.end);
-
-    const leftInitial = leftFrames[0] || {
-        periodLabel: "N/A",
-        labels: [],
-        values: []
+    const progress = (base) => (done) => {
+        const text = `Building the races… ${Math.round((base + done) * 50)}%`;
+        showRaceNote(leftTargetDiv, text);
+        showRaceNote(rightTargetDiv, text);
     };
-    const rightInitial = rightFrames[0] || {
-        periodLabel: "N/A",
-        labels: [],
-        values: []
-    };
-
-    const leftMounted = mountRaceChart(leftTargetDiv, `Left (${leftSortingBasis})`, leftInitial, leftSortingBasis);
-    const rightMounted = mountRaceChart(rightTargetDiv, `Right (${rightSortingBasis})`, rightInitial, rightSortingBasis);
-
-    const totalFrames = Math.max(leftFrames.length, rightFrames.length);
-    state.activeRaceState = {
-        mode: "comparison",
-        frameIndex: 0,
-        totalFrames,
-        updateFrame: (frameIndex) => {
-            const safeIndex = Math.max(0, Math.min(totalFrames - 1, frameIndex));
-            state.activeRaceState.frameIndex = safeIndex;
-
-            const leftFrame = leftFrames[Math.min(safeIndex, leftFrames.length - 1)] || leftInitial;
-            const rightFrame = rightFrames[Math.min(safeIndex, rightFrames.length - 1)] || rightInitial;
-
-            applyRaceFrameToChart(leftMounted.chart, leftFrame, leftMounted.frameLabel, leftSortingBasis);
-            applyRaceFrameToChart(rightMounted.chart, rightFrame, rightMounted.frameLabel, rightSortingBasis);
-        }
-    };
-
-    state.activeRaceState.updateFrame(0);
-    if (state.raceRenderArmed) {
-        startRacePlayback();
+    progress(0)(0);
+    const cancelled = () => run !== raceBuild;
+    const leftFrames = await buildRaceFrames(leftTracks, leftEntityType, leftSortingBasis, leftXValue, leftCaps, timeline, frequency, bounds.end, { onProgress: progress(0), cancelled });
+    if (!leftFrames || cancelled()) return;
+    const rightFrames = leftFrames.error ? leftFrames : await buildRaceFrames(rightTracks, rightEntityType, rightSortingBasis, rightXValue, rightCaps, timeline, frequency, bounds.end, { onProgress: progress(1), cancelled });
+    if (!rightFrames || cancelled()) return;
+    raceBuilt(run);
+    if (leftFrames.error || rightFrames.error) {
+        showRaceNote(leftTargetDiv, leftFrames.error || rightFrames.error);
+        rightTargetDiv.innerHTML = "";
+        return;
     }
+
+    const left = mountRace(leftTargetDiv, leftFrames, leftEntityType, leftSortingBasis);
+    const right = mountRace(rightTargetDiv, rightFrames, rightEntityType, rightSortingBasis);
+    setActiveRace("comparison", [left, right], Math.max(leftFrames.length, rightFrames.length));
 }
 
 const displayModeSelect = document.getElementById("display-mode");
@@ -887,28 +1028,19 @@ if (displayModeSelect) {
     });
 });
 
+// A picked or reset color repaints the race where it is, playing or paused,
+// and recolors bar charts, without rebuilding either.
+// A race playing on a tab you left keeps nothing moving you can see.
+document.addEventListener("view:changed", (event) => {
+    if (event.detail.view !== "lists") stopRacePlayback();
+});
+
+document.addEventListener("artist-colors:changed", () => {
+    state.activeRaceState?.redraw();
+    state.chartInstances.forEach(chart => chart.$recolor?.());
+});
+
 const raceSpeedInput = document.getElementById("race-speed-ms");
 if (raceSpeedInput) {
-    raceSpeedInput.addEventListener("change", () => {
-        syncRacePlaybackSpeedFromInput();
-        if (state.racePlaybackTimerId !== null) {
-            const currentFrame = state.activeRaceState?.frameIndex || 0;
-            stopRacePlayback();
-            if (state.activeRaceState) {
-                state.activeRaceState.updateFrame(currentFrame);
-                state.racePlaybackTimerId = setInterval(() => {
-                    if (!state.activeRaceState || typeof state.activeRaceState.updateFrame !== "function") {
-                        stopRacePlayback();
-                        return;
-                    }
-                    const nextIndex = state.activeRaceState.frameIndex + 1;
-                    if (nextIndex >= state.activeRaceState.totalFrames) {
-                        stopRacePlayback();
-                        return;
-                    }
-                    state.activeRaceState.updateFrame(nextIndex);
-                }, state.racePlaybackSpeedMs);
-            }
-        }
-    });
+    raceSpeedInput.addEventListener("change", syncRacePlaybackSpeedFromInput);
 }

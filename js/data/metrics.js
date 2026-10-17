@@ -139,7 +139,6 @@ export function calculateSeparateScrobbles(tracks, period, entityType = 'track')
         return acc;
     }, {});
 
-    console.log('Separate scrobbles groups:', groups);
     return Object.values(groups);
 }
 
@@ -377,7 +376,6 @@ export function calculateListeningPercentage(tracks, entityType = 'track') {
     // Sort by listening percentage in descending order
     result.sort((a, b) => b.listeningPercentage - a.listeningPercentage);
 
-    console.log('Listening percentage groups:', result);
     return result;
 }
 
@@ -447,7 +445,6 @@ export function calculateListeningDuration(filteredData, entityType = 'track') {
     // Convert aggregated data into an array and sort by listeningDuration
     const sortedAggregatedData = Object.values(aggregatedData).sort((a, b) => b.listeningDuration - a.listeningDuration);
 
-    console.log('Aggregated listening durations:', sortedAggregatedData);
     return sortedAggregatedData;
 }
 
@@ -553,7 +550,6 @@ export function calculateFirstToXScrobbles(tracks, x, entityType = 'track') {
         return acc;
     }, {});
 
-    console.log('First to X scrobbles groups:', groups);
     return Object.values(groups).filter(item => item.count >= x);
 }
 
@@ -610,7 +606,6 @@ export function calculateFastestToXScrobbles(tracks, x, entityType = 'track') {
         return acc;
     }, {});
 
-    console.log('Fastest to X scrobbles groups:', groups);
     return Object.values(groups)
         .filter(item => item.count >= x)
 }

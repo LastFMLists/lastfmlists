@@ -117,11 +117,11 @@ export function setLoadProgress(fraction) {
     setTitle(fraction == null ? "Loading…" : `Loading ${Math.floor(fraction * 100)}%`);
 }
 
-export function finishLoadNotice() {
+export function finishLoadNotice(message = "Your lists are ready.") {
     if (!loading) return;
     endLoad();
     showUntilSeen("✓ Ready");
-    notify("Your lists are ready.");
+    notify(message);
 }
 
 export function failLoadNotice(message) {

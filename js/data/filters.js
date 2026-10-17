@@ -116,31 +116,80 @@ export function convertStateToFilterArray(savedState) {
         .map(([id, value]) => ({ id, value: value.toString() }));
 }
 
-export function applyTracksPerEntityFilter(tracks, maxArtist) {
+// The caps that keep one favourite from filling a list: how many rows one
+// artist can take (albums in an album list, tracks in a track or scrobble
+// list) and, for tracks and scrobbles, how many one album can take.
+export function entityCapsFrom(values) {
+    return {
+        perArtist: parseInt(values?.["max-per-artist"], 10) || Infinity,
+        perAlbum: parseInt(values?.["max-per-album"], 10) || Infinity
+    };
+}
 
-    // To track how many tracks we have included from each album and artist
-    let artistCount = {};
+export function currentEntityCaps() {
+    return entityCapsFrom({
+        "max-per-artist": document.getElementById("max-per-artist")?.value,
+        "max-per-album": document.getElementById("max-per-album")?.value
+    });
+}
 
-    // Result list for the filtered tracks
-    let filteredTracks = [];
-
-    // Loop through the sorted tracks
-    for (let track of tracks) {
-        let artist = track.Artist;
-
-        // Check if we've already added a track from this album or artist
-        if (maxArtist && artistCount[artist] >= maxArtist) {
-            continue; // Skip if the album or artist has reached its limit
-        }
-
-        // Add the track to the result list
-        filteredTracks.push(track);
-
-        // Increment the counts for the album and artist
-        artistCount[artist] = (artistCount[artist] || 0) + 1;
+// Track -> the album it was played from most, for rows that some sorts
+// (days played, streaks, first to X...) build without album details.
+let albumIndex = { source: null, albums: new Map() };
+function mostPlayedAlbum(artist, track) {
+    if (albumIndex.source !== state.allTracks) {
+        const counts = new Map();
+        (state.allTracks || []).forEach(play => {
+            const key = `${(play.Artist || "").toLowerCase()}||${(play.Track || "").toLowerCase()}`;
+            if (!counts.has(key)) counts.set(key, new Map());
+            const albums = counts.get(key);
+            albums.set(play.Album || "", (albums.get(play.Album || "") || 0) + 1);
+        });
+        const albums = new Map();
+        counts.forEach((byAlbum, key) => albums.set(key, [...byAlbum.entries()].sort((a, b) => b[1] - a[1])[0][0]));
+        albumIndex = { source: state.allTracks, albums };
     }
+    return albumIndex.albums.get(`${(artist || "").toLowerCase()}||${(track || "").toLowerCase()}`) || "";
+}
 
-    return filteredTracks;
+// The album a track row counts towards: the one it was played from most.
+function mainAlbum(item) {
+    if (item.albumCounts) {
+        let best = null;
+        Object.entries(item.albumCounts).forEach(([album, count]) => {
+            if (!best || count > best[1]) best = [album, count];
+        });
+        if (best) return best[0];
+    }
+    return item.Album || mostPlayedAlbum(item.Artist, item.Track);
+}
+
+// Returns admit(item): true while the item's artist and album are under
+// their caps, counting it in when it is.
+export function makeCapCounter(entityType, caps = {}) {
+    const perArtist = caps.perArtist > 0 ? caps.perArtist : Infinity;
+    const perAlbum = entityType === "album" ? Infinity : (caps.perAlbum > 0 ? caps.perAlbum : Infinity);
+    if (entityType === "artist" || (perArtist === Infinity && perAlbum === Infinity)) return () => true;
+    const byArtist = new Map();
+    const byAlbum = new Map();
+    return (item) => {
+        const artist = (item.Artist ?? item.artist ?? "").toLowerCase();
+        const artistCount = byArtist.get(artist) || 0;
+        if (artistCount >= perArtist) return false;
+        if (perAlbum !== Infinity) {
+            const album = `${mainAlbum(item).toLowerCase()}||${artist}`;
+            const albumCount = byAlbum.get(album) || 0;
+            if (albumCount >= perAlbum) return false;
+            byAlbum.set(album, albumCount + 1);
+        }
+        byArtist.set(artist, artistCount + 1);
+        return true;
+    };
+}
+
+export function applyEntityCaps(items, entityType, caps) {
+    const admit = makeCapCounter(entityType, caps);
+    return items.filter(item => admit(item));
 }
 
 export function filterTracks(filtersOverride = null, sourceTracks = null) {
@@ -344,21 +393,15 @@ export function filterTracks(filtersOverride = null, sourceTracks = null) {
             return selectedWeekdays.length === 0 || selectedWeekdays.includes(weekday);
         },
 
-        "time-of-day-start": (item, value) => {
-            const endValue = document.getElementById("time-of-day-end")?.value || "";
-            return isWithinTimeRange(item.Date, value, endValue);
-        },
+        "time-of-day-start": (item, value) => isWithinTimeRange(item.Date, value, pairedValue("time-of-day-end")),
 
-        "time-of-day-end": (item, value) => {
-            const startValue = document.getElementById("time-of-day-start")?.value || "";
-            return isWithinTimeRange(item.Date, startValue, value);
-        },
+        "time-of-day-end": (item, value) => isWithinTimeRange(item.Date, pairedValue("time-of-day-start"), value),
 
         "session-starter-only": (item, value) => {
             if (value !== "use-gap") return true;
             const previousTimestamp = state.previousScrobbleTimestampByOrder[item.order];
             if (previousTimestamp === null || previousTimestamp === undefined) return true;
-            const configuredGap = parseFloat(document.getElementById("day-starter-gap-hours")?.value);
+            const configuredGap = parseFloat(pairedValue("day-starter-gap-hours"));
             const gapHours = isNaN(configuredGap) ? 6 : configuredGap;
             const minGapMs = gapHours * 60 * 60 * 1000;
             return parseInt(item.Date, 10) - previousTimestamp >= minGapMs;
@@ -369,7 +412,7 @@ export function filterTracks(filtersOverride = null, sourceTracks = null) {
 
             const isDayStarter = state.isFirstScrobbleOfDayByOrder[item.order] === true;
             const previousTimestamp = state.previousScrobbleTimestampByOrder[item.order];
-            const configuredGap = parseFloat(document.getElementById("day-starter-gap-hours")?.value);
+            const configuredGap = parseFloat(pairedValue("day-starter-gap-hours"));
             const gapHours = isNaN(configuredGap) ? 6 : configuredGap;
             const minGapMs = gapHours * 60 * 60 * 1000;
             const hasLongGap = previousTimestamp === null || previousTimestamp === undefined
@@ -407,6 +450,11 @@ export function filterTracks(filtersOverride = null, sourceTracks = null) {
     };
 
     const effectiveFilters = Array.isArray(filtersOverride) ? filtersOverride : state.activeFilters;
+    // Filters that need a second setting (the other end of a time range, the
+    // long gap) read it from the same set of filters, not from the panel on
+    // screen, so comparison sides and Explore boxes get their own value.
+    const pairedValues = new Map(effectiveFilters.map(filter => [filter.id, filter.value]));
+    const pairedValue = (id) => pairedValues.get(id) ?? "";
 
     const activePredicates = effectiveFilters
         .filter(filter => filterFunctions[filter.id])
@@ -595,17 +643,11 @@ function dedupeOrderedTrackEntities(tracks) {
     return Array.from(entitiesByKey.values());
 }
 
-export function resolveDisplayEntities(pipelineResult, entityType, sortingBasis, xValue, maxPerArtist) {
-    let entities;
+export function resolveDisplayEntities(pipelineResult, entityType, sortingBasis, xValue, caps) {
     if (pipelineResult.hasOrderingStep && entityType === "track") {
-        const dedupedOrderedTracks = dedupeOrderedTrackEntities(pipelineResult.tracks);
-        entities = applyTracksPerEntityFilter(dedupedOrderedTracks, maxPerArtist);
-    } else {
-        entities = buildEntitiesFromTracks(pipelineResult.tracks, entityType, sortingBasis, xValue);
-        if (entityType === "track") {
-            entities = applyTracksPerEntityFilter(entities, maxPerArtist);
-        }
+        return applyEntityCaps(dedupeOrderedTrackEntities(pipelineResult.tracks), entityType, caps);
     }
-
-    return entities;
+    const entities = buildEntitiesFromTracks(pipelineResult.tracks, entityType, sortingBasis, xValue);
+    // Scrobble lists are capped as they are shown, since they can be huge.
+    return entityType === "scrobble" ? entities : applyEntityCaps(entities, entityType, caps);
 }

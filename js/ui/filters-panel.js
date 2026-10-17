@@ -36,6 +36,7 @@ import {
     updateRaceControlsVisibility
 } from './charts.js';
 import { displayEntities, getSelectedDisplayMode, highlightEntityRow } from './lists.js';
+import { getActiveView, setActiveView } from './shell.js';
 
 function getEquationInsertTargetInput() {
     const activeElement = document.activeElement;
@@ -184,6 +185,9 @@ export function updateComparisonInteractionState() {
     const comparisonEnabled = isComparisonEnabled();
     const comparisonEditTarget = document.getElementById("comparison-edit-target");
     const rightEquationsInput = document.getElementById("equations-right");
+    // The side switch only takes room in the panel while comparing.
+    const sideSwitch = document.querySelector(".comparison-controls");
+    if (sideSwitch) sideSwitch.hidden = !comparisonEnabled;
 
     if (comparisonEditTarget) {
         comparisonEditTarget.disabled = !comparisonEnabled;
@@ -243,7 +247,36 @@ function xValueLabel(sortingBasis) {
 }
 
 // Function to update the active filters display
+// Settings that pick or shape the list rather than throw out plays. The
+// rest (the Artist, Album, Track and Time menus) are play filters, which a
+// list with equation steps doesn't use: the steps are its filters.
+const LIST_SETTING_IDS = new Set([
+    ...GLOBAL_BASE_SETTING_IDS, "entity-type", "sorting-basis", "x-value",
+    "max-per-artist", "max-per-album", "equations", "equations-right", "comparison-edit-target"
+]);
+export const isPlayFilter = (id) => !LIST_SETTING_IDS.has(id);
+
+const PAUSED_NOTE = "Paused while Equations has steps";
+
+// The equation steps of the list the panel is editing.
+function editedSideHasSteps() {
+    const right = isComparisonEnabled() && getComparisonEditTarget() === "right";
+    return Boolean((document.getElementById(right ? "equations-right" : "equations")?.value || "").trim());
+}
+
+// The Artist, Album, Track and Time menus say when they are paused.
+export function syncEquationPause() {
+    const section = document.getElementById("filters-section");
+    if (section) section.classList.toggle("equations-active", editedSideHasSteps());
+}
+
+["equations", "equations-right"].forEach(id => {
+    document.getElementById(id)?.addEventListener("input", syncEquationPause);
+});
+document.getElementById("comparison-edit-target")?.addEventListener("change", syncEquationPause);
+
 export function updateActiveFilters() {
+    syncEquationPause();
     const activeFiltersDiv = document.getElementById("active-filters");
     activeFiltersDiv.innerHTML = ""; // Clear previous filters
 
@@ -262,7 +295,8 @@ export function updateActiveFilters() {
         { id: "sorting-basis", label: "Ranked by", isSelect: true },
         { id: "x-value", label: xValueLabel(document.getElementById("sorting-basis")?.value) },
 
-        { id: "max-per-artist", label: "Displayed tracks per artist" },
+        { id: "max-per-artist", label: "Per artist" },
+        { id: "max-per-album", label: "Tracks per album" },
 
         // Artist filters
 
@@ -401,15 +435,16 @@ export function updateActiveFilters() {
     };
 
     // Each chip is a button that opens its filter (see ui/filter-controls.js).
-    const appendFilterLabel = (text, id) => {
+    const appendFilterLabel = (text, id, paused = false) => {
         const filterLabel = document.createElement("button");
         filterLabel.type = "button";
         filterLabel.classList.add("filter-label");
-        filterLabel.textContent = text;
+        filterLabel.textContent = paused ? `${text} (paused)` : text;
         if (id) {
             filterLabel.dataset.filterId = id;
-            filterLabel.title = "Change this filter";
+            filterLabel.title = paused ? `${PAUSED_NOTE}. Click to change it.` : "Change this filter";
         }
+        filterLabel.classList.toggle("is-paused", paused);
         activeFiltersDiv.appendChild(filterLabel);
     };
 
@@ -466,23 +501,26 @@ export function updateActiveFilters() {
                 return;
             }
 
-            if (leftValue === rightValue) {
-                appendFilterLabel(`${labelById[canonicalId]}: ${formatTagValue(canonicalId, leftValue)}`, canonicalId);
+            const leftPaused = Boolean(leftEquationValue) && isPlayFilter(canonicalId);
+            const rightPaused = Boolean(rightEquationValue) && isPlayFilter(canonicalId);
+            if (leftValue === rightValue && leftPaused === rightPaused) {
+                appendFilterLabel(`${labelById[canonicalId]}: ${formatTagValue(canonicalId, leftValue)}`, canonicalId, leftPaused);
                 return;
             }
 
             if (leftValue) {
-                appendFilterLabel(`${labelById[canonicalId]}: ${formatTagValue(canonicalId, leftValue)} (Left)`, canonicalId);
+                appendFilterLabel(`${labelById[canonicalId]}: ${formatTagValue(canonicalId, leftValue)} (Left)`, canonicalId, leftPaused);
             }
 
             if (rightValue) {
-                appendFilterLabel(`${labelById[canonicalId]}: ${formatTagValue(canonicalId, rightValue)} (Right)`, canonicalId);
+                appendFilterLabel(`${labelById[canonicalId]}: ${formatTagValue(canonicalId, rightValue)} (Right)`, canonicalId, rightPaused);
             }
         });
 
         return;
     }
 
+    const singleListSteps = Boolean((document.getElementById("equations")?.value || "").trim());
     filters.forEach(filter => {
         const element = document.getElementById(filter.id);
         if (!element) return; // Skip if element is not found
@@ -517,19 +555,38 @@ export function updateActiveFilters() {
             shouldShow = mode === DISPLAY_MODE_BAR_CHART || mode === DISPLAY_MODE_BAR_RACE;
         }
 
+        // The race settings share one chip, added after the loop.
         if (filter.id === "race-start-date" || filter.id === "race-end-date" || filter.id === "race-frequency" || filter.id === "race-speed-ms") {
-            const mode = document.getElementById("display-mode")?.value || DISPLAY_MODE_LIST;
-            shouldShow = mode === DISPLAY_MODE_BAR_RACE && rawValue !== "";
+            shouldShow = false;
         }
 
         if (filter.id === "unfiltered-stats") {
             shouldShow = element.checked === true;
         }
 
+        // The caps do nothing on list types they don't apply to.
+        const listType = document.getElementById("entity-type")?.value || "track";
+        if (filter.id === "max-per-artist" && listType === "artist") shouldShow = false;
+        if (filter.id === "max-per-album" && listType !== "track" && listType !== "scrobble") shouldShow = false;
+
         if (shouldShow) {
-            appendFilterLabel(`${filter.label}: ${displayValue}`, filter.id);
+            appendFilterLabel(`${filter.label}: ${displayValue}`, filter.id, singleListSteps && isPlayFilter(filter.id));
         }
     });
+
+    appendRaceChip(appendFilterLabel);
+}
+
+// One chip for the race: its dates, step and speed.
+function appendRaceChip(appendFilterLabel) {
+    if ((document.getElementById("display-mode")?.value || DISPLAY_MODE_LIST) !== DISPLAY_MODE_BAR_RACE) return;
+    const from = document.getElementById("race-start-date")?.value;
+    const to = document.getElementById("race-end-date")?.value;
+    if (!from || !to) return;
+    const day = (value) => new Date(`${value}T00:00:00`).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+    const step = { day: "daily", week: "weekly", month: "monthly" }[document.getElementById("race-frequency")?.value] || "daily";
+    const speed = (parseInt(document.getElementById("race-speed-ms")?.value, 10) || 260) / 1000;
+    appendFilterLabel(`Race: ${day(from)} to ${day(to)}, ${step}, ${+speed.toFixed(2)}s per step`, "race-start-date");
 }
 
 // Puts every control back to its default and empties the filter state,
@@ -635,9 +692,15 @@ document.getElementById("comparison-toggle").addEventListener("click", () => {
             ...snapshot,
             equations: (document.getElementById("equations")?.value || snapshot.equations || "").toString()
         };
+        // The right list starts as a copy of the left one, so comparing
+        // means changing one thing (a year, a filter) instead of setting
+        // up a second list from nothing.
         state.comparisonFilterStates.right = {
-            equations: (document.getElementById("equations-right")?.value || "").toString()
+            ...state.comparisonFilterStates.left,
+            equations: (document.getElementById("equations-right")?.value || state.comparisonFilterStates.left.equations || "").toString()
         };
+        const rightEquations = document.getElementById("equations-right");
+        if (rightEquations && !rightEquations.value) rightEquations.value = state.comparisonFilterStates.right.equations;
         state.comparisonStateInitialized = true;
     }
 
@@ -663,6 +726,11 @@ document.getElementById("comparison-toggle").addEventListener("click", () => {
         applyFilterInputState(state.comparisonFilterStates[target]);
         notifyFilterControlsChanged();
     } else {
+        // Back to one list: the left one, whichever side was being edited.
+        applyFilterInputState(state.comparisonFilterStates.left);
+        const editTarget = document.getElementById("comparison-edit-target");
+        if (editTarget) editTarget.value = "left";
+        notifyFilterControlsChanged();
         state.activeFilters.length = 0;
         getManagedFilterElements().forEach(element => {
             const value = element.type === "checkbox"
@@ -719,7 +787,7 @@ document.querySelectorAll('.dropdown').forEach(dropdown => {
     });
 });
 
-function syncEntitySortingSelectors() {
+export function syncEntitySortingSelectors() {
     const entityElement = document.getElementById("entity-type");
     const sortingElement = document.getElementById("sorting-basis");
     if (!entityElement || !sortingElement) return;
@@ -787,6 +855,8 @@ export function notifyFilterControlsChanged() {
 //   options.listLength: rows to show ("0" for all)
 //   options.highlight: { type, name, artist } of a row to scroll to
 export function openListQuery(query, options = {}) {
+    // Explore boxes and entity-page rankings open their list from other views.
+    if (getActiveView() !== "lists") setActiveView("lists");
     destroyVisualizationState();
     state.raceRenderArmed = false;
 

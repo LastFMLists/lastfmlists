@@ -7,10 +7,8 @@ import { LOAD_ALL_DETAILS_TOOLTIP, LOAD_DETAILS_TOOLTIP, debugLogDataset } from 
 import { filterTracks } from './data/filters.js';
 import {
     buildHistoryContextMaps,
-    fetchListeningHistory,
-    fetchRecentTracksSince,
-    renderLoadingPreview,
-    renderSavedDataPreview
+    loadHistory,
+    renderLoadingPreview
 } from './data/history.js';
 import { getUserData, mergeData, saveUserData, topListsFromSavedData } from './data/storage.js';
 import { loadingDiv } from './dom.js';
@@ -18,6 +16,11 @@ import { initGames } from './games/index.js';
 import { state } from './state.js';
 import { ensureRaceDateDefaults, updateRaceControlsVisibility } from './ui/charts.js';
 import './ui/entity-page.js';
+import './ui/equation-editor.js';
+import './ui/explore.js';
+import './ui/graphs.js';
+import { openGraphFromLink } from './ui/graphs.js';
+import { applySettings, startFromUrl, takePendingGraph, takePendingSettings } from './ui/url-state.js';
 import './ui/export.js';
 import { initFilterControls } from './ui/filter-controls.js';
 import { failLoadNotice, finishLoadNotice, startLoadNotice } from './ui/load-notice.js';
@@ -36,6 +39,9 @@ import {
     datasetHasExtendedMetadata,
     enableGamesTab,
     setAppLoadedState,
+    rememberedView,
+    setActiveView,
+    setListControlsLocked,
     showLoadError,
     updateExtendedDataUI
 } from './ui/shell.js';
@@ -63,29 +69,26 @@ document.getElementById("username-form").addEventListener("submit", async (event
 
 	if (submitButton) submitButton.disabled = true;
 	setAppLoadedState(username);
-
-	// Whether this load came from storage, and how much the sync actually added.
-	let syncedFromStorage = false;
-	let newScrobbleCount = 0;
+	state.loadedUsername = username;
+	setListControlsLocked(true);
 
 	// Try to load saved data for the username from IndexedDB
 	let savedData = await getUserData(username).catch(err => {
 		console.error("Error retrieving saved data", err);
 		return null;
 	});
+	const saved = savedData?.data || null;
 
 	// Covers from an earlier save, so the sync below only adds new ones.
-	state.albumArt = { ...(savedData?.data?.albumArt || {}) };
+	state.albumArt = { ...(saved?.albumArt || {}) };
 
+    let history;
     try {
-        if (savedData) {
-            // Saved data exists – retrieve the saved tracks, artists, and albums.
-            let { allTracks: savedAllTracks, artistsData: savedArtistsData, albumsData: savedAlbumsData, tracksData: savedTracksData } = savedData.data;
-    
-            // Restore the saved dataset into shared state
-            state.artistsData = savedArtistsData || [];
-            state.albumsData = savedAlbumsData || [];
-            state.tracksData = savedTracksData || [];
+        if (saved) {
+            // Restore the saved lists; they are rebuilt below if anything changed.
+            state.artistsData = saved.artistsData || [];
+            state.albumsData = saved.albumsData || [];
+            state.tracksData = saved.tracksData || [];
 
             // If the saved dataset already contains detailed metadata, unlock the
             // gated filters/sorts so the user doesn't have to re-download it.
@@ -93,33 +96,17 @@ document.getElementById("username-form").addEventListener("submit", async (event
                 state.extendedDataLoaded = true;
                 updateExtendedDataUI();
             }
-
-            // Find the latest track date in the saved allTracks.
-            let latestTimestamp = 0;
-            savedAllTracks.forEach(track => {
-                const ts = parseInt(track.Date);
-                if (ts > latestTimestamp) latestTimestamp = ts;
-            });
-    
-            // Show the saved lists while the sync runs, so the page isn't blank.
-            renderSavedDataPreview(savedAllTracks);
-
-            // Fetch recent tracks - The function now handles its own progress messages
-            const newTracks = await fetchRecentTracksSince(username, latestTimestamp);
-            syncedFromStorage = true;
-            newScrobbleCount = newTracks.length;
-
-            // Merge new tracks with the saved tracks, keeping chronological order.
-            state.allTracks = newTracks.concat(savedAllTracks);
-
-        } else {
-            // No saved data exists, fetch all history (with a live preview as pages arrive).
-            state.allTracks = await fetchListeningHistory(username, renderLoadingPreview);
+            if (saved.historyProgress) trackEvent("load/resumed", "Continued a saved load");
         }
+
+        // Downloads whatever the saved data is missing, or the whole history.
+        history = await loadHistory(username, saved, renderLoadingPreview);
     } catch (loadError) {
         // A bad username or an unreachable API used to leave the user staring at
         // an empty app with the failure only in the console.
         console.error("Load failed:", loadError);
+        state.historyLoad = null;
+        setListControlsLocked(false);
         clearAppLoadedState();
         trackEvent("load/error", "Load failed");
         document.removeEventListener("visibilitychange", noteSwitchedAway);
@@ -130,6 +117,12 @@ document.getElementById("username-form").addEventListener("submit", async (event
         return;
     }
     if (submitButton) submitButton.disabled = false;
+
+    // From here Save Data stores the full history, marked to rebuild its lists.
+    state.historyLoad.phase = "finishing";
+    state.allTracks = history.tracks;
+    state.historyProgress = history.progress;
+    const syncedFromStorage = Boolean(saved);
     
     state.allTracks = state.allTracks.filter(track => {
         if (!track.Date) {
@@ -155,19 +148,21 @@ document.getElementById("username-form").addEventListener("submit", async (event
     // already holds every ranking, first/last date and per-entity count this
     // block would rebuild, and Last.fm's top lists are derived from the user's
     // own plays, so they cannot have moved either. Skipping it saves hundreds of
-    // API pages and two full passes over the history on every revisit.
+    // API pages and two full passes over the history on every revisit. Lists
+    // saved before their load finished are always rebuilt.
     const nothingNew = syncedFromStorage
-        && newScrobbleCount === 0
+        && !history.changed
+        && !saved.listsNeedRebuild
         && state.artistsData.length > 0
         && state.albumsData.length > 0
         && state.tracksData.length > 0;
 
     if (nothingNew) {
         loadingDiv.innerHTML = "<p>No new scrobbles. Using your saved lists.</p>";
-        const saved = topListsFromSavedData();
-        state.topArtists = saved.artists;
-        state.topAlbums = saved.albums;
-        state.topTracks = saved.tracks;
+        const savedLists = topListsFromSavedData();
+        state.topArtists = savedLists.artists;
+        state.topAlbums = savedLists.albums;
+        state.topTracks = savedLists.tracks;
     } else {
     	// ✅ ALWAYS re-fetch the top stats to update rankings and counts!
     	// These three are independent, so fetch them concurrently.
@@ -344,20 +339,56 @@ document.getElementById("username-form").addEventListener("submit", async (event
 	updateActiveFilters();
 	finishLoadNotice();
 
+    state.historyLoad = null;
+    setListControlsLocked(false);
+    // A link's list settings open that list, and a graph link opens its
+    // graph (after its list, when it graphs a list's plays). Otherwise the
+    // first visit lands on Explore and later ones on the tab used last.
+    const linkSettings = takePendingSettings();
+    const linkGraph = takePendingGraph();
+    if (linkSettings) applySettings(linkSettings);
+    if (linkGraph) openGraphFromLink(linkGraph);
+    else if (!linkSettings) setActiveView(rememberedView() || "explore");
+    if (history.progress) {
+        // Some pages never arrived. The lists work, but say what's missing and
+        // how to fill the gap: a saved copy remembers the missing pages.
+        trackEvent("load/incomplete", "Load finished with pages missing");
+        loadingDiv.innerHTML = `<p class="load-incomplete">About ${history.missing.toLocaleString()} scrobbles couldn't be downloaded, so these lists are missing them. Click Save Data, then load the same username again later to fetch the rest.</p>`;
+    }
 });
 
 document.getElementById("save-data").addEventListener("click", async () => {
-    const username = document.getElementById("username").value.trim();
+    const load = state.historyLoad;
+    const username = load?.username || state.loadedUsername || document.getElementById("username").value.trim();
+
+    // While scrobbles are still downloading, only the pages that have fully
+    // arrived are saved, with a note of the ones still missing, so the next
+    // load of this username fetches just those.
+    let allTracks = state.allTracks;
+    let historyProgress = state.historyProgress;
+    if (load && load.phase === "history") {
+        ({ allTracks, historyProgress } = load.snapshot());
+    }
+    if (!allTracks.length) {
+        alert("There's nothing to save yet. Wait until some of your history has loaded.");
+        return;
+    }
+
     const dataToSave = {
-      allTracks: state.allTracks,
+      allTracks,
       artistsData: state.artistsData,
       albumsData: state.albumsData,
       tracksData: state.tracksData,
-      albumArt: state.albumArt
+      albumArt: state.albumArt,
+      historyProgress,
+      // Lists saved before their load finished don't match its scrobbles yet.
+      listsNeedRebuild: Boolean(load)
     };
     try {
       await saveUserData(username, dataToSave);
-      alert("Your data is saved in this browser.");
+      alert(historyProgress
+        ? `Saved ${allTracks.length.toLocaleString()} scrobbles in this browser. Load the same username again to continue where this load stopped.`
+        : "Your data is saved in this browser.");
     } catch (err) {
       console.error("Error saving data", err);
       alert("Your data could not be saved in this browser.");
@@ -396,4 +427,7 @@ document.addEventListener("DOMContentLoaded", () => {
             menu.style.display = "none";
         });
     });
+
+    // A link with a username loads it; its list settings apply after loading.
+    startFromUrl();
 });

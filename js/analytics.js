@@ -5,6 +5,7 @@
 // referrer of each visit, without cookies.
 
 import { readCurrentFilterInputState } from './data/filters.js';
+import { linkEvent } from './link-events.js';
 
 // count.js loads async and may be blocked, so events wait here until it is
 // ready. The cap keeps a blocked script from growing the queue all visit.
@@ -126,16 +127,26 @@ document.addEventListener("lists:rendered", (event) => {
 // need no changes. Disabled buttons fire no clicks, so these count real use.
 const BUTTON_EVENTS = {
     "load-detailed-data": ["details/top", "Load Details"],
-    "load-all-details": ["details/all", "Load All Details"],
+    "load-all-details": ["details/all", "Load ALL Details"],
     "save-data": ["save-data", "Save Data"],
     "confirm-export-grid": ["export/grid", "Export grid"],
     "tab-games": ["view/games", "Games tab opened"],
+    "tab-explore": ["view/explore", "Explore tab opened"],
+    "tab-graphs": ["view/graphs", "Graphs tab opened"],
+    "graph-this-list": ["graphs/from-list", "Opened a list in Graphs"],
+    "tab-lists": ["view/lists", "Lists tab opened"],
     "ftl-start": ["game/fill-the-list", "Fill the List started"]
 };
 
 document.addEventListener("click", (event) => {
     const target = event.target.closest("button, a");
     if (!target) return;
+    // Links count by destination. The donation banner counts its own.
+    if (target.tagName === "A" && !target.closest("[data-support]")) {
+        const link = linkEvent(target);
+        if (link) trackEvent(...link);
+        return;
+    }
     if (target.id === "confirm-export-image") {
         const race = document.getElementById("display-mode")?.value === "bar-race";
         trackEvent(race ? "export/gif" : "export/image", race ? "Export race GIF" : "Export image");
@@ -147,3 +158,37 @@ document.addEventListener("click", (event) => {
         trackEvent(`game/put-them-in-order/${target.dataset.type}`, `Put Them In Order: ${target.dataset.type}`);
     }
 });
+
+// ---- Time on the site ----
+//
+// GoatCounter has no visit length, so a visit reports each mark it passes:
+// "time/10min" counts the visits that lasted at least 10 minutes. Only time
+// with the tab visible counts, so a load left running in the background
+// doesn't. Marks are sent while the page is open, because a request sent as
+// a tab closes is often dropped.
+const TIME_MARKS_MINUTES = [1, 3, 5, 10, 15, 30, 60];
+let visibleMs = 0;
+let visibleSince = document.visibilityState === "visible" ? performance.now() : null;
+
+function visibleMinutes() {
+    const running = visibleSince === null ? 0 : performance.now() - visibleSince;
+    return (visibleMs + running) / 60000;
+}
+
+function reportTimeMarks() {
+    const minutes = visibleMinutes();
+    TIME_MARKS_MINUTES.forEach(mark => {
+        if (minutes >= mark) trackEventOnce(`time/${mark}min`, `On the site ${mark}+ minutes`);
+    });
+}
+
+document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") {
+        if (visibleSince === null) visibleSince = performance.now();
+    } else if (visibleSince !== null) {
+        visibleMs += performance.now() - visibleSince;
+        visibleSince = null;
+    }
+    reportTimeMarks();
+});
+setInterval(reportTimeMarks, 15000);

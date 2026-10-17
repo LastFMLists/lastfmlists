@@ -14,7 +14,10 @@ import {
 } from '../data/equations.js';
 import {
     convertStateToFilterArray,
+    currentEntityCaps,
+    entityCapsFrom,
     filterTracks,
+    makeCapCounter,
     normalizeEntitySorting,
     resolveDisplayEntities
 } from '../data/filters.js';
@@ -196,7 +199,9 @@ function getAdditionalInfo(sortingBasis, entity) {
         });
 
         showFields.forEach(fieldName => {
-            const fieldValue = getEquationFieldValue(entity, fieldName);
+            const fieldValue = entity.equationPipelineShowValues && fieldName in entity.equationPipelineShowValues
+                ? entity.equationPipelineShowValues[fieldName]
+                : getEquationFieldValue(entity, fieldName);
             if (fieldValue === null || fieldValue === undefined) return;
             const line = `${escapeHTML(formatEquationFieldLabel(fieldName))}: ${escapeHTML(fieldValue)}`;
             if (!seenLines.has(line)) {
@@ -264,7 +269,7 @@ function getAdditionalInfo(sortingBasis, entity) {
 	}
 }
 
-function renderEntitiesToContainer(entities, entityType, targetDiv, sortingBasis) {
+function renderEntitiesToContainer(entities, entityType, targetDiv, sortingBasis, caps) {
     if (entityType === "track") {
         displayTopTracks(entities, targetDiv, sortingBasis);
     } else if (entityType === "album") {
@@ -272,7 +277,7 @@ function renderEntitiesToContainer(entities, entityType, targetDiv, sortingBasis
     } else if (entityType === "artist") {
         displayTopArtists(entities, targetDiv, sortingBasis);
     } else if (entityType === "scrobble") {
-        displayScrobbles(entities, targetDiv, sortingBasis === SCROBBLE_SORT_DESC ? "desc" : "asc");
+        displayScrobbles(entities, targetDiv, sortingBasis === SCROBBLE_SORT_DESC ? "desc" : "asc", caps);
     }
 }
 
@@ -316,6 +321,8 @@ function equalizeComparisonRowHeights(leftContainer, rightContainer) {
 export function displayEntities() {
     destroyVisualizationState();
     ensureRaceDateDefaults();
+    // The address bar follows the list on screen (ui/url-state.js).
+    document.dispatchEvent(new CustomEvent("list:rendered"));
 
     const initialEntityType = document.getElementById("entity-type").value;
     const initialSortingBasis = document.getElementById("sorting-basis").value;
@@ -325,7 +332,8 @@ export function displayEntities() {
     const selectedDisplayMode = getSelectedDisplayMode();
     const supportsVisualization = entityType !== "scrobble";
     const effectiveDisplayMode = supportsVisualization ? selectedDisplayMode : DISPLAY_MODE_LIST;
-    const renderMode = (effectiveDisplayMode !== DISPLAY_MODE_LIST && typeof Chart === "undefined")
+    // Only the plain bar chart needs Chart.js; the race draws its own canvas.
+    const renderMode = (effectiveDisplayMode === DISPLAY_MODE_BAR_CHART && typeof Chart === "undefined")
         ? DISPLAY_MODE_LIST
         : effectiveDisplayMode;
     const raceReady = renderMode !== DISPLAY_MODE_BAR_RACE || hasRaceSettingsReady();
@@ -338,18 +346,12 @@ export function displayEntities() {
         document.getElementById("sorting-basis").value = sortingBasis;
     }
 
-    const maxPerArtist = parseInt(document.getElementById("max-per-artist").value) || Infinity;
+    const caps = currentEntityCaps();
     const xValue = parseInt(document.getElementById("x-value").value) || getDefaultXValue(sortingBasis);
     const comparisonButtonActive = isComparisonEnabled();
 
-    const baseTracks = filterTracks(state.activeFilters, state.allTracks);
     const leftState = state.comparisonFilterStates.left || {};
     const rightState = state.comparisonFilterStates.right || {};
-    const leftFilters = convertStateToFilterArray(leftState);
-    const rightFilters = convertStateToFilterArray(rightState);
-
-    const leftTracksBase = comparisonButtonActive ? filterTracks(leftFilters, state.allTracks) : baseTracks;
-    const rightTracksBase = comparisonButtonActive ? filterTracks(rightFilters, state.allTracks) : baseTracks;
 
     const equationsLeft = comparisonButtonActive
         ? ((leftState.equations || "").trim())
@@ -357,6 +359,18 @@ export function displayEntities() {
     const equationsRight = comparisonButtonActive
         ? ((document.getElementById("equations-right")?.value || rightState.equations || "").trim())
         : "";
+
+    // A list with equation steps starts from the whole history: the steps
+    // are its filters, and the other menus are paused for it (the panel and
+    // the filter chips say so). Without steps, the menus filter as usual.
+    const sideBase = (equations, sideState) => {
+        if (equations) return state.allTracks;
+        return comparisonButtonActive
+            ? filterTracks(convertStateToFilterArray(sideState), state.allTracks)
+            : filterTracks(state.activeFilters, state.allTracks);
+    };
+    const leftTracksBase = sideBase(equationsLeft, leftState);
+    const rightTracksBase = comparisonButtonActive ? sideBase(equationsRight, rightState) : leftTracksBase;
 
     const leftXValue = parseInt(leftState["x-value"], 10) || getDefaultXValue(leftState["sorting-basis"] || sortingBasis);
     const rightXValue = parseInt(rightState["x-value"], 10) || getDefaultXValue(rightState["sorting-basis"] || sortingBasis);
@@ -371,11 +385,12 @@ export function displayEntities() {
         const rightEntityType = rightNormalized.entityType;
         const leftSortingBasis = leftNormalized.sortingBasis;
         const rightSortingBasis = rightNormalized.sortingBasis;
-        const leftMaxPerArtist = parseInt(leftState["max-per-artist"], 10) || maxPerArtist;
-        const rightMaxPerArtist = parseInt(rightState["max-per-artist"], 10) || maxPerArtist;
+        const leftCaps = entityCapsFrom(leftState);
+        const rightCaps = entityCapsFrom(rightState);
 
-        const leftEntities = resolveDisplayEntities(leftPipeline, leftEntityType, leftSortingBasis, leftXValue, leftMaxPerArtist);
-        const rightEntities = resolveDisplayEntities(rightPipeline, rightEntityType, rightSortingBasis, rightXValue, rightMaxPerArtist);
+        const leftEntities = resolveDisplayEntities(leftPipeline, leftEntityType, leftSortingBasis, leftXValue, leftCaps);
+        const rightEntities = resolveDisplayEntities(rightPipeline, rightEntityType, rightSortingBasis, rightXValue, rightCaps);
+        offerGraph(leftEntityType, leftSortingBasis, leftXValue, leftPipeline.tracks, leftEntities);
 
         const resultsDiv = document.getElementById("results");
         resultsDiv.innerHTML = "";
@@ -403,10 +418,14 @@ export function displayEntities() {
         comparisonLayout.appendChild(rightColumn);
         resultsDiv.appendChild(comparisonLayout);
 
-        if (renderMode === DISPLAY_MODE_BAR_CHART) {
+        // A scrobble list can't be charted, so a side with one keeps both
+        // sides as lists, whichever side the panel is editing.
+        const sidesChartable = leftEntityType !== "scrobble" && rightEntityType !== "scrobble";
+        const comparisonMode = sidesChartable ? renderMode : DISPLAY_MODE_LIST;
+        if (comparisonMode === DISPLAY_MODE_BAR_CHART) {
             renderBarChartEntities(leftEntities, leftEntityType, leftSortingBasis, leftList);
             renderBarChartEntities(rightEntities, rightEntityType, rightSortingBasis, rightList);
-        } else if (renderMode === DISPLAY_MODE_BAR_RACE) {
+        } else if (comparisonMode === DISPLAY_MODE_BAR_RACE) {
             if (raceCanRender) {
                 insertRacePlaybackToolbar(resultsDiv);
                 renderBarRaceComparison(
@@ -418,8 +437,8 @@ export function displayEntities() {
                     rightSortingBasis,
                     leftXValue,
                     rightXValue,
-                    leftMaxPerArtist,
-                    rightMaxPerArtist,
+                    leftCaps,
+                    rightCaps,
                     leftList,
                     rightList
                 );
@@ -428,8 +447,8 @@ export function displayEntities() {
                 renderBarChartEntities(rightEntities, rightEntityType, rightSortingBasis, rightList);
             }
         } else {
-            renderEntitiesToContainer(leftEntities, leftEntityType, leftList, leftSortingBasis);
-            renderEntitiesToContainer(rightEntities, rightEntityType, rightList, rightSortingBasis);
+            renderEntitiesToContainer(leftEntities, leftEntityType, leftList, leftSortingBasis, leftCaps);
+            renderEntitiesToContainer(rightEntities, rightEntityType, rightList, rightSortingBasis, rightCaps);
             equalizeComparisonRowHeights(leftList, rightList);
         }
 
@@ -441,9 +460,9 @@ export function displayEntities() {
         };
 
         const resultsHeader = document.querySelector("#results-section h2");
-        if (renderMode === DISPLAY_MODE_BAR_CHART) {
+        if (comparisonMode === DISPLAY_MODE_BAR_CHART) {
             resultsHeader.textContent = "Comparison Bar Charts";
-        } else if (renderMode === DISPLAY_MODE_BAR_RACE) {
+        } else if (comparisonMode === DISPLAY_MODE_BAR_RACE) {
             resultsHeader.textContent = raceCanRender
                 ? "Comparison Bar Chart Race"
                 : "Comparison Bar Charts (Race settings pending or Apply Filters required)";
@@ -456,13 +475,14 @@ export function displayEntities() {
         announceRenderedList(leftEntities.length + rightEntities.length, {
             comparison: true,
             entityType: leftEntityType,
-            renderMode: raceCanRender ? renderMode : DISPLAY_MODE_BAR_CHART
+            renderMode: raceCanRender ? comparisonMode : DISPLAY_MODE_BAR_CHART
         });
         return;
     }
 
-    const singleEntities = resolveDisplayEntities(leftPipeline, entityType, sortingBasis, xValue, maxPerArtist);
+    const singleEntities = resolveDisplayEntities(leftPipeline, entityType, sortingBasis, xValue, caps);
     state.filteredData = singleEntities;
+    offerGraph(entityType, sortingBasis, xValue, leftPipeline.tracks, singleEntities);
     const resultsTarget = document.getElementById("results");
 
     if (renderMode === DISPLAY_MODE_BAR_CHART) {
@@ -478,7 +498,7 @@ export function displayEntities() {
             renderBarChartEntities(singleEntities, entityType, sortingBasis, resultsTarget);
         }
     } else {
-        renderEntitiesToContainer(singleEntities, entityType, resultsTarget, sortingBasis);
+        renderEntitiesToContainer(singleEntities, entityType, resultsTarget, sortingBasis, caps);
     }
 
     state.lastRenderedListState = {
@@ -523,9 +543,22 @@ function announceRenderedList(count, listInfo) {
     document.dispatchEvent(new CustomEvent("lists:rendered", { detail: { count, ...listInfo } }));
 }
 
-function displayScrobbles(scrobbles, targetDiv = null, order = "asc") {
+// "Graph over time" opens the list on screen in the graph builder: its top
+// items, ranked the same way, counted over the plays the list uses.
+function offerGraph(entityType, sortingBasis, xValue, tracks, entities) {
+    const graphable = entityType !== "scrobble" && entities.length > 0;
+    const plural = { track: "Tracks", album: "Albums", artist: "Artists" }[entityType];
+    const sortLabel = document.querySelector(`#sorting-basis option[value="${sortingBasis}"]`)?.textContent.trim().toLowerCase() || sortingBasis;
+    state.graphableList = graphable
+        ? { entityType, sortingBasis, xValue, tracks, entities: entities.slice(0, 10), title: `${plural} by ${sortLabel}` }
+        : null;
+    const button = document.getElementById("graph-this-list");
+    if (button) button.hidden = !graphable;
+}
+
+function displayScrobbles(scrobbles, targetDiv = null, order = "asc", caps = currentEntityCaps()) {
     const resultsDiv = targetDiv || document.getElementById("results");
-    const maxPerArtist = parseInt(document.getElementById("max-per-artist").value) || Infinity;
+    const admit = makeCapCounter("scrobble", caps);
     const listLength = getListLengthLimit();
     let tracks = [...scrobbles];
     resultsDiv.innerHTML = "";
@@ -537,17 +570,12 @@ function displayScrobbles(scrobbles, targetDiv = null, order = "asc") {
         return order === "desc" ? bDate - aDate : aDate - bDate;
     });
 
-    // Apply the per-artist cap BEFORE trimming to the list length, otherwise a
-    // capped artist eats slots and the list comes back shorter than requested.
-    const artistCounts = {};
+    // Apply the caps BEFORE trimming to the list length, otherwise a capped
+    // artist eats slots and the list comes back shorter than requested.
     const visible = [];
     for (const track of tracks) {
         if (visible.length >= listLength) break;
-        const artist = track.Artist;
-        if (!artistCounts[artist]) artistCounts[artist] = 0;
-        if (artistCounts[artist] >= maxPerArtist) continue;
-        artistCounts[artist]++;
-        visible.push(track);
+        if (admit(track)) visible.push(track);
     }
 
     visible.forEach((track) => {
