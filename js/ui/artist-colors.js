@@ -55,14 +55,29 @@ function changed() {
     document.dispatchEvent(new CustomEvent("artist-colors:changed"));
 }
 
-function save() {
+// Charts repaint at once; the write to storage waits until a drag in the
+// color picker settles.
+let saveTimer = null;
+function writeStore() {
+    clearTimeout(saveTimer);
+    saveTimer = null;
     try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
     } catch (e) {
         // Private windows can refuse storage; the colors still last the visit.
     }
+}
+
+function save() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(writeStore, 200);
     changed();
 }
+
+// A pick made just before the tab closes still gets saved.
+window.addEventListener("pagehide", () => {
+    if (saveTimer) writeStore();
+});
 
 // The picked color for a name (any capitalisation), or null.
 export function customColor(name) {

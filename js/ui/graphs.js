@@ -21,7 +21,7 @@ const MAX_SERIES = 8;
 const MAX_POINTS = 1000;
 // Rank graphs rebuild the whole list for every point; past this many play
 // visits they take too long, and a longer period is the better choice.
-const MAX_RANK_WORK = 250_000_000;
+const MAX_RANK_WORK = 60_000_000;
 
 const SCROBBLE_ORDER_SORTS = new Set(["earliest-to-latest", "latest-to-earliest"]);
 const DATE_SORTS = new Set(["first-n-scrobbles", "oldest-average-listening-time", "newest-average-listening-time"]);
@@ -174,6 +174,9 @@ const pause = () => new Promise(resolve => setTimeout(resolve, 0));
 // Returns { labels, values: [series][point] } or { error }.
 async function computeLines(onProgress) {
     const run = ++generation;
+    // Lines added or removed while this runs start a new run; this one
+    // keeps to the lines it started with.
+    const lines = [...graph.series];
     const plays = sourcePlays();
     if (!plays.length) return { error: "There are no plays in this date range." };
     const timeline = [];
@@ -187,7 +190,7 @@ async function computeLines(onProgress) {
     const metric = graph.metric;
     const x = parseInt(graph.x, 10) || getDefaultXValue(metric);
     const cumulative = graph.scope === "cumulative";
-    const values = graph.series.map(() => new Array(timeline.length).fill(null));
+    const values = lines.map(() => new Array(timeline.length).fill(null));
     const empty = ZERO_WHEN_EMPTY.has(metric) && graph.show === "value" ? 0 : null;
     let lastPause = performance.now();
     const breathe = async (done) => {
@@ -203,7 +206,7 @@ async function computeLines(onProgress) {
         if (work > MAX_RANK_WORK) {
             return { error: "Ranking every point takes too long for this many plays. Pick a longer period or a shorter date range." };
         }
-        const types = [...new Set(graph.series.map(series => series.type))];
+        const types = [...new Set(lines.map(series => series.type))];
         let pointer = 0;
         let periodFrom = 0;
         for (let index = 0; index < timeline.length; index++) {
@@ -218,7 +221,7 @@ async function computeLines(onProgress) {
                         const key = entityKey(entity, type);
                         if (!ranks.has(key)) ranks.set(key, position + 1);
                     });
-                    graph.series.forEach((series, seriesIndex) => {
+                    lines.forEach((series, seriesIndex) => {
                         if (series.type === type) values[seriesIndex][index] = ranks.get(series.key) ?? null;
                     });
                 });
@@ -226,8 +229,8 @@ async function computeLines(onProgress) {
             if (!(await breathe(index / timeline.length))) return null;
         }
     } else {
-        for (let seriesIndex = 0; seriesIndex < graph.series.length; seriesIndex++) {
-            const series = graph.series[seriesIndex];
+        for (let seriesIndex = 0; seriesIndex < lines.length; seriesIndex++) {
+            const series = lines[seriesIndex];
             const own = plays.filter(playMatcher(series));
             let pointer = 0;
             let periodFrom = 0;
@@ -247,12 +250,13 @@ async function computeLines(onProgress) {
                     values[seriesIndex][index] = value ?? empty;
                     previous = { size: subset.length, value: values[seriesIndex][index] };
                 }
+                if (!(await breathe((seriesIndex + index / timeline.length) / lines.length))) return null;
             }
-            if (!(await breathe((seriesIndex + 1) / graph.series.length))) return null;
         }
     }
     if (run !== generation) return null;
     return {
+        keys: lines.map(series => series.key).join("\n"),
         labels: timeline.map(start => periodLabel(start, graph.period)),
         ticks: timeline.map(start => periodLabel(start, graph.period, true)),
         values
@@ -303,9 +307,15 @@ function recolorChart() {
     chart.update("none");
 }
 
+// Whether the last result still belongs to the lines on screen; while a
+// newer run works, a redraw would pair old values with new names.
+function resultMatches() {
+    return Boolean(lastResult) && lastResult.keys === graph.series.map(series => series.key).join("\n");
+}
+
 function drawChart() {
     const canvas = document.getElementById("graph-canvas");
-    if (!canvas || !lastResult || typeof Chart === "undefined") return;
+    if (!canvas || !resultMatches() || typeof Chart === "undefined") return;
     const { labels, values } = lastResult;
     const colors = seriesColors();
     const rank = graph.show === "rank";
@@ -418,6 +428,19 @@ function el(tag, className, text) {
     return node;
 }
 
+// The controls are rebuilt on every change, so each has a key and focus
+// goes back to the same control afterwards; keyboard users don't get
+// thrown back to the top of the page.
+function focusedKey() {
+    const active = document.activeElement;
+    return active && section.contains(active) ? active.dataset.focus || null : null;
+}
+
+function restoreFocus(key) {
+    if (!key) return;
+    section.querySelector(`[data-focus="${CSS.escape(key)}"]`)?.focus();
+}
+
 function segmented(name, options, current, onChange) {
     const group = el("div", "graph-segmented");
     group.setAttribute("role", "radiogroup");
@@ -429,6 +452,7 @@ function segmented(name, options, current, onChange) {
         button.setAttribute("aria-checked", String(value === current));
         button.classList.toggle("is-active", value === current);
         button.disabled = Boolean(disabled);
+        button.dataset.focus = `${name}:${value}`;
         button.addEventListener("click", () => onChange(value));
         group.appendChild(button);
     });
@@ -472,7 +496,12 @@ function topFive(type) {
     return buildEntitiesFromTracks(plays, type, graph.metric, x).slice(0, 5).map(entity => makeSeries(entityIdentity(entity, type)));
 }
 
-function renderSeries() {
+function renderSeries(focus = focusedKey()) {
+    buildSeries();
+    restoreFocus(focus);
+}
+
+function buildSeries() {
     const box = section.querySelector(".graph-series");
     box.innerHTML = "";
     const colors = seriesColors();
@@ -486,6 +515,7 @@ function renderSeries() {
         swatch.setAttribute("aria-label", `Color for ${series.label}`);
         swatch.setAttribute("aria-haspopup", "dialog");
         swatch.setAttribute("aria-expanded", "false");
+        swatch.dataset.focus = `swatch:${series.key}`;
         swatch.addEventListener("click", () => {
             const custom = Boolean(customColor(series.label));
             openColorPicker(swatch, seriesColors()[graph.series.indexOf(series)], color => setCustomColor(series.label, color), {
@@ -501,9 +531,12 @@ function renderSeries() {
         remove.type = "button";
         remove.title = "Remove";
         remove.setAttribute("aria-label", `Remove ${series.label}`);
+        remove.dataset.focus = `remove:${series.key}`;
         remove.addEventListener("click", () => {
+            // Focus moves on to the next line's ×, or to Add after the last.
+            const next = graph.series[index + 1] || graph.series[index - 1];
             graph.series.splice(index, 1);
-            renderSeries();
+            renderSeries(next ? `remove:${next.key}` : "add-open");
             refresh();
         });
         chip.append(swatch, text, remove);
@@ -514,6 +547,7 @@ function renderSeries() {
         if (graph.series.length < MAX_SERIES) {
             const open = el("button", "graph-chip graph-add-open");
             open.type = "button";
+            open.dataset.focus = "add-open";
             open.innerHTML = '<i class="fas fa-plus" aria-hidden="true"></i> Add';
             open.addEventListener("click", () => {
                 adding = true;
@@ -527,6 +561,7 @@ function renderSeries() {
 
     const form = el("form", "graph-add");
     const typeSelect = document.createElement("select");
+    typeSelect.dataset.focus = "add-type";
     typeSelect.setAttribute("aria-label", "What to add");
     Object.entries(TYPE_NAMES).forEach(([value, label]) => {
         const option = el("option", "", `${label}s`);
@@ -539,6 +574,7 @@ function renderSeries() {
     input.placeholder = `${TYPE_NAMES[addType]} name`;
     input.setAttribute("aria-label", input.placeholder);
     input.setAttribute("list", "graph-names");
+    input.dataset.focus = "add-input";
     input.autocomplete = "off";
     const options = document.createElement("datalist");
     options.id = "graph-names";
@@ -547,6 +583,7 @@ function renderSeries() {
     add.type = "submit";
     const top = el("button", "graph-chip", `My top 5 ${TYPE_NAMES[addType].toLowerCase()}s`);
     top.type = "button";
+    top.dataset.focus = "add-top";
     top.title = graph.source ? "Replace the lines with the top 5 of your list" : "Replace the lines with your top 5";
     const done = el("button", "graph-chip", "Done");
     done.type = "button";
@@ -559,8 +596,7 @@ function renderSeries() {
 
     typeSelect.addEventListener("change", () => {
         addType = typeSelect.value;
-        renderSeries();
-        section.querySelector(".graph-add input")?.focus();
+        renderSeries("add-type");
     });
     form.addEventListener("submit", (event) => {
         event.preventDefault();
@@ -584,12 +620,12 @@ function renderSeries() {
     top.addEventListener("click", () => {
         graph.series = topFive(addType);
         adding = false;
-        renderSeries();
+        renderSeries("add-open");
         refresh();
     });
     done.addEventListener("click", () => {
         adding = false;
-        renderSeries();
+        renderSeries("add-open");
     });
 }
 
@@ -616,10 +652,17 @@ function currentPreset() {
 // Below the graph: the kind of graph and the period, which is what most
 // people change. Everything else waits behind Customize.
 function renderControls() {
+    const focus = focusedKey();
+    buildControls();
+    restoreFocus(focus);
+}
+
+function buildControls() {
     const main = section.querySelector(".graph-main-settings");
     main.innerHTML = "";
 
     const kind = document.createElement("select");
+    kind.dataset.focus = "graph-kind";
     const active = currentPreset();
     PRESETS.forEach(preset => {
         const option = el("option", "", preset.label);
@@ -646,6 +689,7 @@ function renderControls() {
 
     const toggle = el("button", "graph-chip graph-customize");
     toggle.type = "button";
+    toggle.dataset.focus = "customize";
     toggle.setAttribute("aria-expanded", String(customizing));
     toggle.innerHTML = `<i class="fas fa-sliders" aria-hidden="true"></i> Customize`;
     toggle.addEventListener("click", () => {
@@ -660,6 +704,7 @@ function renderControls() {
     if (!customizing) return;
 
     const metric = document.createElement("select");
+    metric.dataset.focus = "measure";
     metricOptions().forEach(({ value, label }) => {
         const option = el("option", "", label);
         option.value = value;
@@ -674,6 +719,7 @@ function renderControls() {
         const x = document.createElement("input");
         x.type = "number";
         x.min = "1";
+        x.dataset.focus = "x";
         x.value = graph.x || String(getDefaultXValue(graph.metric));
         x.addEventListener("change", () => update({ x: x.value }));
         box.appendChild(field("X", x));
@@ -704,14 +750,21 @@ function renderControls() {
         ["linear", "Linear"], ["logarithmic", "Log"]
     ], graph.scale, value => update({ scale: value }))));
 
-    const from = document.createElement("input");
-    from.type = "date";
-    from.value = graph.from;
-    from.addEventListener("change", () => update({ from: from.value }));
-    const to = document.createElement("input");
-    to.type = "date";
-    to.value = graph.to;
-    to.addEventListener("change", () => update({ to: to.value }));
+    // Typing a date fires a change for every digit of the year (year 2,
+    // then 20, then 202), so only a cleared box or a full year counts.
+    const dateInput = (key) => {
+        const input = document.createElement("input");
+        input.type = "date";
+        input.value = graph[key];
+        input.dataset.focus = key;
+        input.addEventListener("change", () => {
+            const year = parseInt(input.value.slice(0, 4), 10);
+            if (input.value === "" || year >= 1900) update({ [key]: input.value });
+        });
+        return input;
+    };
+    const from = dateInput("from");
+    const to = dateInput("to");
     box.append(field("From", from), field("To", to));
 }
 
@@ -755,6 +808,7 @@ async function refresh() {
     dirty = false;
     announce();
     if (!graph.series.length) {
+        generation += 1;
         lastResult = null;
         if (chart) chart.destroy();
         chart = null;
@@ -812,7 +866,9 @@ function build() {
 
 function showGraphs() {
     build();
+    // Also picks up a theme change made on another tab.
     if (dirty) refresh();
+    else drawChart();
 }
 
 // A list from the Lists tab: its top items, ranked the way the list ranks
@@ -875,12 +931,16 @@ function openEntity({ type, name, artist }) {
 
 const LINE_PREFIXES = { artist: "a", album: "al", track: "t" };
 const PREFIX_TYPES = { a: "artist", al: "album", t: "track" };
+// A | inside a name would look like the one between title and artist.
+const escapeBar = (text) => text.replace(/%/g, "%25").replace(/\|/g, "%7C");
+const unescapeBar = (text) => text.replace(/%7C/gi, "|").replace(/%25/g, "%");
+
 const RANK_LIMITS = { 10: "10", 25: "25", 50: "50", 100: "100", 0: "all" };
 
 export function graphLinkPairs(listPairs) {
     const pairs = [["view", "graphs"]];
     graph.series.forEach(series => {
-        pairs.push(["g.line", `${LINE_PREFIXES[series.type]}:${series.type === "artist" ? series.name : `${series.name}|${series.artist}`}`]);
+        pairs.push(["g.line", `${LINE_PREFIXES[series.type]}:${series.type === "artist" ? series.name : `${escapeBar(series.name)}|${escapeBar(series.artist)}`}`]);
     });
     if (graph.metric !== "scrobbles") pairs.push(["g.measure", graph.metric]);
     if (graph.x) pairs.push(["g.x", graph.x]);
@@ -891,7 +951,12 @@ export function graphLinkPairs(listPairs) {
     if (graph.scale === "logarithmic") pairs.push(["g.scale", "log"]);
     if (graph.from) pairs.push(["g.from", graph.from]);
     if (graph.to) pairs.push(["g.to", graph.to]);
-    if (graph.source) pairs.push(["g.plays", "list"], ...listPairs());
+    if (graph.source) {
+        // The list as it was when the graph was opened, even if the Lists
+        // tab has changed since.
+        if (!graph.source.pairs) graph.source.pairs = listPairs();
+        pairs.push(["g.plays", "list"], ...graph.source.pairs);
+    }
     pairs.push(...colorLinkPairs(graph.series.map(series => series.label.toLowerCase())));
     return pairs;
 }
@@ -905,10 +970,10 @@ export function openGraphFromLink(params) {
         const type = PREFIX_TYPES[value.slice(0, split)];
         if (split < 1 || !type) return null;
         const rest = value.slice(split + 1);
-        const bar = rest.lastIndexOf("|");
         if (type === "artist") return makeSeries({ type, name: rest, artist: rest });
-        if (bar < 1) return null;
-        return makeSeries({ type, name: rest.slice(0, bar), artist: rest.slice(bar + 1) });
+        const bar = rest.indexOf("|");
+        if (bar < 0) return null;
+        return makeSeries({ type, name: unescapeBar(rest.slice(0, bar)), artist: unescapeBar(rest.slice(bar + 1)) });
     }).filter(Boolean).slice(0, MAX_SERIES);
     // A link with no lines starts from the visitor's own top 5 artists.
     if (!graph.series.length) graph.series = topEntities("artist").slice(0, 5);
@@ -939,7 +1004,7 @@ export function openGraphFromLink(params) {
 
 function downloadPng() {
     const canvas = document.getElementById("graph-canvas");
-    if (!canvas || !chart) return;
+    if (!canvas || !chart || !resultMatches()) return;
     trackEvent("graphs/download", "Graphs: downloaded a PNG");
     const ratio = canvas.width / canvas.clientWidth;
     const pad = 16 * ratio;

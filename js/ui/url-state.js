@@ -243,5 +243,12 @@ export function applySettings(settings) {
 document.addEventListener("list:rendered", syncUrl);
 document.addEventListener("view:changed", syncUrl);
 document.addEventListener("artist-colors:shown", syncUrl);
-document.addEventListener("artist-colors:changed", syncUrl);
+// Dragging in the color picker changes the color many times a second;
+// browsers limit how often the address can change, so it waits until the
+// drag settles.
+let colorSyncTimer = null;
+document.addEventListener("artist-colors:changed", () => {
+    clearTimeout(colorSyncTimer);
+    colorSyncTimer = setTimeout(syncUrl, 250);
+});
 document.addEventListener("graph:changed", syncUrl);

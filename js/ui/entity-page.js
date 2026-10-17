@@ -578,7 +578,9 @@ if (section) {
         if (target.closest('[data-action="back"]')) { backToList(); return; }
         if (target.closest('[data-action="graph"]')) {
             const { type, name, artist } = page.entity;
-            hideEntityView();
+            // A history entry of its own, like going back to a list, so
+            // Back returns to this page.
+            leaveForList();
             document.dispatchEvent(new CustomEvent("graphs:open-entity", { detail: { type, name, artist } }));
             return;
         }
