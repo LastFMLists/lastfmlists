@@ -316,6 +316,8 @@ function equalizeComparisonRowHeights(leftContainer, rightContainer) {
 export function displayEntities() {
     destroyVisualizationState();
     ensureRaceDateDefaults();
+    // The address bar follows the list on screen (ui/url-state.js).
+    document.dispatchEvent(new CustomEvent("list:rendered"));
 
     const initialEntityType = document.getElementById("entity-type").value;
     const initialSortingBasis = document.getElementById("sorting-basis").value;

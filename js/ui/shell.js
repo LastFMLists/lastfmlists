@@ -130,6 +130,17 @@ if (themeToggleButton) {
 
 // ---- View switching (Explore / Lists / Games) ----
 const VIEWS = ["explore", "lists", "games"];
+const VIEW_STORAGE_KEY = "lastfmlists-view";
+
+// The tab used last, so a returning visitor lands where they left off.
+export function rememberedView() {
+    try {
+        const view = localStorage.getItem(VIEW_STORAGE_KEY);
+        return VIEWS.includes(view) ? view : null;
+    } catch (e) {
+        return null;
+    }
+}
 
 export function getActiveView() {
     if (document.body.classList.contains("view-games")) return "games";
@@ -149,6 +160,13 @@ export function setActiveView(view) {
     });
     if (games) hlShowHome();
     else hlClearTimer();
+    if (document.body.classList.contains("app-loaded")) {
+        try {
+            localStorage.setItem(VIEW_STORAGE_KEY, view);
+        } catch (e) {
+            // Storage blocked: the next visit starts on Explore.
+        }
+    }
     document.dispatchEvent(new CustomEvent("view:changed", { detail: { view } }));
 }
 

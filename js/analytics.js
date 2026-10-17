@@ -131,6 +131,7 @@ const BUTTON_EVENTS = {
     "confirm-export-grid": ["export/grid", "Export grid"],
     "tab-games": ["view/games", "Games tab opened"],
     "tab-explore": ["view/explore", "Explore tab opened"],
+    "tab-lists": ["view/lists", "Lists tab opened"],
     "ftl-start": ["game/fill-the-list", "Fill the List started"]
 };
 

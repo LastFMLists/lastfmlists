@@ -720,7 +720,7 @@ document.querySelectorAll('.dropdown').forEach(dropdown => {
     });
 });
 
-function syncEntitySortingSelectors() {
+export function syncEntitySortingSelectors() {
     const entityElement = document.getElementById("entity-type");
     const sortingElement = document.getElementById("sorting-basis");
     if (!entityElement || !sortingElement) return;

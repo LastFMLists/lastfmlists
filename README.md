@@ -27,6 +27,8 @@ work. Serve the folder over HTTP instead (`python3 -m http.server`).
 
 Unreleased:
 
+- Lists can be shared as links. The address bar holds the username and the list's settings (?user=name&type=artist&sort=consecutive-days&year=2024), including both sides of a comparison and the equations. Opening a link loads that user and shows the same list; a link without user= applies its settings to whoever loads their own data. Refreshing keeps the list. Page views sent to GoatCounter count the path only, never the username or settings.
+- The first visit lands on Explore; later visits open the tab you used last.
 - The Equations menu is a step editor, ported from the Android app. Each step is picked from a list (Keep matching plays, Order plays, Keep first per value, Show value), fields have readable names, either side of a condition can be a field, number, text or a calculation, and steps can be moved and removed. A short guide has one-click examples. The text form is still there as the Advanced text editor, which points out mistakes and switches back to steps once the text is valid.
 - On phones the session panel scrolls away with the page instead of covering a third of the screen.
 - Explore boxes keep their height while they are worked out, so the page doesn't shift and section jumps land where they should.
@@ -42,7 +44,6 @@ Unreleased:
 - Fixed Save Data during the check for new scrobbles, which replaced the saved history with an empty one.
 - Apply Filters, Reset, the display mode and comparison wait until loading finishes, since the list on screen is only a preview until then. Filters set up during the load apply when it finishes.
 - Search engines and link previews: a robots.txt, a sitemap, link preview tags for Reddit, Discord and other sites, and a description of the site's features that search engines can read.
-- Refreshing the page resets the filters, instead of showing old filters the list wasn't using.
 - Long loads can run in another tab. The tab title shows the loading progress and "✓ Ready" when your lists are done, and after 10 seconds a "Notify me when it's done" button can send a browser notification when loading finishes or fails. The browser asks for permission only when you click it.
 - Anonymous usage counts through GoatCounter: visits, list types, filters, games, entity pages, exports, library size ranges, and page and data load times as ranges. No usernames, names or scrobbles are sent.
 - Album covers in lists. Last.fm sends a cover with every scrobble, so most covers need no extra requests. Covers are saved with the rest of your data, and any that are missing are looked up when their row scrolls into view. Tracks use the cover of the album you played them from most, and artists use the cover of their most-played album.

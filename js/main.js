@@ -18,6 +18,7 @@ import { ensureRaceDateDefaults, updateRaceControlsVisibility } from './ui/chart
 import './ui/entity-page.js';
 import './ui/equation-editor.js';
 import './ui/explore.js';
+import { applySettings, startFromUrl, takePendingSettings } from './ui/url-state.js';
 import './ui/export.js';
 import { initFilterControls } from './ui/filter-controls.js';
 import { failLoadNotice, finishLoadNotice, startLoadNotice } from './ui/load-notice.js';
@@ -36,7 +37,7 @@ import {
     datasetHasExtendedMetadata,
     enableGamesTab,
     setAppLoadedState,
-    getActiveView,
+    rememberedView,
     setActiveView,
     setListControlsLocked,
     showLoadError,
@@ -338,8 +339,11 @@ document.getElementById("username-form").addEventListener("submit", async (event
 
     state.historyLoad = null;
     setListControlsLocked(false);
-    // Explore is where a finished load lands; the list is one tab away.
-    if (getActiveView() === "lists") setActiveView("explore");
+    // A link's list settings open that list. Otherwise the first visit lands
+    // on Explore and later ones on the tab used last.
+    const linkSettings = takePendingSettings();
+    if (linkSettings) applySettings(linkSettings);
+    else setActiveView(rememberedView() || "explore");
     if (history.progress) {
         // Some pages never arrived. The lists work, but say what's missing and
         // how to fill the gap: a saved copy remembers the missing pages.
@@ -418,4 +422,7 @@ document.addEventListener("DOMContentLoaded", () => {
             menu.style.display = "none";
         });
     });
+
+    // A link with a username loads it; its list settings apply after loading.
+    startFromUrl();
 });
