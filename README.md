@@ -28,6 +28,7 @@ work. Serve the folder over HTTP instead (`python3 -m http.server`).
 
 Unreleased:
 
+- The Options button in a Fill the List round is now called Back to menu, since it ends the round and returns to the setup screen.
 - Graphs take up to ten lines, and every line gets a color of its own: ten line colors in each theme, checked for colorblind and normal vision. Lines past the sixth (fifth in dark mode) all used to come out the same purple. Automatic colors still step around any color you picked that looks like one of them.
 - On an artist, album or track page none of the Explore, Lists, Graphs and Games tabs is lit, and each of them leaves the page for its view, the one the page was opened from included. Clicking Explore or Graphs on a page used to do nothing.
 - The browser's Back and Forward buttons step through the tabs you switched between, and back onto an artist, album or track page with the tab it was opened from underneath. Back used to skip tab switches, so a page opened from Explore could return to Graphs.

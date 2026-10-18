@@ -65,7 +65,7 @@ The site picks a top 10 list from the user's library, shows what the list is (fo
 - One puzzle at a time, with a New list button for the next one. There is no daily puzzle, because every library is different.
 - An optional time limit of 1, 2 or 5 minutes. Without one, the round lasts until the player asks to see the answers.
 - Showing the answers fills in the missed entries and marks them.
-- An Options button during a round goes back to the setup screen.
+- A Back to menu button during a round ends it and goes back to the setup screen.
 
 ### Setup screen
 
@@ -131,7 +131,7 @@ Three rules keep the puzzles varied.
 
 If a draw is rejected, the generator tries again: up to 25 times per category, across every enabled category. If nothing new turns up, it uses the overall top 10 of an enabled type. If that was also played recently, it allows lists from the recent 20 again, except the list from the round just played. This means the game keeps going for as long as the player wants, and the same list never comes up twice in a row.
 
-The memory of recent lists is kept when the player goes back to Options and starts again, so changing a setting does not bring back the lists just played. Reloading the page clears it.
+The memory of recent lists is kept when the player goes back to the menu and starts again, so changing a setting does not bring back the lists just played. Reloading the page clears it.
 
 ### Answer matching
 
