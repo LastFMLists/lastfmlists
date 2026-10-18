@@ -21,8 +21,17 @@ export const PALETTE = {
     dark: ["#3987e5", "#c98500", "#d55181", "#008300"]
 };
 const OTHER = { light: "#bdbab0", dark: "#4b5568" };
-// Offered when someone adds an artist and the starting colors are taken.
-const EXTRA_SUGGESTIONS = ["#8a5cd1", "#00a3a3", "#d1495b", "#7a4a1f", "#5c6bc0", "#c2185b"];
+// Graph lines take these in order, and adding an artist to a chart offers
+// them: the starting colors, then violet, rust, teal, wine, lime and indigo.
+// Validated with the dataviz palette validator against #FFFCF8 and #1E293B:
+// neighbors pass colorblind and normal vision in both themes, and the
+// closest pair overall is 13.5 apart in light and 12.3 in dark (OKLab x100).
+// Lines can cross any other line, so every line also has its name in the
+// legend and the tooltip.
+const LINE_PALETTE = {
+    light: [...PALETTE.light, "#8b55d9", "#c75d14", "#23b3ad", "#8f1d40", "#86b52c", "#3a3fae"],
+    dark: [...PALETTE.dark, "#9b70e6", "#ad5216", "#1fa396", "#a3264c", "#73a12a", "#4b50d4"]
+};
 // Starting colors that look like a picked one are skipped, so two artists
 // never seem to share a color by accident: too close overall (OKLab
 // distance), or the same hue family, like a pink next to a light pink.
@@ -158,11 +167,29 @@ export function looksAlike(a, b) {
     return Math.min(turn, 360 - turn) < SAME_HUE_DEGREES;
 }
 
-// A color for a newly added name: a starting color, then a few extras,
-// skipping anything that looks like a color already in use.
+// A color for a newly added name: the first line color that looks like
+// none in use, or failing that the first one not in use at all.
 export function suggestColor(taken, theme) {
-    return [...PALETTE[theme], ...EXTRA_SUGGESTIONS].find(hex => taken.every(used => !looksAlike(hex, used)))
-        || EXTRA_SUGGESTIONS[0];
+    const colors = LINE_PALETTE[theme];
+    return colors.find(hex => taken.every(used => !looksAlike(hex, used)))
+        || colors.find(hex => !taken.includes(hex))
+        || colors[0];
+}
+
+// Colors for graph lines, given each line's picked color or null. Picked
+// colors stay; the other lines take the line colors in order, skipping any
+// that look like a picked one until there are no others left. Automatic
+// colors are only checked against picked ones: the line colors were chosen
+// to work together.
+export function lineColors(picked, theme) {
+    const chosen = picked.filter(Boolean);
+    const unused = LINE_PALETTE[theme].filter(hex => !chosen.includes(hex));
+    const order = [
+        ...unused.filter(hex => chosen.every(color => !looksAlike(hex, color))),
+        ...unused.filter(hex => chosen.some(color => looksAlike(hex, color)))
+    ];
+    let next = 0;
+    return picked.map(color => color || order[next++ % order.length]);
 }
 
 // Colors for the names in `order` (lowercase, most shown first). Picked
