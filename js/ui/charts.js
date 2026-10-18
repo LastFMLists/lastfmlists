@@ -91,6 +91,12 @@ function syncRacePlaybackSpeedFromInput() {
 function syncRaceToolbar() {
     const toolbar = state.raceToolbar;
     const race = state.activeRaceState;
+    if (toolbar?.fullscreen) {
+        const full = Boolean(document.fullscreenElement);
+        toolbar.fullscreen.innerHTML = `<i class="fas ${full ? "fa-compress" : "fa-expand"}" aria-hidden="true"></i>`;
+        toolbar.fullscreen.title = full ? "Leave full screen" : "Full screen";
+        toolbar.fullscreen.setAttribute("aria-label", toolbar.fullscreen.title);
+    }
     if (!toolbar) return;
     const playing = state.racePlaybackTimerId !== null;
     toolbar.play.innerHTML = playing ? '<i class="fas fa-pause" aria-hidden="true"></i>' : '<i class="fas fa-play" aria-hidden="true"></i>';
@@ -167,6 +173,58 @@ function toolbarButton(icon, label, onClick) {
     return button;
 }
 
+// The race gets a view of its own: the chart (or the two being compared)
+// sized to fit the window, with the controls underneath, like Graphs.
+export function createRaceView(container) {
+    const view = document.createElement("div");
+    view.className = "race-view";
+    const charts = document.createElement("div");
+    charts.className = "race-view-charts";
+    const controls = document.createElement("div");
+    controls.className = "race-controls";
+    view.append(charts, controls);
+    container.appendChild(view);
+    return { view, charts, controls };
+}
+
+// After Apply, the whole race view comes on screen.
+function revealRace(targetDiv) {
+    const view = targetDiv.closest(".race-view");
+    if (!view || !state.raceRenderArmed) return;
+    const box = view.getBoundingClientRect();
+    if (box.top < 0 || box.bottom > window.innerHeight) view.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+// Leaving full screen comes back to the same place on the page.
+let scrollBeforeFullscreen = null;
+
+function toggleRaceFullscreen(view) {
+    if (document.fullscreenElement) {
+        document.exitFullscreen?.();
+        return;
+    }
+    scrollBeforeFullscreen = window.scrollY;
+    view?.requestFullscreen?.().catch(() => { scrollBeforeFullscreen = null; });
+}
+
+document.addEventListener("fullscreenchange", () => {
+    syncRaceToolbar();
+    if (!document.fullscreenElement && scrollBeforeFullscreen !== null) {
+        const top = scrollBeforeFullscreen;
+        scrollBeforeFullscreen = null;
+        requestAnimationFrame(() => window.scrollTo({ top }));
+    }
+});
+
+function textButton(icon, label, onClick) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "race-text-button";
+    button.innerHTML = `<i class="fas ${icon}" aria-hidden="true"></i> ${label}`;
+    button.addEventListener("click", onClick);
+    return button;
+}
+
 export function insertRacePlaybackToolbar(targetDiv) {
     if (!targetDiv) return;
 
@@ -209,10 +267,33 @@ export function insertRacePlaybackToolbar(targetDiv) {
     );
 
     toolbar.append(transport, scrubber, speed);
-    targetDiv.prepend(toolbar);
+
+    // Under the playback controls: the legend's color tools on the left,
+    // the GIF and full screen on the right. The export dialog lives outside
+    // the race view, so full screen ends first.
+    const extras = document.createElement("div");
+    extras.className = "race-extras";
+    const toolsSlot = document.createElement("div");
+    toolsSlot.className = "race-tools-slot";
+    const actions = document.createElement("div");
+    actions.className = "race-actions";
+    const gif = textButton("fa-film", "Download GIF", async () => {
+        if (document.fullscreenElement) await document.exitFullscreen?.().catch(() => {});
+        document.getElementById("open-export-options")?.click();
+    });
+    actions.appendChild(gif);
+    const view = targetDiv.closest(".race-view");
+    let fullscreen = null;
+    if (view && document.fullscreenEnabled) {
+        fullscreen = toolbarButton("fa-expand", "Full screen", () => toggleRaceFullscreen(view));
+        fullscreen.classList.add("race-fullscreen");
+        actions.appendChild(fullscreen);
+    }
+    extras.append(toolsSlot, actions);
+    targetDiv.append(toolbar, extras);
 
     state.raceSpeedReadoutElement = readout;
-    state.raceToolbar = { play, scrubber };
+    state.raceToolbar = { play, scrubber, toolsSlot, fullscreen };
     syncRacePlaybackSpeedFromInput();
     syncRaceToolbar();
 }
@@ -893,7 +974,9 @@ function showRaceNote(targetDiv, text) {
     targetDiv.appendChild(note);
 }
 
-function mountRace(targetDiv, frames, entityType, sortingBasis) {
+// The first chart puts its color tools in the control bar; a second one,
+// when comparing, would only repeat them.
+function mountRace(targetDiv, frames, entityType, sortingBasis, { tools = state.raceToolbar?.toolsSlot } = {}) {
     targetDiv.innerHTML = "";
     const wrapper = document.createElement("div");
     wrapper.className = "race-wrapper";
@@ -902,7 +985,8 @@ function mountRace(targetDiv, frames, entityType, sortingBasis) {
         slots: getRaceSlots(),
         sortingBasis,
         entityType,
-        title: getRaceTitle(entityType, sortingBasis)
+        title: getRaceTitle(entityType, sortingBasis),
+        tools
     });
 }
 
@@ -964,6 +1048,7 @@ export async function renderBarRaceSingle(tracks, entityType, targetDiv, sorting
     }
     const chart = mountRace(targetDiv, frames, entityType, sortingBasis);
     setActiveRace("single", [chart], frames.length);
+    revealRace(targetDiv);
 }
 
 export async function renderBarRaceComparison(leftTracks, rightTracks, leftEntityType, rightEntityType, leftSortingBasis, rightSortingBasis, leftXValue, rightXValue, leftCaps, rightCaps, leftTargetDiv, rightTargetDiv) {
@@ -991,8 +1076,9 @@ export async function renderBarRaceComparison(leftTracks, rightTracks, leftEntit
     }
 
     const left = mountRace(leftTargetDiv, leftFrames, leftEntityType, leftSortingBasis);
-    const right = mountRace(rightTargetDiv, rightFrames, rightEntityType, rightSortingBasis);
+    const right = mountRace(rightTargetDiv, rightFrames, rightEntityType, rightSortingBasis, { tools: null });
     setActiveRace("comparison", [left, right], Math.max(leftFrames.length, rightFrames.length));
+    revealRace(leftTargetDiv);
 }
 
 const displayModeSelect = document.getElementById("display-mode");

@@ -28,6 +28,8 @@ work. Serve the folder over HTTP instead (`python3 -m http.server`).
 
 Unreleased:
 
+- The bar chart race has a view of its own: the chart is sized to fit the window, with every bar on screen (up to 20 fit on a 768px-tall laptop), and the controls sit underneath like in Graphs: play, scrub and speed, then Color an artist and the automatic colors, Download GIF and a full screen button. Rows, bars and text grow when there is room, Apply brings the whole race on screen, and the GIF uses the same rows. The export dialog says GIF when a race is on screen.
+- Turning "Color the top artists for me" off and on no longer moves the chart: the color tools have their own row, and the legend keeps its height while the chart is on screen.
 - The Options button in a Fill the List round is now called Back to menu, since it ends the round and returns to the setup screen.
 - Graphs take up to ten lines, and every line gets a color of its own: ten line colors in each theme, checked for colorblind and normal vision. Lines past the sixth (fifth in dark mode) all used to come out the same purple. Automatic colors still step around any color you picked that looks like one of them.
 - On an artist, album or track page none of the Explore, Lists, Graphs and Games tabs is lit, and each of them leaves the page for its view, the one the page was opened from included. Clicking Explore or Graphs on a page used to do nothing.

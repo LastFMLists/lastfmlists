@@ -1838,10 +1838,9 @@ label.inline-checkbox {
 
 .race-legend {
     display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem 1rem;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
     margin-bottom: 0.75rem;
     padding-bottom: 0.65rem;
     border-bottom: 1px solid var(--border-color);
@@ -2044,6 +2043,10 @@ button.race-swatch[aria-expanded="true"] {
     cursor: pointer;
 }
 
+.race-controls .race-legend-add {
+    background-color: var(--background-color);
+}
+
 .race-legend-add:hover,
 .race-legend-form button:hover {
     border-color: var(--primary-accent-color);
@@ -2087,11 +2090,86 @@ button.race-swatch[aria-expanded="true"] {
     color: var(--secondary-text-color);
 }
 
+/* The race view: the chart with the controls underneath, never taller than
+   the window, so the whole race is on screen at once (bar-race.js sizes the
+   rows to fit). Full screen gives it the whole screen. */
+.race-view {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    max-height: calc(100vh - 1.5rem);
+    max-height: calc(100dvh - 1.5rem);
+    scroll-margin-top: 0.75rem;
+}
+
+.race-view:fullscreen {
+    height: 100vh;
+    max-height: 100vh;
+    padding: 1.25rem 1.5rem;
+    justify-content: space-between;
+    background-color: var(--background-color);
+}
+
+.race-view-charts {
+    flex: 0 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+}
+
+.race-view .comparison-results {
+    align-items: start;
+}
+
+.race-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    padding: 0.7rem 0.9rem;
+    background-color: var(--sidebar-color);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+}
+
+.race-extras {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem 1rem;
+}
+
+.race-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-left: auto;
+}
+
+.race-text-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.4rem 0.8rem;
+    background-color: var(--background-color);
+    color: var(--primary-text-color);
+    border: 1px solid var(--border-color);
+    border-radius: 999px;
+    font: inherit;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.race-text-button:hover {
+    background-color: var(--accent-soft);
+    border-color: var(--primary-accent-color);
+}
+
 .race-playback-toolbar {
     display: flex;
     flex-wrap: wrap;
     gap: 0.6rem 1rem;
-    margin-bottom: 0.9rem;
     align-items: center;
 }
 
@@ -2102,7 +2180,8 @@ button.race-swatch[aria-expanded="true"] {
     gap: 0.35rem;
 }
 
-.race-playback-toolbar button {
+.race-playback-toolbar button,
+.race-actions button.race-fullscreen {
     width: 36px;
     height: 36px;
     padding: 0;
@@ -2127,7 +2206,8 @@ button.race-swatch[aria-expanded="true"] {
     border-color: var(--primary-accent-color);
 }
 
-.race-playback-toolbar button:hover {
+.race-playback-toolbar button:hover,
+.race-actions button.race-fullscreen:hover {
     background-color: var(--accent-soft);
     border-color: var(--primary-accent-color);
 }
@@ -2254,6 +2334,10 @@ button.race-swatch[aria-expanded="true"] {
 
 .export-options .inline-checkbox {
     margin: 0;
+}
+
+.export-options .inline-checkbox[hidden] {
+    display: none;
 }
 
 .export-options > button {
@@ -4834,6 +4918,16 @@ button.game-card:hover {
 @media (max-width: 768px) {
     .race-wrapper {
         padding: 10px 8px 8px;
+    }
+
+    /* Play buttons and speed share a row, the scrubber gets the next one. */
+    .race-speed {
+        margin-left: auto;
+    }
+
+    .race-scrubber {
+        order: 1;
+        flex-basis: 100%;
     }
 
     /* The two round buttons go above the lines, so lines sit two to a row. */

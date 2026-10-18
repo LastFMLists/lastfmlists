@@ -2,14 +2,35 @@
 // from its old rank to its new one and its value grows on the way, so the
 // race moves instead of swapping rows. Every bar carries its name and value,
 // the date and running total sit in the corner, and colors follow artists
-// for the whole race. The same drawing code makes the GIF export, so the
-// file looks like the page.
+// for the whole race. Rows grow and shrink so every bar fits in the race
+// view (charts.js) at once. The same drawing code makes the GIF export, so
+// the file looks like the page.
 
 import { formatDuration } from '../time.js';
 import { assignColors, createColorLegend, customColor, otherColor } from './artist-colors.js';
 
 // Share of each step that rank changes take.
 const RANK_MOVE_SHARE = 0.55;
+
+// Row heights the race picks between to fit its view, and the one it uses
+// outside a view. Below the smallest, the view scrolls instead.
+const MIN_ROW = 18;
+const MAX_ROW = 80;
+const DEFAULT_ROW = 36;
+// The GIF stays this wide at most, however wide the screen is.
+const MAX_GIF_WIDTH = 1280;
+
+// Bars and text grow with the rows: at 36px rows the bars are 24px with
+// 13px names, the sizes the race had before rows could grow.
+function rowSizes(rowHeight) {
+    const name = Math.max(12, Math.min(19, Math.round(rowHeight * 0.36)));
+    return {
+        bar: Math.max(8, Math.min(50, Math.round(rowHeight * 0.66))),
+        name,
+        artist: Math.max(10, Math.round(name * 0.82)),
+        value: Math.max(12, Math.min(17, Math.round(rowHeight * 0.33)))
+    };
+}
 
 const DATE_SORTS = new Set(["first-n-scrobbles", "oldest-average-listening-time", "newest-average-listening-time"]);
 
@@ -80,7 +101,10 @@ function roundedBar(ctx, x, y, width, height, radius) {
 
 // frames: [{ label, total, rows: [{ key, name, artist, value }] }], rows in
 // rank order, a few more than `slots` so bars can slide in from below.
-export function createRaceChart(container, frames, { slots, sortingBasis, entityType, title }) {
+// tools: where the legend's "Color an artist" and automatic-colors controls
+// go (the race view's control bar), null to leave them out, or undefined to
+// keep them in the legend.
+export function createRaceChart(container, frames, { slots, sortingBasis, entityType, title, tools }) {
     const font = getComputedStyle(document.body).fontFamily || "sans-serif";
     const showArtist = entityType !== "artist";
     const dateMetric = DATE_SORTS.has(sortingBasis);
@@ -138,6 +162,8 @@ export function createRaceChart(container, frames, { slots, sortingBasis, entity
         otherLabel,
         known: [...artistOrder, ...[...artistNames.keys()].filter(artist => !screenTime.has(artist))].map(artist => [artist, artistNames.get(artist)])
     });
+    if (tools) tools.appendChild(legend.tools);
+    else if (tools === null) legend.tools.remove();
     const stage = document.createElement("div");
     stage.className = "race-stage";
     const canvas = document.createElement("canvas");
@@ -146,8 +172,7 @@ export function createRaceChart(container, frames, { slots, sortingBasis, entity
     stage.appendChild(canvas);
     container.append(legend.el, stage);
 
-    const rowHeight = slots <= 12 ? 36 : slots <= 20 ? 30 : 24;
-    const barHeight = Math.min(24, rowHeight - 10);
+    let rowHeight = DEFAULT_ROW;
     let width = 0;
     let position = 0;
 
@@ -164,22 +189,23 @@ export function createRaceChart(container, frames, { slots, sortingBasis, entity
 
     // Room for the value at the tip of the longest bar: the widest value
     // anywhere in the race, so the bars don't rescale when one appears.
-    let widestValue = null;
-    function valueWidth(ctx) {
-        if (widestValue === null) {
-            ctx.font = `600 12px ${font}`;
-            widestValue = 0;
+    const widestValues = new Map();
+    function valueWidth(ctx, size) {
+        if (!widestValues.has(size)) {
+            ctx.font = `600 ${size}px ${font}`;
+            let widest = 0;
             frames.forEach(frame => frame.rows.slice(0, slots).forEach(row => {
-                widestValue = Math.max(widestValue, ctx.measureText(formatRaceValue(row.value, sortingBasis)).width);
+                widest = Math.max(widest, ctx.measureText(formatRaceValue(row.value, sortingBasis)).width);
             }));
+            widestValues.set(size, widest);
         }
-        return widestValue;
+        return widestValues.get(size);
     }
 
     // The header holds the title and legend on the left and the date on the
     // right, or the date under the legend when the chart is too narrow for
     // both. Keeping the date out of the plot means no bar ever runs into it.
-    function layout(ctx, totalWidth, withLegend) {
+    function layout(ctx, totalWidth, withLegend, rows = rowHeight) {
         const dateSize = Math.round(Math.min(36, Math.max(22, totalWidth / 26)));
         const dateWidth = widestDate(ctx, dateSize);
         const dateBeside = totalWidth - dateWidth - 24 >= 300;
@@ -210,7 +236,7 @@ export function createRaceChart(container, frames, { slots, sortingBasis, entity
         const headerHeight = Math.max(leftHeight, date.totalY + 6);
         const axisHeight = 22;
         const labelWidth = totalWidth < 480 ? Math.round(totalWidth * 0.4) : Math.min(Math.max(totalWidth * 0.3, 150), 280);
-        return { legendRows, legendWidth, date, headerHeight, axisHeight, labelWidth, height: headerHeight + axisHeight + slots * rowHeight + 10 };
+        return { legendRows, legendWidth, date, headerHeight, axisHeight, labelWidth, height: headerHeight + axisHeight + slots * rows + 10 };
     }
 
     // Draws the race at a fractional step: 3.4 is 40% of the way from step
@@ -226,9 +252,10 @@ export function createRaceChart(container, frames, { slots, sortingBasis, entity
         const b = indexed[Math.min(step + 1, last)];
         const frame = frames[t < 0.5 ? step : Math.min(step + 1, last)];
         const box = layout(ctx, totalWidth, withLegend);
+        const sizes = rowSizes(rowHeight);
         const plotTop = box.headerHeight + box.axisHeight;
         const plotLeft = box.labelWidth + 12;
-        const valueRoom = valueWidth(ctx) + 10;
+        const valueRoom = valueWidth(ctx, sizes.value) + 10;
         const plotWidth = Math.max(40, totalWidth - plotLeft - valueRoom);
 
         // Value scale, eased between steps so the axis never jumps.
@@ -320,38 +347,66 @@ export function createRaceChart(container, frames, { slots, sortingBasis, entity
         bars.forEach(bar => {
             const row = details.get(bar.key);
             const top = plotTop + bar.y * rowHeight;
-            const barTop = top + (rowHeight - barHeight) / 2;
+            const barTop = top + (rowHeight - sizes.bar) / 2;
             const middle = top + rowHeight / 2;
             // Fade bars in and out across the last slot.
             ctx.globalAlpha = Math.max(0, Math.min(1, slots - bar.y));
             const length = Math.max(2, scale(bar.value));
             ctx.fillStyle = colorOf(row);
-            roundedBar(ctx, plotLeft, barTop, length, barHeight, 4);
+            roundedBar(ctx, plotLeft, barTop, length, sizes.bar, Math.min(6, Math.max(4, sizes.bar / 6)));
 
             ctx.textAlign = "right";
             const nameRight = box.labelWidth;
             if (showArtist && rowHeight >= 30) {
+                // Title over artist, the pair centered on the bar.
+                const blockTop = middle - (sizes.name + sizes.artist + 2) / 2;
                 ctx.fillStyle = ink.primary;
-                ctx.font = `650 13px ${font}`;
-                ctx.fillText(fitText(ctx, row.name, box.labelWidth), nameRight, middle - 1);
+                ctx.font = `650 ${sizes.name}px ${font}`;
+                ctx.fillText(fitText(ctx, row.name, box.labelWidth), nameRight, blockTop + sizes.name * 0.85);
                 ctx.fillStyle = ink.secondary;
-                ctx.font = `500 11px ${font}`;
-                ctx.fillText(fitText(ctx, row.artist, box.labelWidth), nameRight, middle + 12);
+                ctx.font = `500 ${sizes.artist}px ${font}`;
+                ctx.fillText(fitText(ctx, row.artist, box.labelWidth), nameRight, blockTop + sizes.name + 2 + sizes.artist * 0.85);
             } else {
                 ctx.fillStyle = ink.primary;
-                ctx.font = `650 ${rowHeight >= 30 ? 13 : 12}px ${font}`;
+                ctx.font = `650 ${sizes.name}px ${font}`;
                 const text = showArtist ? `${row.name} · ${row.artist}` : row.name;
-                ctx.fillText(fitText(ctx, text, box.labelWidth), nameRight, middle + 4);
+                ctx.fillText(fitText(ctx, text, box.labelWidth), nameRight, middle + sizes.name * 0.33);
             }
 
             ctx.textAlign = "left";
             ctx.fillStyle = ink.secondary;
-            ctx.font = `600 12px ${font}`;
-            ctx.fillText(formatRaceValue(bar.value, sortingBasis), plotLeft + length + 6, middle + 4);
+            ctx.font = `600 ${sizes.value}px ${font}`;
+            ctx.fillText(formatRaceValue(bar.value, sortingBasis), plotLeft + length + 6, middle + sizes.value * 0.33);
         });
         ctx.restore();
         ctx.globalAlpha = 1;
         return box.height;
+    }
+
+    // The row height that fits every bar in the race view: its tallest
+    // allowed height, less everything in it besides this canvas. The parts
+    // are added up rather than read off the view, which in full screen is
+    // as tall as the screen whatever is in it.
+    function fitRows(probe, totalWidth) {
+        const view = container.closest(".race-view");
+        const styles = view ? getComputedStyle(view) : null;
+        // Full screen lifts max-height; the view is then the screen's height.
+        const room = !styles ? NaN : document.fullscreenElement === view ? view.offsetHeight : parseFloat(styles.maxHeight);
+        if (!Number.isFinite(room)) return DEFAULT_ROW;
+        const charts = view.querySelector(".race-view-charts");
+        const controls = view.querySelector(".race-controls");
+        const px = (name) => parseFloat(styles[name]) || 0;
+        // Above and below this canvas inside the charts area: its legend and,
+        // when comparing, its column heading. The other column doesn't count.
+        const canvasBox = canvas.getBoundingClientRect();
+        const chartsTop = charts ? charts.getBoundingClientRect().top - charts.scrollTop : canvasBox.top;
+        const beside = (canvasBox.top - chartsTop) + (container.getBoundingClientRect().bottom - canvasBox.bottom);
+        const around = px("paddingTop") + px("paddingBottom") + px("borderTopWidth") + px("borderBottomWidth")
+            + px("rowGap") * (view.children.length - 1)
+            + (controls ? controls.offsetHeight : 0)
+            + beside;
+        const chrome = layout(probe, totalWidth, false, 0).height;
+        return Math.max(MIN_ROW, Math.min(MAX_ROW, Math.floor((room - around - chrome) / slots)));
     }
 
     function draw(at = position) {
@@ -362,6 +417,7 @@ export function createRaceChart(container, frames, { slots, sortingBasis, entity
         colors = assignColors(artistOrder, artistNames, theme);
         legend.sync(colors, theme);
         const probe = canvas.getContext("2d");
+        rowHeight = fitRows(probe, nextWidth);
         const height = layout(probe, nextWidth, false).height;
         if (nextWidth !== width || canvas.height !== Math.round(height * ratio)) {
             width = nextWidth;
@@ -379,25 +435,30 @@ export function createRaceChart(container, frames, { slots, sortingBasis, entity
     }
 
     // A flat copy at 1x for the GIF, on the page background, since GIF has
-    // no transparency.
+    // no transparency. Same rows as on screen, so every bar is in it too.
     function snapshot(at) {
         readTheme();
         colors = assignColors(artistOrder, artistNames, theme);
         const out = document.createElement("canvas");
         const probe = out.getContext("2d");
-        const height = layout(probe, width, true).height;
-        out.width = width + 24;
+        const gifWidth = Math.min(width, MAX_GIF_WIDTH);
+        const height = layout(probe, gifWidth, true).height;
+        out.width = gifWidth + 24;
         out.height = height + 24;
         const ctx = out.getContext("2d");
         ctx.fillStyle = ink.surface;
         ctx.fillRect(0, 0, out.width, out.height);
         ctx.translate(12, 12);
-        renderTo(ctx, width, at, true);
+        renderTo(ctx, gifWidth, at, true);
         return out;
     }
 
+    // A new width redraws, and so does a new window height or full screen,
+    // which change the room the rows have.
     const resize = typeof ResizeObserver !== "undefined" ? new ResizeObserver(() => draw()) : null;
     if (resize) resize.observe(stage);
+    const onWindowResize = () => draw();
+    window.addEventListener("resize", onWindowResize);
 
     draw(0);
     return {
@@ -406,6 +467,7 @@ export function createRaceChart(container, frames, { slots, sortingBasis, entity
         artists: artistOrder,
         destroy() {
             if (resize) resize.disconnect();
+            window.removeEventListener("resize", onWindowResize);
         }
     };
 }
