@@ -9,7 +9,7 @@ import { trackEvent } from '../analytics.js';
 import { buildEntitiesFromTracks } from '../data/filters.js';
 import { getDefaultXValue, isSortingBasisUsingXValue } from '../data/metrics.js';
 import { state } from '../state.js';
-import { clearCustomColor, colorLinkPairs, customColor, setCustomColor, suggestColor } from './artist-colors.js';
+import { clearCustomColor, colorLinkPairs, customColor, lineColors, setCustomColor } from './artist-colors.js';
 import { openColorPicker } from './color-picker.js';
 import { formatRaceValue } from './bar-race.js';
 import { getEntityMetricValue } from './charts.js';
@@ -17,7 +17,7 @@ import { getActiveView, setActiveView } from './shell.js';
 
 const section = document.getElementById("graphs-section");
 
-const MAX_SERIES = 8;
+const MAX_SERIES = 10;
 const MAX_POINTS = 1000;
 // Rank graphs rebuild the whole list for every point; past this many play
 // visits they take too long, and a longer period is the better choice.
@@ -298,18 +298,8 @@ function cssVar(name, fallback) {
     return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
 }
 
-// Picked colors first, then starting colors that don't look like any color
-// already on the graph.
 function seriesColors() {
-    const theme = themeName();
-    const picked = graph.series.map(series => customColor(series.label));
-    const taken = picked.filter(Boolean);
-    return picked.map(color => {
-        if (color) return color;
-        const next = suggestColor(taken, theme);
-        taken.push(next);
-        return next;
-    });
+    return lineColors(graph.series.map(series => customColor(series.label)), themeName());
 }
 
 function formatValue(value) {

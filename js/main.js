@@ -40,6 +40,7 @@ import {
     enableGamesTab,
     setAppLoadedState,
     rememberedView,
+    replacingViewHistory,
     setActiveView,
     setListControlsLocked,
     showLoadError,
@@ -346,9 +347,11 @@ document.getElementById("username-form").addEventListener("submit", async (event
     // first visit lands on Explore and later ones on the tab used last.
     const linkSettings = takePendingSettings();
     const linkGraph = takePendingGraph();
-    if (linkSettings) applySettings(linkSettings);
-    if (linkGraph) openGraphFromLink(linkGraph);
-    else if (!linkSettings) setActiveView(rememberedView() || "explore");
+    replacingViewHistory(() => {
+        if (linkSettings) applySettings(linkSettings);
+        if (linkGraph) openGraphFromLink(linkGraph);
+        else if (!linkSettings) setActiveView(rememberedView() || "explore");
+    });
     if (history.progress) {
         // Some pages never arrived. The lists work, but say what's missing and
         // how to fill the gap: a saved copy remembers the missing pages.

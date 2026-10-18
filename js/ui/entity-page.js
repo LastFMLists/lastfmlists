@@ -30,6 +30,7 @@ import {
 import { escapeHTML } from '../dom.js';
 import { state } from '../state.js';
 import { openListQuery } from './filters-panel.js';
+import { getActiveView, restoreViewFromHistory, syncViewTabs } from './shell.js';
 
 const section = document.getElementById("entity-section");
 
@@ -104,6 +105,7 @@ function isOpen() {
 function hideEntityView() {
     saveView();
     document.body.classList.remove("view-entity");
+    syncViewTabs();
     if (section) section.hidden = true;
     page = null;
 }
@@ -117,9 +119,10 @@ export function openEntityPage(identity, { push = true } = {}) {
     if (push) {
         trackEvent(`entity/${entity.type}`, `Entity page: ${entity.type}`);
         const depth = (history.state && history.state.lfmEntity ? history.state.depth || 0 : 0) + 1;
-        history.pushState({ lfmEntity: { ...entity }, depth }, "");
+        history.pushState({ lfmEntity: { ...entity }, depth, view: getActiveView() }, "");
     }
     document.body.classList.add("view-entity");
+    syncViewTabs();
     section.hidden = false;
     const restored = push ? null : savedViews.get(entity.key);
     section.classList.add("is-entering");
@@ -137,13 +140,18 @@ function backToList() {
     }
 }
 
-// Leave the page for a list. A new history entry means Back returns here.
-function leaveForList() {
+// Leave the page for a view, so that Back returns here. Going to another
+// view, setActiveView adds the history entry; staying on the view underneath
+// needs one of its own.
+function leaveFor(view) {
+    const stays = view === getActiveView();
     hideEntityView();
-    history.pushState({ lfmList: true }, "");
+    if (stays) history.pushState({ lfmList: true, view }, "");
 }
 
 window.addEventListener("popstate", (event) => {
+    // The view first, so a page opened on top of it names it on its back button.
+    restoreViewFromHistory(event.state);
     const entity = event.state && event.state.lfmEntity;
     if (entity) openEntityPage(entity, { push: false });
     else if (isOpen()) hideEntityView();
@@ -157,7 +165,7 @@ function openLink(link, highlight = null) {
         ? Math.max(50, Math.ceil((link.rank + 5) / 50) * 50)
         : (scoped ? 0 : 100);
     const target = highlight || page.entity;
-    leaveForList();
+    leaveFor("lists");
     openListQuery(link.query, { listLength, highlight: target });
 }
 
@@ -578,9 +586,7 @@ if (section) {
         if (target.closest('[data-action="back"]')) { backToList(); return; }
         if (target.closest('[data-action="graph"]')) {
             const { type, name, artist } = page.entity;
-            // A history entry of its own, like going back to a list, so
-            // Back returns to this page.
-            leaveForList();
+            leaveFor("graphs");
             document.dispatchEvent(new CustomEvent("graphs:open-entity", { detail: { type, name, artist } }));
             return;
         }
@@ -592,7 +598,7 @@ if (section) {
         if (shortcut) {
             const { query, highlight } = shortcutQuery(shortcut.dataset.shortcut);
             const target = highlight || page.entity;
-            leaveForList();
+            leaveFor("lists");
             openListQuery({ sortingBasis: "scrobbles", xValue: "", ...query }, { listLength: 0, highlight: target });
             return;
         }
@@ -600,7 +606,7 @@ if (section) {
         const milestoneOpen = target.closest("[data-milestone-open]");
         if (milestoneOpen) {
             const query = { entityType: page.entity.type, sortingBasis: milestoneOpen.dataset.milestoneOpen, xValue: String(page.milestone), filters: {} };
-            leaveForList();
+            leaveFor("lists");
             openListQuery(query, { listLength: 100 });
             return;
         }
@@ -695,16 +701,23 @@ if (results) {
 
 // Anything that changes the list closes the page first.
 function closeForListChange() {
-    if (isOpen()) leaveForList();
+    if (isOpen()) leaveFor(getActiveView());
 }
 
-["apply-filters", "reset-filters", "tab-lists"].forEach(id => {
+["apply-filters", "reset-filters"].forEach(id => {
     const element = document.getElementById(id);
     if (element) element.addEventListener("click", closeForListChange);
 });
 
-const gamesTab = document.getElementById("tab-games");
-if (gamesTab) gamesTab.addEventListener("click", () => { if (isOpen()) hideEntityView(); });
+// Every tab leaves the page for its view, the view the page was opened from
+// included. Capturing runs this before the tab's own handler, so the view is
+// visible again by the time it draws.
+const viewTabs = document.getElementById("view-tabs");
+if (viewTabs) viewTabs.addEventListener("click", (event) => {
+    const tab = event.target.closest(".view-tab");
+    if (!tab || tab.disabled || !isOpen()) return;
+    leaveFor(tab.dataset.view);
+}, true);
 
 const usernameForm = document.getElementById("username-form");
 if (usernameForm) usernameForm.addEventListener("submit", () => { if (isOpen()) hideEntityView(); });

@@ -154,18 +154,59 @@ export function getActiveView() {
     return "lists";
 }
 
-export function setActiveView(view) {
-    const previous = getActiveView();
-    const games = view === "games";
-    document.body.classList.toggle("view-games", games);
-    document.body.classList.toggle("view-explore", view === "explore");
-    document.body.classList.toggle("view-graphs", view === "graphs");
+// The lit tab is the view on screen. An artist, album or track page sits on
+// top of a view without being one, so no tab is lit while it is open.
+export function syncViewTabs() {
+    const view = document.body.classList.contains("view-entity") ? null : getActiveView();
     VIEWS.forEach(name => {
         const tab = document.getElementById(`tab-${name}`);
         if (!tab) return;
         tab.classList.toggle("is-active", name === view);
         tab.setAttribute("aria-pressed", String(name === view));
     });
+}
+
+// Each switch to another view is a history entry whose state names the view,
+// so Back returns to the tab before. Entity pages add their own entries on
+// top (entity-page.js). While a loaded history picks its first view, the
+// current entry is replaced instead, so Back doesn't step through startup.
+let replaceViewEntry = false;
+
+export function replacingViewHistory(run) {
+    replaceViewEntry = true;
+    try {
+        run();
+    } finally {
+        replaceViewEntry = false;
+    }
+}
+
+function recordView(view, previous) {
+    if (replaceViewEntry) {
+        history.replaceState({ view }, "");
+        return;
+    }
+    if (view === previous) return;
+    // An entry from before any view was recorded learns its own first, so
+    // going Back to it restores it.
+    if (!history.state || !history.state.view) history.replaceState({ ...history.state, view: previous }, "");
+    history.pushState({ view }, "");
+}
+
+// Back and Forward bring an entry's view back without adding an entry.
+export function restoreViewFromHistory(entry) {
+    const view = entry && entry.view;
+    if (VIEWS.includes(view) && view !== getActiveView()) setActiveView(view, { fromHistory: true });
+}
+
+export function setActiveView(view, { fromHistory = false } = {}) {
+    const previous = getActiveView();
+    const games = view === "games";
+    document.body.classList.toggle("view-games", games);
+    document.body.classList.toggle("view-explore", view === "explore");
+    document.body.classList.toggle("view-graphs", view === "graphs");
+    syncViewTabs();
+    if (!fromHistory && document.body.classList.contains("app-loaded")) recordView(view, previous);
     if (games) hlShowHome();
     else hlClearTimer();
     // Coming to Lists opens the filters; on phones the drawer would cover
