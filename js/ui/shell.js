@@ -154,18 +154,25 @@ export function getActiveView() {
     return "lists";
 }
 
-export function setActiveView(view) {
-    const previous = getActiveView();
-    const games = view === "games";
-    document.body.classList.toggle("view-games", games);
-    document.body.classList.toggle("view-explore", view === "explore");
-    document.body.classList.toggle("view-graphs", view === "graphs");
+// The lit tab is the view on screen. An artist, album or track page sits on
+// top of a view without being one, so no tab is lit while it is open.
+export function syncViewTabs() {
+    const view = document.body.classList.contains("view-entity") ? null : getActiveView();
     VIEWS.forEach(name => {
         const tab = document.getElementById(`tab-${name}`);
         if (!tab) return;
         tab.classList.toggle("is-active", name === view);
         tab.setAttribute("aria-pressed", String(name === view));
     });
+}
+
+export function setActiveView(view) {
+    const previous = getActiveView();
+    const games = view === "games";
+    document.body.classList.toggle("view-games", games);
+    document.body.classList.toggle("view-explore", view === "explore");
+    document.body.classList.toggle("view-graphs", view === "graphs");
+    syncViewTabs();
     if (games) hlShowHome();
     else hlClearTimer();
     // Coming to Lists opens the filters; on phones the drawer would cover

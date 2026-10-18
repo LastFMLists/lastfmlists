@@ -30,6 +30,7 @@ import {
 import { escapeHTML } from '../dom.js';
 import { state } from '../state.js';
 import { openListQuery } from './filters-panel.js';
+import { syncViewTabs } from './shell.js';
 
 const section = document.getElementById("entity-section");
 
@@ -104,6 +105,7 @@ function isOpen() {
 function hideEntityView() {
     saveView();
     document.body.classList.remove("view-entity");
+    syncViewTabs();
     if (section) section.hidden = true;
     page = null;
 }
@@ -120,6 +122,7 @@ export function openEntityPage(identity, { push = true } = {}) {
         history.pushState({ lfmEntity: { ...entity }, depth }, "");
     }
     document.body.classList.add("view-entity");
+    syncViewTabs();
     section.hidden = false;
     const restored = push ? null : savedViews.get(entity.key);
     section.classList.add("is-entering");
@@ -698,13 +701,21 @@ function closeForListChange() {
     if (isOpen()) leaveForList();
 }
 
-["apply-filters", "reset-filters", "tab-lists"].forEach(id => {
+["apply-filters", "reset-filters"].forEach(id => {
     const element = document.getElementById(id);
     if (element) element.addEventListener("click", closeForListChange);
 });
 
-const gamesTab = document.getElementById("tab-games");
-if (gamesTab) gamesTab.addEventListener("click", () => { if (isOpen()) hideEntityView(); });
+// Every tab leaves the page for its view, the view the page was opened from
+// included. Capturing runs this before the tab's own handler, so the view is
+// visible again by the time it draws.
+const viewTabs = document.getElementById("view-tabs");
+if (viewTabs) viewTabs.addEventListener("click", (event) => {
+    const tab = event.target.closest(".view-tab");
+    if (!tab || tab.disabled || !isOpen()) return;
+    if (tab.id === "tab-games") hideEntityView();
+    else leaveForList();
+}, true);
 
 const usernameForm = document.getElementById("username-form");
 if (usernameForm) usernameForm.addEventListener("submit", () => { if (isOpen()) hideEntityView(); });

@@ -28,6 +28,7 @@ work. Serve the folder over HTTP instead (`python3 -m http.server`).
 
 Unreleased:
 
+- On an artist, album or track page none of the Explore, Lists, Graphs and Games tabs is lit, and each of them leaves the page for its view, the one the page was opened from included. Clicking Explore or Graphs on a page used to do nothing.
 - On phones the Explore section chips (Highlights, Your year and so on) wrap onto a second line instead of hiding in a row you had to know to swipe.
 - Adding a line in Graphs starts on the kind of item already on the graph (albums for a graph of albums), and opening a list, a page or a link in Graphs closes an add form left open.
 - Link previews on Reddit, Discord and elsewhere show a wide image of a bar chart race and a graph instead of the square logo, and the descriptions mention the graphs.
