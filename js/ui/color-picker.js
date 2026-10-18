@@ -136,19 +136,23 @@ export function openColorPicker(anchor, color, onPick, { title = "Color", reset 
         closeColorPicker();
     });
 
-    document.body.appendChild(panel);
+    // A full-screen race shows only its own element, so the panel goes there.
+    const host = document.fullscreenElement || document.body;
+    host.appendChild(panel);
     paint();
 
     // Under the swatch, kept inside the window.
     const place = () => {
+        const scrollX = host === document.body ? window.scrollX : 0;
+        const scrollY = host === document.body ? window.scrollY : 0;
         const box = anchor.getBoundingClientRect();
         const width = panel.offsetWidth;
         const height = panel.offsetHeight;
         const left = Math.min(Math.max(8, box.left), window.innerWidth - width - 8);
         const below = box.bottom + 6;
         const top = below + height > window.innerHeight - 8 && box.top - height - 6 > 8 ? box.top - height - 6 : below;
-        panel.style.left = `${left + window.scrollX}px`;
-        panel.style.top = `${top + window.scrollY}px`;
+        panel.style.left = `${left + scrollX}px`;
+        panel.style.top = `${top + scrollY}px`;
     };
     place();
 

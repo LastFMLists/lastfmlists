@@ -27,6 +27,7 @@ import { escapeHTML, getListLengthLimit } from '../dom.js';
 import { state } from '../state.js';
 import { formatDuration } from '../time.js';
 import {
+    createRaceView,
     destroyVisualizationState,
     ensureRaceDateDefaults,
     hasRaceSettingsReady,
@@ -427,7 +428,9 @@ export function displayEntities() {
             renderBarChartEntities(rightEntities, rightEntityType, rightSortingBasis, rightList);
         } else if (comparisonMode === DISPLAY_MODE_BAR_RACE) {
             if (raceCanRender) {
-                insertRacePlaybackToolbar(resultsDiv);
+                const raceView = createRaceView(resultsDiv);
+                raceView.charts.appendChild(comparisonLayout);
+                insertRacePlaybackToolbar(raceView.controls);
                 renderBarRaceComparison(
                     leftPipeline.tracks,
                     rightPipeline.tracks,
@@ -490,10 +493,9 @@ export function displayEntities() {
     } else if (renderMode === DISPLAY_MODE_BAR_RACE) {
         if (raceCanRender) {
             resultsTarget.innerHTML = "";
-            insertRacePlaybackToolbar(resultsTarget);
-            const raceChartContainer = document.createElement("div");
-            resultsTarget.appendChild(raceChartContainer);
-            renderBarRaceSingle(leftPipeline.tracks, entityType, raceChartContainer, sortingBasis);
+            const raceView = createRaceView(resultsTarget);
+            insertRacePlaybackToolbar(raceView.controls);
+            renderBarRaceSingle(leftPipeline.tracks, entityType, raceView.charts, sortingBasis);
         } else {
             renderBarChartEntities(singleEntities, entityType, sortingBasis, resultsTarget);
         }

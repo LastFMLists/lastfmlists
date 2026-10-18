@@ -342,10 +342,24 @@ export function createColorLegend({ otherLabel, known, addLabel = "Color an arti
     const other = makeChip({ label: otherLabel }, { onPick: setOtherColor, onReset: () => setOtherColor(null) });
     other.el.classList.add("race-legend-other");
 
+    // The swatches only ever take more room while a chart is on screen, so
+    // turning automatic colors off and on doesn't move what sits under them.
+    // A new width starts over.
+    let heldWidth = 0;
+    function holdHeight() {
+        const width = items.clientWidth;
+        if (width !== heldWidth) {
+            heldWidth = width;
+            items.style.minHeight = "";
+        }
+        if (items.offsetHeight) items.style.minHeight = `${items.offsetHeight}px`;
+    }
+
     let signature = "";
     function sync(colors, theme) {
         current = colors;
         currentTheme = theme;
+        if (items.clientWidth !== heldWidth) signature = "";
         const next = `${theme}|${autoColorsOn()}|${colors.other}|${otherIsCustom()}|${colors.legend.map(item => `${item.key}:${item.color}:${item.custom}`).join("|")}`;
         if (next === signature) return;
         signature = next;
@@ -371,9 +385,10 @@ export function createColorLegend({ otherLabel, known, addLabel = "Color an arti
         other.update({ label: otherLabel, color: colors.other, custom: otherIsCustom() });
         items.appendChild(other.el);
         autoBox.checked = autoColorsOn();
+        holdHeight();
     }
 
-    return { el, sync };
+    return { el, tools, sync };
 }
 
 // ---- Colors in shared links ----
