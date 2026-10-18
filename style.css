@@ -443,18 +443,12 @@ body.app-loaded #input-section {
 
 #session-panel {
     display: none;
-    position: sticky;
-    top: 0.75rem;
-    z-index: 800;
     grid-template-columns: auto 1fr auto;
     align-items: center;
     gap: 0.75rem;
     padding: 0.55rem 0.8rem;
     margin-bottom: 1.1rem;
     background-color: var(--sidebar-color);
-    background-color: color-mix(in srgb, var(--sidebar-color) 82%, transparent);
-    -webkit-backdrop-filter: blur(14px);
-    backdrop-filter: blur(14px);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
     box-shadow: var(--shadow-sm);
@@ -3091,9 +3085,7 @@ footer a:hover {
         padding: 0.9rem 0.9rem 2.2rem;
     }
 
-    /* Too tall to keep on screen on a phone, so it scrolls away */
     #session-panel {
-        position: static;
         padding: 0.55rem 0.6rem;
     }
 
@@ -3403,7 +3395,7 @@ footer a:hover {
 
 .explore-group {
     padding-top: 0.9rem;
-    scroll-margin-top: calc(var(--explore-offset, 0px) + 0.75rem);
+    scroll-margin-top: 0.75rem;
 }
 
 .explore-group-head {

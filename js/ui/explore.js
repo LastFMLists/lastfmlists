@@ -373,15 +373,6 @@ export function showExplore() {
 
 // ---- Events ----
 
-// On wider screens the session panel sticks to the top, so a section jump
-// stops just below it. On phones it scrolls away and needs no room.
-function updateJumpOffset() {
-    const panel = document.getElementById("session-panel");
-    const style = panel ? getComputedStyle(panel) : null;
-    const offset = style && style.position === "sticky" ? panel.offsetHeight + (parseFloat(style.top) || 0) : 0;
-    sectionElement.style.setProperty("--explore-offset", `${offset}px`);
-}
-
 if (sectionElement) {
 
     document.addEventListener("view:changed", (event) => {
@@ -408,7 +399,6 @@ if (sectionElement) {
     sectionElement.addEventListener("click", (event) => {
         const chip = event.target.closest("[data-jump]");
         if (chip) {
-            updateJumpOffset();
             document.getElementById(`explore-${chip.dataset.jump}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
             return;
         }
