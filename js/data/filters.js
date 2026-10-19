@@ -8,7 +8,8 @@ import {
     serializeControlValue
 } from '../dom.js';
 import { state } from '../state.js';
-import { isWithinTimeRange } from '../time.js';
+import { hasKnownDate, isWithinTimeRange } from '../time.js';
+import { equationReadsTime } from './equations.js';
 import {
     calculateAverageListeningTime,
     calculateConsecutivePeriods,
@@ -192,6 +193,33 @@ export function applyEntityCaps(items, entityType, caps) {
     return items.filter(item => admit(item));
 }
 
+// Filters that look at when a play happened, its place in the history, or
+// when an entity was first or last played.
+const TIME_FILTER_IDS = new Set([
+    "year", "month", "day-of-month", "weekday",
+    "time-of-day-start", "time-of-day-end",
+    "session-starter-only", "day-starter-only",
+    "last-n-days", "date-range-start", "date-range-end",
+    "scrobble-order-from", "scrobble-order-to",
+    "artist-first-scrobble-years", "album-first-scrobble-years", "track-first-scrobble-years",
+    "artist-days-since-last-min", "artist-days-since-last-max",
+    "album-days-since-last-min", "album-days-since-last-max",
+    "track-days-since-last-min", "track-days-since-last-max"
+]);
+
+// The scrobbles with no date (state.undatedTracks) that belong in a list.
+// They only count where time plays no part: a plain scrobble count, with no
+// time filter and no equation step that reads a date. Scrobble lists are in
+// time order, so they never take them. With equation steps the other filters
+// are paused, as for the dated plays.
+export function undatedTracksFor({ filters = [], equations = "", entityType, sortingBasis }) {
+    const undated = state.undatedTracks || [];
+    if (!undated.length || entityType === "scrobble" || sortingBasis !== "scrobbles") return [];
+    if (equations) return equationReadsTime(equations) ? [] : undated;
+    if (filters.some(filter => TIME_FILTER_IDS.has(filter.id))) return [];
+    return filterTracks(filters, undated);
+}
+
 export function filterTracks(filtersOverride = null, sourceTracks = null) {
     const tracksSource = sourceTracks || state.allTracks;
     if (!tracksSource) return [];
@@ -366,39 +394,40 @@ export function filterTracks(filtersOverride = null, sourceTracks = null) {
         // Time-based filters
 
         "year": (item, value) => {
-            if (!item.Date || isNaN(item.Date)) return false;
+            if (!hasKnownDate(item)) return false;
             const selectedYears = value.split(",").map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n));
             const date = new Date(parseInt(item.Date, 10));
             return selectedYears.length === 0 || selectedYears.includes(date.getFullYear());
         },
     
         "month": (item, value) => {
-            if (!item.Date || isNaN(item.Date)) return false;
+            if (!hasKnownDate(item)) return false;
             const selectedMonths = parseSerializedNumberList(value);
             const month = new Date(parseInt(item.Date, 10)).getMonth() + 1;
             return selectedMonths.length === 0 || selectedMonths.includes(month);
         },
     
         "day-of-month": (item, value) => {
-            if (!item.Date || isNaN(item.Date)) return false;
+            if (!hasKnownDate(item)) return false;
             const selectedDays = value.split(",").map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n));
             const day = new Date(parseInt(item.Date, 10)).getDate();
             return selectedDays.length === 0 || selectedDays.includes(day);
         },
     
         "weekday": (item, value) => {
-            if (!item.Date || isNaN(item.Date)) return false;
+            if (!hasKnownDate(item)) return false;
             const selectedWeekdays = parseSerializedNumberList(value);
             const weekday = new Date(parseInt(item.Date, 10)).getDay();
             return selectedWeekdays.length === 0 || selectedWeekdays.includes(weekday);
         },
 
-        "time-of-day-start": (item, value) => isWithinTimeRange(item.Date, value, pairedValue("time-of-day-end")),
+        "time-of-day-start": (item, value) => hasKnownDate(item) && isWithinTimeRange(item.Date, value, pairedValue("time-of-day-end")),
 
-        "time-of-day-end": (item, value) => isWithinTimeRange(item.Date, pairedValue("time-of-day-start"), value),
+        "time-of-day-end": (item, value) => hasKnownDate(item) && isWithinTimeRange(item.Date, pairedValue("time-of-day-start"), value),
 
         "session-starter-only": (item, value) => {
             if (value !== "use-gap") return true;
+            if (!hasKnownDate(item)) return false;
             const previousTimestamp = state.previousScrobbleTimestampByOrder[item.order];
             if (previousTimestamp === null || previousTimestamp === undefined) return true;
             const configuredGap = parseFloat(pairedValue("day-starter-gap-hours"));
@@ -409,6 +438,7 @@ export function filterTracks(filtersOverride = null, sourceTracks = null) {
 
         "day-starter-only": (item, value) => {
             if (!value) return true;
+            if (!hasKnownDate(item)) return false;
 
             const isDayStarter = state.isFirstScrobbleOfDayByOrder[item.order] === true;
             const previousTimestamp = state.previousScrobbleTimestampByOrder[item.order];
@@ -431,18 +461,21 @@ export function filterTracks(filtersOverride = null, sourceTracks = null) {
         },
 
         "last-n-days": (item, value) => {
+            if (!hasKnownDate(item)) return false;
             const now = Date.now();
             return now - parseInt(item.Date) <= value * 86400000;
         },
 
         "date-range-start": (item, value) => {
             const startTime = parseLocalDateStart(value);
-            return startTime === null || item.Date >= startTime;
+            if (startTime === null) return true;
+            return hasKnownDate(item) && item.Date >= startTime;
         },
         "date-range-end": (item, value) => {
             // The day after the chosen one, so the whole end day is included.
             const endTime = parseLocalDateStart(value, 1);
-            return endTime === null || item.Date < endTime;
+            if (endTime === null) return true;
+            return hasKnownDate(item) && item.Date < endTime;
         },
 
         "scrobble-order-from": (item, value) => item.order >= parseInt(value, 10),

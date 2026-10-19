@@ -4,6 +4,10 @@
 export const state = {
     // Loaded scrobble history
     allTracks: [],
+    // Scrobbles Last.fm has no date for (Date is null). They are kept out of
+    // allTracks, which is in time order, and only join lists that count plays
+    // without looking at time (see undatedTracksFor in data/filters.js).
+    undatedTracks: [],
     lastfmData: [],
     filteredData: [],
 

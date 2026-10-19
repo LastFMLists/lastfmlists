@@ -21,7 +21,7 @@ import {
 } from '../config.js';
 import { escapeHTML, getListLengthLimit, loadingDiv, mapWithConcurrency } from '../dom.js';
 import { state } from '../state.js';
-import { getLocalDayKeyFromTimestamp } from '../time.js';
+import { getLocalDayKeyFromTimestamp, hasKnownDate, isKnownScrobbleTime } from '../time.js';
 import { displayEntities } from '../ui/lists.js';
 import { finishLoadNotice, setLoadProgress, startLoadNotice } from '../ui/load-notice.js';
 import { updateExtendedDataUI } from '../ui/shell.js';
@@ -354,15 +354,20 @@ function recentTrackList(data) {
     return list ? [list] : [];
 }
 
-// The scrobbles on a page that belong to the range. "Now playing" has no date,
-// and Last.fm may or may not count `from` itself as inside the range, so
-// anything at or before it is dropped here.
+// "Now playing" rides along on the first page but isn't a scrobble yet.
+function isScrobble(track) {
+    return Boolean(track) && String(track["@attr"]?.nowplaying) !== "true";
+}
+
+// The scrobbles on a page that belong to the range. Last.fm may or may not
+// count `from` itself as inside the range, so anything at or before it is
+// dropped here. Scrobbles with no date only come with the whole history.
 function rangeTracks(list, from) {
     const fromMs = from === null ? -Infinity : from * 1000;
     return list
-        .filter(track => track && track.date && track.date.uts)
+        .filter(isScrobble)
         .map(mapRecentTrack)
-        .filter(track => track.Date > fromMs);
+        .filter(track => hasKnownDate(track) ? track.Date > fromMs : from === null);
 }
 
 function serializeRange(range) {
@@ -376,7 +381,7 @@ async function fetchNewestScrobbleTime(username) {
     if (apiError) throw new Error(apiError);
     const list = recentTrackList(data);
     if (!list) throw new Error("Couldn't reach Last.fm. Check your connection and try again.");
-    const newest = list.find(track => track && track.date && track.date.uts);
+    const newest = list.find(track => isScrobble(track) && isKnownScrobbleTime(parseInt(track.date?.uts, 10) * 1000));
     return newest ? parseInt(newest.date.uts, 10) : null;
 }
 
@@ -398,7 +403,7 @@ async function openRange(username, from, anchor) {
     if (!list) throw new Error("Couldn't reach Last.fm. Check your connection and try again.");
 
     const total = parseInt(data.recenttracks["@attr"]?.total, 10) || 0;
-    const servedPageSize = Math.max(1, list.filter(track => track && track.date && track.date.uts).length);
+    const servedPageSize = Math.max(1, list.filter(isScrobble).length);
     const totalPages = total > 0 ? Math.max(1, Math.ceil(total / servedPageSize)) : 1;
     console.log(`History range: ${total} scrobbles, page size ${servedPageSize}, ${totalPages} pages.`);
 
@@ -464,7 +469,12 @@ async function walkRange(username, range, pages, onPage) {
 export async function loadHistory(username, saved, onPreview = null) {
     resetFetchThrottle();
 
-    const savedTracks = Array.isArray(saved?.allTracks) ? saved.allTracks.filter(track => track && track.Date) : [];
+    // Saves made before unknown dates were recognised still carry the 1969
+    // timestamps; they become Date null like freshly loaded ones.
+    const savedTracks = Array.isArray(saved?.allTracks) ? saved.allTracks.filter(Boolean) : [];
+    savedTracks.forEach(track => {
+        if (!hasKnownDate(track)) track.Date = null;
+    });
     let base = savedTracks;
     let range = null;
     let from = null;
@@ -503,7 +513,7 @@ export async function loadHistory(username, saved, onPreview = null) {
             fetchedAnything = true;
         } else {
             console.warn("The saved part of the history changed on Last.fm since it was saved; loading that part again.");
-            base = range.from === null ? [] : base.filter(track => parseInt(track.Date, 10) <= range.from * 1000);
+            base = range.from === null ? [] : base.filter(track => !hasKnownDate(track) || parseInt(track.Date, 10) <= range.from * 1000);
             range = null;
             fetchedAnything = true;
         }
@@ -598,7 +608,7 @@ export async function loadHistory(username, saved, onPreview = null) {
     let missing = 0;
     if (!complete) {
         const fromMs = range.from === null ? -Infinity : range.from * 1000;
-        const inRange = tracks.reduce((count, track) => count + (parseInt(track.Date, 10) > fromMs ? 1 : 0), 0);
+        const inRange = tracks.reduce((count, track) => count + ((hasKnownDate(track) ? Number(track.Date) > fromMs : range.from === null) ? 1 : 0), 0);
         missing = Math.max(0, range.total - inRange);
     }
     console.log(`History loaded: ${tracks.length} scrobbles${complete ? "" : `, about ${missing} still missing`}.`);

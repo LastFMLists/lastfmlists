@@ -127,6 +127,22 @@ export const equationFieldResolvers = {
 };
 
 const equationFieldNames = Object.keys(equationFieldResolvers).sort((a, b) => b.length - a.length);
+
+// Fields that read a play's date or place in time, or an entity's first or
+// last play.
+const TIME_FIELDS = [
+    "year", "month", "day-of-month", "weekday", "scrobble-order",
+    "artist-first-scrobble-year", "album-first-scrobble-year", "track-first-scrobble-year",
+    "artist-days-since-last", "album-days-since-last", "track-days-since-last",
+    "oldest-average-listening-time", "newest-average-listening-time"
+];
+
+// Whether any step of an equation uses time, which leaves out the scrobbles
+// that have no date.
+export function equationReadsTime(equationsInput) {
+    const text = (equationsInput || "").toLowerCase();
+    return TIME_FIELDS.some(field => text.includes(field));
+}
 const equationNumericFieldNames = [
     "artist-name-length",
     "album-name-length",

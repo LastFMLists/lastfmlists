@@ -7,6 +7,10 @@
 // stable sort, so a tie keeps whoever was played first in that period. The
 // helpers below count the same way: a Map keeps first-appearance order, and
 // rankInCounts walks it with that tie rule.
+//
+// Scrobbles with no date (state.undatedTracks) count where the linked list
+// takes them: plain play counts with no time filter. They come after the
+// dated plays there, so they are counted after them here too.
 
 import { state } from '../state.js';
 import { formatDuration } from '../time.js';
@@ -38,6 +42,12 @@ export function resultEntityKey(type, entity) {
     return entityKey(type, entity.name, entity.artist);
 }
 
+// Every loaded scrobble, the ones with no date last.
+export function withUndated() {
+    const undated = state.undatedTracks || [];
+    return undated.length ? state.allTracks.concat(undated) : state.allTracks;
+}
+
 function countByKey(scrobbles, type) {
     const counts = new Map();
     for (const scrobble of scrobbles) {
@@ -66,20 +76,22 @@ export function rankInCounts(counts, key) {
 
 let cacheSource = null;
 let cacheLength = -1;
+let cacheUndated = null;
 let caches = null;
 
 function getCaches() {
     const tracks = state.allTracks || [];
-    if (caches && cacheSource === tracks && cacheLength === tracks.length) return caches;
+    if (caches && cacheSource === tracks && cacheLength === tracks.length && cacheUndated === state.undatedTracks) return caches;
     cacheSource = tracks;
     cacheLength = tracks.length;
+    cacheUndated = state.undatedTracks;
     caches = { library: {}, periods: {}, sorts: new Map() };
     return caches;
 }
 
 export function libraryCounts(type) {
     const store = getCaches().library;
-    if (!store[type]) store[type] = countByKey(state.allTracks, type);
+    if (!store[type]) store[type] = countByKey(withUndated(), type);
     return store[type];
 }
 
@@ -148,9 +160,10 @@ function rankedLink(label, result, query, extra = {}) {
 
 // ---- The page's sections ----
 
-function scanCounts(type, predicate) {
+// Time-based predicates pass undated = false.
+function scanCounts(type, predicate, undated = true) {
     const counts = new Map();
-    for (const scrobble of state.allTracks) {
+    for (const scrobble of undated ? withUndated() : state.allTracks) {
         if (!predicate(scrobble)) continue;
         const key = scrobbleKey(type, scrobble);
         counts.set(key, (counts.get(key) || 0) + 1);
@@ -225,7 +238,7 @@ export const RECENT_DAY_WINDOWS = [7, 30, 90, 365];
 export function recentRanks(entity) {
     const now = Date.now();
     return RECENT_DAY_WINDOWS.map(days => {
-        const result = rankInCounts(scanCounts(entity.type, s => now - Number(s.Date) <= days * 86400000), entity.key);
+        const result = rankInCounts(scanCounts(entity.type, s => now - Number(s.Date) <= days * 86400000, false), entity.key);
         return rankedLink(`Last ${days} days`, result, listQuery(entity.type, { "last-n-days": String(days) }));
     });
 }
@@ -374,7 +387,7 @@ function sortIndex(type, sort, x) {
     const cacheKey = `${type}|${sort}|${x}`;
     const store = getCaches().sorts;
     if (store.has(cacheKey)) return store.get(cacheKey);
-    const entities = buildEntitiesFromTracks(state.allTracks, type, sort, x);
+    const entities = buildEntitiesFromTracks(sort === "scrobbles" ? withUndated() : state.allTracks, type, sort, x);
     const positions = new Map();
     entities.forEach((entity, index) => {
         const key = resultEntityKey(type, entity);
