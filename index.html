@@ -41,7 +41,7 @@
 			"Album cover collage grids",
 			"Side-by-side comparison of two lists",
 			"A page for every artist, album and track with your ranks and play history",
-			"Games: Higher or Lower, Fill the List and Put Them In Order"
+			"Games: Higher or Lower, Fill the List, Put Them In Order, Odd One Out and Common Thread"
 		],
 		"sameAs": ["https://github.com/LastFMLists/lastfmlists"]
 	}
@@ -735,6 +735,16 @@
                         <span class="game-card-title">Put Them In Order</span>
                         <span class="game-card-desc">Put three to five artists, albums or tracks in order by one statistic, such as total plays or first listen.</span>
                     </button>
+                    <button type="button" class="game-card" id="open-odd">
+                        <span class="game-card-icon"><i class="fas fa-shapes" aria-hidden="true"></i></span>
+                        <span class="game-card-title">Odd One Out</span>
+                        <span class="game-card-desc">Three of four artists, albums or tracks share a fact, such as more than 100 scrobbles. Find the one that doesn't.</span>
+                    </button>
+                    <button type="button" class="game-card" id="open-thread">
+                        <span class="game-card-icon"><i class="fas fa-link" aria-hidden="true"></i></span>
+                        <span class="game-card-title">Common Thread</span>
+                        <span class="game-card-desc">Four artists, albums or tracks and four statements about them. Pick the only one that is true for all four.</span>
+                    </button>
                 </div>
             </div>
 
@@ -885,6 +895,87 @@
                         <div class="hl-over-actions">
                             <button type="button" id="ord-again" class="hl-primary">Play again</button>
                             <button type="button" id="ord-over-change-type" class="hl-secondary">Change type</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="odd-game" class="odd-game" hidden>
+                <button type="button" class="hl-back" id="odd-back"><i class="fas fa-arrow-left" aria-hidden="true"></i> All games</button>
+
+                <div id="odd-setup" class="hl-setup game-options">
+                    <h2>Odd One Out</h2>
+                    <p class="game-options-intro">Each round names a fact that three of four items share, such as more than 100 scrobbles or first played in 2021. Pick the one it isn't true for. The values get closer to the line as your streak grows. Choose what to play with.</p>
+                    <div class="hl-type-choice">
+                        <button type="button" class="odd-type" data-type="artist"><i class="fas fa-microphone" aria-hidden="true"></i><span>Artists</span></button>
+                        <button type="button" class="odd-type" data-type="album"><i class="fas fa-compact-disc" aria-hidden="true"></i><span>Albums</span></button>
+                        <button type="button" class="odd-type" data-type="track"><i class="fas fa-music" aria-hidden="true"></i><span>Tracks</span></button>
+                    </div>
+                    <p id="odd-setup-note" class="hl-setup-note" hidden></p>
+                </div>
+
+                <div id="odd-play" class="odd-play" hidden>
+                    <div class="ord-topbar">
+                        <div>
+                            <div class="ord-title" id="odd-prompt"></div>
+                            <div class="ord-instruction">Which one is the odd one out?</div>
+                        </div>
+                        <span class="ftl-meta"><span id="odd-score"></span></span>
+                    </div>
+                    <div id="odd-options" class="odd-options"></div>
+                    <div id="odd-feedback" class="hl-feedback" aria-live="polite"></div>
+                    <div class="ftl-actions" id="odd-actions">
+                        <button type="button" id="odd-next" class="hl-primary" hidden>Next round</button>
+                        <button type="button" id="odd-change-type" class="hl-secondary">Change type</button>
+                    </div>
+
+                    <div id="odd-over" class="ord-over" hidden>
+                        <h3>Streak over</h3>
+                        <p class="hl-over-score">You reached <strong id="odd-final">0</strong>. Your best: <strong id="odd-best">0</strong>.</p>
+                        <div class="hl-over-actions">
+                            <button type="button" id="odd-again" class="hl-primary">Play again</button>
+                            <button type="button" id="odd-over-change-type" class="hl-secondary">Change type</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="thread-game" class="thread-game" hidden>
+                <button type="button" class="hl-back" id="thread-back"><i class="fas fa-arrow-left" aria-hidden="true"></i> All games</button>
+
+                <div id="thread-setup" class="hl-setup game-options">
+                    <h2>Common Thread</h2>
+                    <p class="game-options-intro">Each round shows four items and four statements about them. Only one statement is true for all four, and the others each miss for one or two of them. Choose what to play with.</p>
+                    <div class="hl-type-choice">
+                        <button type="button" class="thread-type" data-type="artist"><i class="fas fa-microphone" aria-hidden="true"></i><span>Artists</span></button>
+                        <button type="button" class="thread-type" data-type="album"><i class="fas fa-compact-disc" aria-hidden="true"></i><span>Albums</span></button>
+                        <button type="button" class="thread-type" data-type="track"><i class="fas fa-music" aria-hidden="true"></i><span>Tracks</span></button>
+                    </div>
+                    <p id="thread-setup-note" class="hl-setup-note" hidden></p>
+                </div>
+
+                <div id="thread-play" class="thread-play" hidden>
+                    <div class="ord-topbar">
+                        <div>
+                            <div class="ord-title">What do all four have in common?</div>
+                            <div class="ord-instruction">Only one statement is true for every one of them.</div>
+                        </div>
+                        <span class="ftl-meta"><span id="thread-score"></span></span>
+                    </div>
+                    <ul id="thread-items" class="thread-items"></ul>
+                    <div id="thread-statements" class="thread-statements"></div>
+                    <div id="thread-feedback" class="hl-feedback" aria-live="polite"></div>
+                    <div class="ftl-actions" id="thread-actions">
+                        <button type="button" id="thread-next" class="hl-primary" hidden>Next round</button>
+                        <button type="button" id="thread-change-type" class="hl-secondary">Change type</button>
+                    </div>
+
+                    <div id="thread-over" class="ord-over" hidden>
+                        <h3>Streak over</h3>
+                        <p class="hl-over-score">You reached <strong id="thread-final">0</strong>. Your best: <strong id="thread-best">0</strong>.</p>
+                        <div class="hl-over-actions">
+                            <button type="button" id="thread-again" class="hl-primary">Play again</button>
+                            <button type="button" id="thread-over-change-type" class="hl-secondary">Change type</button>
                         </div>
                     </div>
                 </div>

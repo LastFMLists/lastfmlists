@@ -6,6 +6,7 @@ import { getLocalDayKeyFromTimestamp } from '../time.js';
 import { FTL_MONTHS, ftlFormatDay, ftlRandom, ftlShuffle } from './fill-the-list.js';
 import { showCelebration } from './celebration.js';
 import { gamesRecords, saveGamesRecords } from './records.js';
+import { showGamePanel } from './screens.js';
 import {
     getScrobbleIndex,
     indexEntities,
@@ -469,10 +470,7 @@ function beginRun(type) {
 }
 
 export function ordOpenGame() {
-    document.getElementById("hl-game").hidden = true;
-    document.getElementById("ftl-game").hidden = true;
-    document.getElementById("games-home").hidden = true;
-    document.getElementById("ord-game").hidden = false;
+    showGamePanel("ord-game");
     ordShowSetup(false);
 }
 

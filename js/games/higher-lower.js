@@ -5,6 +5,7 @@ import { state } from '../state.js';
 import { ftlStopTimer } from './fill-the-list.js';
 import { showCelebration } from './celebration.js';
 import { gamesRecords, saveGamesRecords } from './records.js';
+import { showGamePanel } from './screens.js';
 
 // Fair-play pools: an item qualifies by rank OR by raw scrobble count, so
 // there's always enough to play even for a modest library.
@@ -207,22 +208,16 @@ export function hlClearTimer() {
 }
 
 // ---- Higher or Lower: screens ----
-// Shared "back to the games menu" used by both games.
+// Shared "back to the games menu" used by every game.
 export function hlShowHome() {
     hlClearTimer();
     ftlStopTimer();
-    document.getElementById("games-home").hidden = false;
-    document.getElementById("hl-game").hidden = true;
-    document.getElementById("ftl-game").hidden = true;
-    document.getElementById("ord-game").hidden = true;
+    showGamePanel("games-home");
 }
 
 export function hlOpenGame() {
     hlClearTimer();
-    document.getElementById("ftl-game").hidden = true;
-    document.getElementById("ord-game").hidden = true;
-    document.getElementById("games-home").hidden = true;
-    document.getElementById("hl-game").hidden = false;
+    showGamePanel("hl-game");
     hlShowSetup();
 }
 

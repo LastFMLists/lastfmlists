@@ -5,6 +5,7 @@ import { state } from '../state.js';
 import { getLocalDayKeyFromTimestamp } from '../time.js';
 import { showCelebration } from './celebration.js';
 import { gamesRecords, saveGamesRecords } from './records.js';
+import { showGamePanel } from './screens.js';
 import {
     FTL_MIN_SCROBBLES,
     getScrobbleIndex,
@@ -641,10 +642,7 @@ export function ftlNextPuzzle() {
 // ---- Fill the List: screens ----
 export function ftlOpenGame() {
     ftlStopTimer();
-    document.getElementById("hl-game").hidden = true;
-    document.getElementById("ord-game").hidden = true;
-    document.getElementById("games-home").hidden = true;
-    document.getElementById("ftl-game").hidden = false;
+    showGamePanel("ftl-game");
     ftlShowSetup(false);
 }
 

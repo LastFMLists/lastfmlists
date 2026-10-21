@@ -1,4 +1,4 @@
-// Wiring shared by the three games.
+// Wiring shared by the games.
 
 import { getActiveView, setActiveView } from '../ui/shell.js';
 import {
@@ -27,6 +27,22 @@ import {
     ordShowSetup,
     ordStart
 } from './ordering.js';
+import {
+    oddNextRound,
+    oddOpenGame,
+    oddPick,
+    oddRestartCurrent,
+    oddShowSetup,
+    oddStart
+} from './odd-one-out.js';
+import {
+    threadNextRound,
+    threadOpenGame,
+    threadPick,
+    threadRestartCurrent,
+    threadShowSetup,
+    threadStart
+} from './common-thread.js';
 import { loadGamesRecords } from './records.js';
 
 export function initGames() {
@@ -111,4 +127,30 @@ export function initGames() {
     if (ordOverChangeType) ordOverChangeType.addEventListener("click", () => ordShowSetup(false));
 
     initOrderingControls();
+
+    // Odd One Out and Common Thread share the same screens: a type choice, a
+    // round with a Next round button, and a run-over panel under the reveal.
+    const factGames = [
+        { prefix: "odd", open: oddOpenGame, start: oddStart, next: oddNextRound, setup: oddShowSetup, again: oddRestartCurrent },
+        { prefix: "thread", open: threadOpenGame, start: threadStart, next: threadNextRound, setup: threadShowSetup, again: threadRestartCurrent }
+    ];
+    for (const g of factGames) {
+        document.getElementById(`open-${g.prefix}`)?.addEventListener("click", g.open);
+        document.getElementById(`${g.prefix}-back`)?.addEventListener("click", hlShowHome);
+        document.querySelectorAll(`.${g.prefix}-type`).forEach(btn =>
+            btn.addEventListener("click", () => g.start(btn.dataset.type)));
+        document.getElementById(`${g.prefix}-next`)?.addEventListener("click", g.next);
+        document.getElementById(`${g.prefix}-again`)?.addEventListener("click", g.again);
+        document.getElementById(`${g.prefix}-change-type`)?.addEventListener("click", () => g.setup(false));
+        document.getElementById(`${g.prefix}-over-change-type`)?.addEventListener("click", () => g.setup(false));
+    }
+
+    document.getElementById("odd-options")?.addEventListener("click", (e) => {
+        const btn = e.target.closest(".odd-option");
+        if (btn) oddPick(btn.dataset.key);
+    });
+    document.getElementById("thread-statements")?.addEventListener("click", (e) => {
+        const btn = e.target.closest(".thread-statement");
+        if (btn) threadPick(Number(btn.dataset.index));
+    });
 }

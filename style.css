@@ -3791,7 +3791,9 @@ button.game-card:hover {
 }
 
 .hl-type,
-.ord-type {
+.ord-type,
+.odd-type,
+.thread-type {
     display: inline-flex;
     align-items: center;
     gap: 0.55rem;
@@ -3807,13 +3809,17 @@ button.game-card:hover {
 }
 
 .hl-type:hover,
-.ord-type:hover {
+.ord-type:hover,
+.odd-type:hover,
+.thread-type:hover {
     transform: translateY(-2px);
     border-color: var(--primary-accent-color);
 }
 
 .hl-type i,
-.ord-type i {
+.ord-type i,
+.odd-type i,
+.thread-type i {
     color: var(--primary-accent-color);
 }
 
@@ -4244,7 +4250,9 @@ button.game-card:hover {
 }
 
 .game-options .hl-type,
-.game-options .ord-type {
+.game-options .ord-type,
+.game-options .odd-type,
+.game-options .thread-type {
     flex-direction: column;
     justify-content: center;
     gap: 0.6rem;
@@ -4253,7 +4261,9 @@ button.game-card:hover {
 }
 
 .game-options .hl-type i,
-.game-options .ord-type i {
+.game-options .ord-type i,
+.game-options .odd-type i,
+.game-options .thread-type i {
     font-size: 1.6rem;
 }
 
@@ -4463,6 +4473,11 @@ button.game-card:hover {
     flex-wrap: wrap;
 }
 
+/* The row is hidden once a run ends, leaving the run-over panel's buttons. */
+.ftl-actions[hidden] {
+    display: none;
+}
+
 .ftl-flash {
     animation: ftlFlash 0.4s ease;
 }
@@ -4608,6 +4623,221 @@ button.game-card:hover {
     .ord-value {
         width: 100%;
         padding-left: 2.2em;
+    }
+}
+
+/* --- Odd One Out --- */
+
+.odd-options {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.8rem;
+    margin-bottom: 0.9rem;
+}
+
+.odd-option {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 1.1rem 0.7rem;
+    border: 2px solid var(--border-color);
+    border-radius: 16px;
+    background: var(--sidebar-color);
+    color: var(--primary-text-color);
+    text-align: center;
+    cursor: pointer;
+    transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+
+.odd-option:hover:not(.revealed) {
+    transform: translateY(-3px);
+    border-color: var(--primary-accent-color);
+    box-shadow: 0 8px 22px rgba(0, 0, 0, 0.12);
+}
+
+.odd-option.revealed {
+    cursor: default;
+}
+
+.entity-art.odd-option-art {
+    width: 72px;
+    height: 72px;
+    margin-bottom: 0.4rem;
+    border-radius: var(--radius-md);
+    font-size: 1.4rem;
+}
+
+.odd-option-name {
+    font-weight: 700;
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+}
+
+.odd-option-sub {
+    color: var(--secondary-text-color);
+    font-size: 0.88rem;
+    overflow-wrap: anywhere;
+}
+
+.odd-option-value {
+    margin-top: 0.3rem;
+    font-weight: 600;
+    font-size: 0.92rem;
+    color: var(--primary-text-color);
+}
+
+.odd-option-value:empty {
+    display: none;
+}
+
+.odd-option.correct {
+    border-color: #3fae6b;
+    background: rgba(63, 174, 107, 0.12);
+}
+
+.odd-option.wrong {
+    border-color: #d9534f;
+    background: rgba(217, 83, 79, 0.1);
+}
+
+@media (max-width: 700px) {
+    .odd-options {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+/* --- Common Thread --- */
+
+.thread-items {
+    list-style: none;
+    margin: 0 0 1rem;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.6rem;
+}
+
+.thread-item {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    min-width: 0;
+    padding: 0.6rem;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    background: var(--sidebar-color);
+}
+
+.thread-item-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.thread-item-name {
+    font-weight: 700;
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+}
+
+.thread-item-sub {
+    color: var(--secondary-text-color);
+    font-size: 0.85rem;
+    overflow-wrap: anywhere;
+}
+
+.thread-statements {
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    margin-bottom: 0.9rem;
+}
+
+.thread-statement {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.55rem;
+    padding: 0.8rem 1rem;
+    border: 2px solid var(--border-color);
+    border-radius: 12px;
+    background: var(--sidebar-color);
+    color: var(--primary-text-color);
+    font-size: 1rem;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 0.15s, transform 0.15s;
+}
+
+.thread-statement:hover:not(.revealed) {
+    border-color: var(--primary-accent-color);
+    transform: translateY(-2px);
+}
+
+.thread-statement.revealed {
+    cursor: default;
+}
+
+.thread-statement-text {
+    font-weight: 600;
+}
+
+.thread-checks {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.3rem 1rem;
+    font-size: 0.88rem;
+    color: var(--secondary-text-color);
+}
+
+.thread-checks:empty {
+    display: none;
+}
+
+.thread-check {
+    display: flex;
+    gap: 0.4rem;
+    align-items: baseline;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.thread-check strong {
+    color: var(--primary-text-color);
+}
+
+.thread-check.ok i {
+    color: #3fae6b;
+}
+
+.thread-check.no i {
+    color: #d9534f;
+}
+
+.thread-statement.correct {
+    border-color: #3fae6b;
+    background: rgba(63, 174, 107, 0.12);
+}
+
+.thread-statement.wrong {
+    border-color: #d9534f;
+    background: rgba(217, 83, 79, 0.1);
+}
+
+@media (max-width: 700px) {
+    .thread-items {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 560px) {
+    .thread-checks {
+        grid-template-columns: minmax(0, 1fr);
+    }
+    .entity-art.thread-item-art {
+        width: 38px;
+        height: 38px;
     }
 }
 
