@@ -313,7 +313,7 @@ const FACTS = [
             k === "more" ? `have a most played track with more than ${n(a)} scrobbles`
                 : k === "less" ? `have a most played track with fewer than ${n(a)} scrobbles`
                     : `have a most played track with between ${n(a)} and ${n(b)} scrobbles`),
-        show: st => `top track ${n(st.topTrack.count)}`
+        show: st => `top track: ${st.topTrack.name} (${n(st.topTrack.count)})`
     },
     {
         id: "albumcount", group: "counts", types: ["artist"], kind: "number", scale: "ratio",
