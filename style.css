@@ -4715,6 +4715,7 @@ button.game-card:hover {
     font-weight: 600;
     font-size: 0.92rem;
     color: var(--primary-text-color);
+    overflow-wrap: anywhere;
 }
 
 .odd-option-value:empty {
