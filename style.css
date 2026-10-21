@@ -4626,6 +4626,36 @@ button.game-card:hover {
     }
 }
 
+/* --- Odd One Out and Common Thread: the footer under a round --- */
+
+/* Once a round is answered, the result, Next round and the run-over panel
+   stick to the bottom of the screen while the reveal above is read. */
+.answered .game-footer {
+    position: sticky;
+    bottom: 0;
+    z-index: 5;
+    margin: 0 -0.75rem;
+    padding: 0.6rem 0.75rem 0.75rem;
+    background: var(--background-color);
+    border-top: 1px solid var(--border-color);
+    box-shadow: 0 -10px 24px -18px rgba(0, 0, 0, 0.35);
+}
+
+.game-footer .ftl-actions {
+    margin-top: 0.5rem;
+}
+
+.game-footer .ord-over {
+    margin-top: 0.4rem;
+    padding-top: 0;
+    border-top: none;
+}
+
+.game-footer .hl-over-score {
+    margin: 0.2rem 0 0.7rem;
+    font-size: 1rem;
+}
+
 /* --- Odd One Out --- */
 
 .odd-options {
