@@ -1,5 +1,6 @@
 // Odd One Out: three of four items share a fact, and you pick the one that doesn't.
 
+import { trackGameRound } from '../analytics.js';
 import { createArtworkElement } from '../data/artwork.js';
 import { escapeHTML } from '../dom.js';
 import { showCelebration } from './celebration.js';
@@ -59,6 +60,8 @@ export function oddPick(key) {
     // The footer with the result and Next round sticks to the bottom of the
     // screen from here, so it stays in reach while the values are read.
     document.getElementById("odd-play").classList.add("answered");
+    oddState.rounds += 1;
+    trackGameRound("odd-one-out", oddState.rounds);
     gamesRecords.oddPlayed = (gamesRecords.oddPlayed || 0) + 1;
     const fb = document.getElementById("odd-feedback");
     if (correct) {
@@ -111,7 +114,7 @@ export function oddRestartCurrent() {
 }
 
 function beginRun(type, memory = createFactMemory()) {
-    oddState = { type, memory, ctx: factContext(), streak: 0, round: null, picked: false };
+    oddState = { type, memory, ctx: factContext(), streak: 0, rounds: 0, round: null, picked: false };
     document.getElementById("odd-setup").hidden = true;
     document.getElementById("odd-play").hidden = false;
     oddNextRound();

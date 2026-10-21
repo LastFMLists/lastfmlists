@@ -8,6 +8,7 @@ The site has five games that use the scrobble library the user has already loade
 - Switching between Games and Lists takes one click. Nothing reloads and neither side loses its state.
 - Anything that needs extended metadata (durations, tags, global stats) only appears once `extendedDataLoaded` is true, the same flag the metadata filters use.
 - Personal records are kept in `localStorage`: the best Higher or Lower streak per entity type, the best Fill the List score, and the best Put Them In Order, Odd One Out and Common Thread streaks.
+- Anonymous counts go to GoatCounter (`js/analytics.js`): which game and entity type is started, each Play again after a miss, and how far a run gets. A run reports reaching 1, 5, 10, 20, 50 and 100 answered rounds (lists finished, in Fill the List), so the dashboard shows how many runs last that long without one count per round.
 - Every right answer shows a green "Correct!" confirmation in the middle of the screen. It springs in, settles and fades out, and it restarts on each answer, so quick answers in Fill the List each get their own. With reduced motion turned on, it appears and disappears without moving.
 
 ---

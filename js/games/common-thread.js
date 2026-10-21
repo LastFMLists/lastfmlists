@@ -1,6 +1,7 @@
 // Common Thread: four items and four statements, and only one statement holds
 // for all four.
 
+import { trackGameRound } from '../analytics.js';
 import { createArtworkElement } from '../data/artwork.js';
 import { escapeHTML } from '../dom.js';
 import { showCelebration } from './celebration.js';
@@ -75,6 +76,8 @@ export function threadPick(index) {
     // The revealed statements run past the screen, so the footer with the
     // result and Next round sticks to the bottom of it from here.
     document.getElementById("thread-play").classList.add("answered");
+    threadState.rounds += 1;
+    trackGameRound("common-thread", threadState.rounds);
     gamesRecords.threadPlayed = (gamesRecords.threadPlayed || 0) + 1;
     const fb = document.getElementById("thread-feedback");
     if (correct) {
@@ -127,7 +130,7 @@ export function threadRestartCurrent() {
 }
 
 function beginRun(type, memory = createFactMemory()) {
-    threadState = { type, memory, ctx: factContext(), streak: 0, round: null, picked: false };
+    threadState = { type, memory, ctx: factContext(), streak: 0, rounds: 0, round: null, picked: false };
     document.getElementById("thread-setup").hidden = true;
     document.getElementById("thread-play").hidden = false;
     threadNextRound();

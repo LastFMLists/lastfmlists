@@ -135,8 +135,30 @@ const BUTTON_EVENTS = {
     "tab-graphs": ["view/graphs", "Graphs tab opened"],
     "graph-this-list": ["graphs/from-list", "Opened a list in Graphs"],
     "tab-lists": ["view/lists", "Lists tab opened"],
-    "ftl-start": ["game/fill-the-list", "Fill the List started"]
+    "ftl-start": ["game/fill-the-list", "Fill the List started"],
+    "hl-again": ["game/higher-or-lower/play-again", "Higher or Lower: play again"],
+    "ord-again": ["game/put-them-in-order/play-again", "Put Them In Order: play again"],
+    "odd-again": ["game/odd-one-out/play-again", "Odd One Out: play again"],
+    "thread-again": ["game/common-thread/play-again", "Common Thread: play again"]
 };
+
+// How far a run got. A run reports each mark it passes, so
+// "game/odd-one-out/rounds-10" counts the runs that reached 10 answered rounds
+// (Fill the List: 10 lists finished since Start game). One event per round
+// would use up far more of the GoatCounter allowance.
+const GAME_ROUND_MARKS = [1, 5, 10, 20, 50, 100];
+const GAME_TITLES = {
+    "higher-or-lower": "Higher or Lower",
+    "fill-the-list": "Fill the List",
+    "put-them-in-order": "Put Them In Order",
+    "odd-one-out": "Odd One Out",
+    "common-thread": "Common Thread"
+};
+
+export function trackGameRound(game, rounds) {
+    if (!GAME_ROUND_MARKS.includes(rounds)) return;
+    trackEvent(`game/${game}/rounds-${rounds}`, `${GAME_TITLES[game]}: ${rounds} round${rounds === 1 ? "" : "s"}`);
+}
 
 document.addEventListener("click", (event) => {
     const target = event.target.closest("button, a");

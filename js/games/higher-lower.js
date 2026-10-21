@@ -1,5 +1,6 @@
 // Higher or Lower: two entities, guess which you played more.
 
+import { trackGameRound } from '../analytics.js';
 import { createArtworkElement } from '../data/artwork.js';
 import { state } from '../state.js';
 import { ftlStopTimer } from './fill-the-list.js';
@@ -169,6 +170,8 @@ export function hlGuess(side) {
 
     hlRemember(left.key);
     hlRemember(right.key);
+    hlState.rounds += 1;
+    trackGameRound("higher-or-lower", hlState.rounds);
 
     const fb = document.getElementById("hl-feedback");
     if (correct) {
@@ -241,6 +244,7 @@ export function hlStart(type) {
         type,
         pool,
         streak: 0,
+        rounds: 0,
         lastPair: "",
         recent: new Set(),
         recentQueue: [],
