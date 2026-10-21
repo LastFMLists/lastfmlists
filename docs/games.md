@@ -1,13 +1,13 @@
 # Games design doc
 
-The site has three games that use the scrobble library the user has already loaded: Higher or Lower, Fill the List and Put Them In Order. They make no API calls, so they work as soon as a library is loaded and do not use any of the Last.fm request budget.
+The site has five games that use the scrobble library the user has already loaded: Higher or Lower, Fill the List, Put Them In Order, Odd One Out and Common Thread. They make no API calls, so they work as soon as a library is loaded and do not use any of the Last.fm request budget.
 
 ## Where the games live
 
 - A Games tab sits next to the Lists tab. It stays disabled until data is loaded, and its tooltip says so (the same gating as Load Details).
 - Switching between Games and Lists takes one click. Nothing reloads and neither side loses its state.
 - Anything that needs extended metadata (durations, tags, global stats) only appears once `extendedDataLoaded` is true, the same flag the metadata filters use.
-- Personal records are kept in `localStorage`: the best Higher or Lower streak per entity type, the best Fill the List score, and the best Put Them In Order streak.
+- Personal records are kept in `localStorage`: the best Higher or Lower streak per entity type, the best Fill the List score, and the best Put Them In Order, Odd One Out and Common Thread streaks.
 - Every right answer shows a green "Correct!" confirmation in the middle of the screen. It springs in, settles and fades out, and it restarts on each answer, so quick answers in Fill the List each get their own. With reduced motion turned on, it appears and disappears without moving.
 
 ---
@@ -231,3 +231,93 @@ The shuffled starting order is also checked, so the player never gets a round th
 ### Scoring
 
 When the player checks, each row shows whether it is in the right place, its actual value, and where it belongs. A round counts only if every row is right, and the best streak of such rounds is saved.
+
+---
+
+## Games 4 and 5: Odd One Out and Common Thread
+
+The two games are mirror images built on one set of facts (`js/games/facts.js`).
+
+- Odd One Out shows one statement and four items. The statement is true for three of them, and the player picks the one it isn't true for.
+- Common Thread shows four items and four statements. One statement is true for all four, and the player picks it.
+
+Both are streaks: a wrong answer ends the run. The player picks one entity type (artists, albums or tracks) before the run, and the whole run uses that type. There is no mode with a hidden statement, because four items almost always differ in several ways, and a player who found a different valid reason would be marked wrong.
+
+### How a round is built
+
+Both games start from the statement, never from the items.
+
+Odd One Out:
+1. Take the next criterion from the queue (see Variety).
+2. Pick one of its statements, such as "have more than 100 scrobbles", with a round number as the line.
+3. Draw three items that clearly pass it and one that clearly fails it.
+
+Common Thread:
+1. Take the next criterion and pick a statement that holds for at most 40% of the current pool, so the answer is a real feature of the four items and not something nearly everything has. Ranges and single years ("between 100 and 150 scrobbles", "first played in 2021") pass this easily.
+2. Draw four items that clearly pass it.
+3. Build three wrong statements around those four items, each from a different criterion. A wrong statement holds for most of the four and clearly fails for one or two of them. For "more than N" this means putting N between the values.
+4. Check every statement against every item: exactly one statement is true for all four.
+
+### Statement forms
+
+Number criteria use "more than N", "fewer than N" and "between N and M", with N and M taken from a list of round numbers (5, 10, 25, 50, 100, 250, 500, 1,000 and so on). Dates use a year ("first played in 2021"), "before 2020", "in 2022 or later", and windows such as "played in the last 30 days". Category criteria name a value ("were played most in 2021", "have a most played track starting with H").
+
+### Margins
+
+No item may sit close to the line, so that every answer can be reasoned out. Distance is measured as a ratio for counts and in days for dates.
+
+- The floor shrinks over the first 20 wins: from 1.3x to 1.1x for counts, and from 120 days to 21 for dates. For "more than 100" at the start of a run, a passing item has at least 130 and a failing one at most 77.
+- The floor is the only hard limit on difficulty. Above it, items are drawn on a curve that favours values near the floor but allows larger gaps, so the same items don't come up for every statement of the same kind. A round can come out easier than the floor, never harder.
+- There is also a cap: no item further than 2.5x (or three years) from the line. This keeps the odd one from being an obvious outlier, such as 12 scrobbles against three items with 150.
+- Counts also need a gap of at least 2, as in Put Them In Order, so "5+ in a row" never comes down to 4 against 5.
+- Inside a range with two ends ("between 100 and 200", "in 2021"), the room is shared: the square root of the floor from each end for counts, half the days for dates.
+- A window statement such as "played in the last 30 days" asks for at most half the window as its margin.
+- In Common Thread, the floor applies to every item of the true statement and to the items a wrong statement fails for. Items a wrong statement holds for need no margin, because misreading them only makes the player rule it out, which is right anyway.
+
+The pool also widens over the first 20 wins, from the top 50 items to the top 600 (limited to the top 250 artists, 400 albums or 600 tracks with at least 5 scrobbles).
+
+In Common Thread, each wrong statement fails for two of the four items until the fifth win and for one after that. If the four items can't support three wrong statements at that count, the builder accepts more failing items, which only makes the round easier.
+
+### Criteria
+
+Every criterion must be something a player who knows their library can reason about. Weekdays and time of day are left out for that reason. Facts about names are allowed only when the name is not on screen: "their most played track starts with H" is fine, "their name starts with H" is not.
+
+| Criterion | Group | Types | Statements |
+|-----------|-------|-------|------------|
+| Total scrobbles | counts | all | more than, fewer than, between |
+| Scrobbles in a given year | counts | all | more than, fewer than |
+| Most plays in one day | counts | all | more than, never as many as |
+| Days played on | counts | all | more than, fewer than, between |
+| Longest run back to back | counts | all | more than, never as many as |
+| Different tracks played | counts | artists, albums | more than, fewer than |
+| Plays of the most played track | counts | artists, albums | more than, fewer than, between |
+| Different albums played | counts | artists | more than, fewer than |
+| All-time rank | counts | all | in your top 10, 25, 50, 100, 200 or 300 |
+| First scrobble | dates | all | in a year, before a year, in a year or later |
+| Last scrobble | dates | all | in the last 30, 90, 180 or 365 days or not, in a year, not since a year |
+| Peak year | dates | all | played most in a year |
+| Played in every year since a year | shape | all | true for three or four |
+| Share of plays in their best year | shape | all | more than, never as much as (30% to 90%) |
+| A comeback | shape | all | came back after a break of more than six months to three years |
+| Days to reach 50 or 100 plays | shape | all | within a week to two years, or took longer |
+| First letter of the most played track | names | artists, albums | starts with a letter |
+| Most played track has a one-word title | names | artists, albums | true for three or four |
+| Most played album is self-titled | names | artists | true for three or four |
+| Your most played track by its artist | relations | tracks | true for three or four |
+| The most played track on its album | relations | tracks | true for three or four |
+| Your most played album by its artist | relations | albums | true for three or four |
+
+A category is only used for an item when it is clear. A most played track or album must beat the next one by the round's floor, a peak year must beat the next year by the floor, and "every year since" needs at least two plays in each of those years. The relation criteria compare an item's plays with the best of the rest, so the floor applies to them like a count: a track that is #1 by a hair never decides a round.
+
+Rare criteria, such as a self-titled top album, only come up when the library has enough items that fit.
+
+### Variety
+
+- Criteria sit in a queue. One used in the last 5 rounds goes to the back, and so does any criterion from the group (counts, dates, shape, names, relations) used in the last round or, less strongly, the round before. A run doesn't ask about counts three times in a row.
+- In Common Thread the four statements come from four different criteria and at least three groups. Each wrong statement tries a group not yet in the round first.
+- Items shown in the last 12 cards are drawn with a quarter of their usual weight, so they can still come back in a small library but rarely do. The same set of four items never comes up twice in a row.
+- Play again after a miss keeps this memory, so a new run doesn't open with the items and criteria just seen.
+
+### The reveal
+
+After an answer, every card or statement shows the real values behind it. In Odd One Out each card shows its value for the statement, with the odd one in green and a wrong pick in red. In Common Thread each statement lists the four items with their values and a tick or a cross, so the player sees which item breaks each wrong statement. The reveal stays on screen until the player moves on, because reading it is how the player learns their library.

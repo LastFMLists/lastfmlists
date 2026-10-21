@@ -156,6 +156,10 @@ document.addEventListener("click", (event) => {
         trackEvent(`game/higher-or-lower/${target.dataset.type}`, `Higher or Lower: ${target.dataset.type}`);
     } else if (target.matches(".ord-type")) {
         trackEvent(`game/put-them-in-order/${target.dataset.type}`, `Put Them In Order: ${target.dataset.type}`);
+    } else if (target.matches(".odd-type")) {
+        trackEvent(`game/odd-one-out/${target.dataset.type}`, `Odd One Out: ${target.dataset.type}`);
+    } else if (target.matches(".thread-type")) {
+        trackEvent(`game/common-thread/${target.dataset.type}`, `Common Thread: ${target.dataset.type}`);
     }
 });
 

@@ -20,13 +20,16 @@ loads `js/main.js` as an ES module; the browser resolves the rest.
                           filter panel and its controls, entity pages, exporting, the
                           support banner
     js/games/             shared scrobble index, records, the right-answer confirmation,
-                          and the three games
+                          the facts behind Odd One Out and Common Thread, and the five games
     js/main.js            entry point: loads a user's data and wires the flows that span modules
 
 Because it uses ES modules, opening `index.html` straight off disk will not
 work. Serve the folder over HTTP instead (`python3 -m http.server`).
 
 Unreleased:
+
+- Two new games. Odd One Out shows four artists, albums or tracks and a fact that three of them share, such as "have more than 100 scrobbles" or "were first played in 2021", and you pick the one it isn't true for. Common Thread shows four items and four statements, and you pick the only statement that is true for all four. Both draw on over twenty facts, from play counts, first and last plays, streaks and peak years to comebacks, "played every year since 2019", the first letter of an artist's most played track and whether a track is the most played on its album. Every value keeps a clear distance from the line (at least 1.3x at the start of a run, 1.1x after 20 wins), the reveal shows the real value behind every statement, and a wrong answer ends the streak.
+- After a missed round in Put Them In Order, the Check order row is hidden, so Change type no longer shows twice.
 
 - The bar chart race has a view of its own: the chart is sized to fit the window, with every bar on screen (up to 20 fit on a 768px-tall laptop), and the controls sit underneath like in Graphs: play, scrub and speed, then Color an artist and the automatic colors, Download GIF and a full screen button. Rows, bars and text grow when there is room, Apply brings the whole race on screen, and the GIF uses the same rows. The export dialog says GIF when a race is on screen.
 - Turning "Color the top artists for me" off and on no longer moves the chart: the color tools have their own row, and the legend keeps its height while the chart is on screen.

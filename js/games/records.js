@@ -6,7 +6,11 @@ export const gamesRecords = {
     ftlBest: 0,
     ftlPlayed: 0,
     ordBest: 0,
-    ordPlayed: 0
+    ordPlayed: 0,
+    oddBest: 0,
+    oddPlayed: 0,
+    threadBest: 0,
+    threadPlayed: 0
 };
 
 export function loadGamesRecords() {
