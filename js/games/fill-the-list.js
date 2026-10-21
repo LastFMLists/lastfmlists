@@ -1,5 +1,6 @@
 // Fill the List: name as many of a generated top ten as you can.
 
+import { trackGameRound } from '../analytics.js';
 import { escapeHTML } from '../dom.js';
 import { state } from '../state.js';
 import { getLocalDayKeyFromTimestamp } from '../time.js';
@@ -589,6 +590,8 @@ export function ftlFinish(timedOut) {
     ftlStopTimer();
     ftlState.puzzle.answers.forEach((a, i) => { if (!ftlState.found.has(i)) ftlMarkSlot(i, true); });
     document.getElementById("ftl-guess").disabled = true;
+    ftlState.finished += 1;
+    trackGameRound("fill-the-list", ftlState.finished);
     gamesRecords.ftlPlayed = (gamesRecords.ftlPlayed || 0) + 1;
     if (ftlState.found.size > (gamesRecords.ftlBest || 0)) gamesRecords.ftlBest = ftlState.found.size;
     saveGamesRecords();
@@ -679,6 +682,7 @@ export function ftlStartGame() {
         lastKey: ftlState ? ftlState.lastKey : null,
         relaxed: false,
         puzzleNum: 0,
+        finished: 0,
         puzzle: null,
         found: new Set(),
         done: false,

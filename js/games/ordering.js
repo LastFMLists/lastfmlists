@@ -1,5 +1,6 @@
 // Put Them In Order: rank a handful of entities by a chosen metric.
 
+import { trackGameRound } from '../analytics.js';
 import { escapeHTML } from '../dom.js';
 import { state } from '../state.js';
 import { getLocalDayKeyFromTimestamp } from '../time.js';
@@ -399,6 +400,7 @@ export function ordCheck() {
     });
 
     ordState.rounds += 1;
+    trackGameRound("put-them-in-order", ordState.rounds);
     const perfect = right === correct.length;
     if (perfect) {
         ordState.streak += 1;
