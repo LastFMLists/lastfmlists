@@ -8,7 +8,7 @@
 import { trackEvent } from '../analytics.js';
 import { createArtworkElement } from '../data/artwork.js';
 import { libraryCounts, sortMetricText } from '../data/entity-stats.js';
-import { applyEntityCaps, buildEntitiesFromTracks, entityCapsFrom, filterTracks } from '../data/filters.js';
+import { applyEntityCaps, buildEntitiesFromTracks, entityCapsFrom, filterTracks, undatedTracksFor } from '../data/filters.js';
 import { applyEquationPipeline } from '../data/equations.js';
 import { getDefaultXValue } from '../data/metrics.js';
 import { escapeHTML } from '../dom.js';
@@ -144,6 +144,8 @@ function computeEntities(query) {
         .map(([id, value]) => ({ id, value: String(value) }));
     // Like on the Lists tab, equation steps replace the other filters.
     let tracks = filterList.length && !query.filters.equations ? filterTracks(filterList, state.allTracks) : state.allTracks;
+    const undated = undatedTracksFor({ filters: filterList, equations: query.filters.equations, entityType: query.entityType, sortingBasis: query.sortingBasis });
+    if (undated.length) tracks = tracks.concat(undated);
     const x = query.xValue === "" ? getDefaultXValue(query.sortingBasis) : Number(query.xValue);
     if (query.filters.equations) tracks = applyEquationPipeline(tracks, query.filters.equations, { xValue: x }).tracks;
     let entities = buildEntitiesFromTracks(tracks, query.entityType, query.sortingBasis, x);
@@ -195,7 +197,7 @@ let boxesById = new Map();
 
 // What the boxes were worked out from; a new load or new details redo them.
 function currentStamp() {
-    return `${state.allTracks.length}|${state.allTracks[0]?.Date}|${state.allTracks.at(-1)?.Date}|${state.extendedDataLoaded}`;
+    return `${state.allTracks.length}|${state.undatedTracks.length}|${state.allTracks[0]?.Date}|${state.allTracks.at(-1)?.Date}|${state.extendedDataLoaded}`;
 }
 
 function libraryYears() {

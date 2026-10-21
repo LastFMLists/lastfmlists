@@ -1,6 +1,22 @@
 // Calendar helpers. Everything here works in the user's local time and in
 // whole days, so results do not shift with daylight saving or time of day.
 
+// Last.fm keeps scrobbles it has no date for, and the API hands them over
+// without a usable timestamp: missing, zero or around 1970-01-01, which used
+// to show up as plays from 1969. Nobody scrobbled before 2000, so anything
+// earlier counts as an unknown date.
+const EARLIEST_KNOWN_SCROBBLE_MS = Date.UTC(2000, 0, 1);
+
+export function isKnownScrobbleTime(timestamp) {
+    if (timestamp === null || timestamp === undefined || timestamp === "") return false;
+    const value = Number(timestamp);
+    return Number.isFinite(value) && value >= EARLIEST_KNOWN_SCROBBLE_MS;
+}
+
+export function hasKnownDate(scrobble) {
+    return Boolean(scrobble) && isKnownScrobbleTime(scrobble.Date);
+}
+
 // Whole days since 1970-01-01 in the LOCAL calendar. Reading the calendar
 // fields instead of subtracting a fixed offset keeps this correct across DST
 // changes, where new Date().getTimezoneOffset() is wrong for historic dates.

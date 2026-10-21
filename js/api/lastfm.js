@@ -5,6 +5,7 @@ import { API_KEY } from '../config.js';
 import { pickImageUrl, rememberAlbumArt } from '../data/artwork.js';
 import { loadingDiv, mapWithConcurrency } from '../dom.js';
 import { albumCoverCache } from '../state.js';
+import { isKnownScrobbleTime } from '../time.js';
 import { fetchJsonWithRetry, rateLimitedFetch } from './rate-limit.js';
 
 // Last.fm answers errors with HTTP 200 and a JSON body like
@@ -89,12 +90,14 @@ export async function fetchAlbumCoverUrl(albumName, artistName) {
 // Map a raw Last.fm recenttracks entry to our internal shape.
 // The album cover that comes with each scrobble is kept in a separate
 // per-album map instead of on the scrobble, so it is stored once per album.
+// A scrobble Last.fm has no date for gets Date null.
 export function mapRecentTrack(track) {
+    const time = parseInt(track.date?.uts, 10) * 1000;
     const mapped = {
         Artist: track.artist?.name || track.artist?.["#text"] || "Unknown",
         Album: track.album?.["#text"] || "Unknown",
         Track: track.name || "Unknown",
-        Date: track.date?.uts ? parseInt(track.date.uts) * 1000 : null
+        Date: isKnownScrobbleTime(time) ? time : null
     };
     rememberAlbumArt(mapped.Album, mapped.Artist, pickImageUrl(track.image));
     return mapped;

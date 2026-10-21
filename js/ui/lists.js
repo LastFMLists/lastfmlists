@@ -19,7 +19,8 @@ import {
     filterTracks,
     makeCapCounter,
     normalizeEntitySorting,
-    resolveDisplayEntities
+    resolveDisplayEntities,
+    undatedTracksFor
 } from '../data/filters.js';
 import { createArtworkElement } from '../data/artwork.js';
 import { computeUnfilteredStats, getDefaultXValue, isRollingWindowSortingBasis } from '../data/metrics.js';
@@ -364,11 +365,15 @@ export function displayEntities() {
     // A list with equation steps starts from the whole history: the steps
     // are its filters, and the other menus are paused for it (the panel and
     // the filter chips say so). Without steps, the menus filter as usual.
+    // Scrobbles with no date join at the end when the list doesn't use time.
     const sideBase = (equations, sideState) => {
-        if (equations) return state.allTracks;
-        return comparisonButtonActive
-            ? filterTracks(convertStateToFilterArray(sideState), state.allTracks)
-            : filterTracks(state.activeFilters, state.allTracks);
+        const filters = comparisonButtonActive ? convertStateToFilterArray(sideState) : state.activeFilters;
+        const sorting = comparisonButtonActive
+            ? normalizeEntitySorting((sideState["entity-type"] || entityType || "track").toLowerCase(), sideState["sorting-basis"] || sortingBasis)
+            : { entityType, sortingBasis };
+        const dated = equations ? state.allTracks : filterTracks(filters, state.allTracks);
+        const undated = undatedTracksFor({ filters, equations, ...sorting });
+        return undated.length ? dated.concat(undated) : dated;
     };
     const leftTracksBase = sideBase(equationsLeft, leftState);
     const rightTracksBase = comparisonButtonActive ? sideBase(equationsRight, rightState) : leftTracksBase;

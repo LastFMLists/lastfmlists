@@ -25,6 +25,7 @@ import {
     recentRanks,
     sortRank,
     weekRanks,
+    withUndated,
     yearRanks
 } from '../data/entity-stats.js';
 import { escapeHTML } from '../dom.js';
@@ -387,7 +388,7 @@ function paint() {
             ${renderTimeline()}
         </section>
 
-        <p class="entity-footnote">These numbers use all ${state.allTracks.length.toLocaleString()} scrobbles loaded in this browser, whatever filters the list had. Click a ranking to open its list.</p>
+        <p class="entity-footnote">These numbers use all ${withUndated().length.toLocaleString()} scrobbles loaded in this browser, whatever filters the list had. Click a ranking to open its list.</p>
     </div>`;
 
     const artHolder = section.querySelector(".entity-header-art");

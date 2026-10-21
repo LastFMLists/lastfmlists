@@ -12,7 +12,8 @@ import {
 
 /**
  * Computes a mapping from a group key to its global ranking and total scrobble count,
- * based on allTracks (the unfiltered list). The group key is defined differently depending
+ * based on allTracks (the unfiltered list) plus the scrobbles with no date, which the
+ * unfiltered list counts too. The group key is defined differently depending
  * on the entityType.
  * @param {string} entityType - "track", "album", or "artist".
  * @returns {Object} - Mapping: { groupKey: { rank, count } }
@@ -23,14 +24,17 @@ export function computeUnfilteredStats(entityType) {
         cacheEntry &&
         cacheEntry.source === state.allTracks &&
         cacheEntry.length === state.allTracks.length &&
+        cacheEntry.undated === state.undatedTracks &&
         cacheEntry.mapping
     ) {
         return cacheEntry.mapping;
     }
 
+    const undated = state.undatedTracks || [];
+    const tracks = undated.length ? state.allTracks.concat(undated) : state.allTracks;
     const groups = {};
     if (entityType === 'track') {
-        state.allTracks.forEach(track => {
+        tracks.forEach(track => {
             const key = `${track.Artist.toLowerCase()} - ${track.Track.toLowerCase()}`;
             if (!groups[key]) {
                 groups[key] = { count: 0 };
@@ -38,7 +42,7 @@ export function computeUnfilteredStats(entityType) {
             groups[key].count++;
         });
     } else if (entityType === 'album') {
-        state.allTracks.forEach(track => {
+        tracks.forEach(track => {
             const key = `${track.Album.toLowerCase()}||${track.Artist.toLowerCase()}`;
             if (!groups[key]) {
                 groups[key] = { count: 0 };
@@ -46,7 +50,7 @@ export function computeUnfilteredStats(entityType) {
             groups[key].count++;
         });
     } else if (entityType === 'artist') {
-        state.allTracks.forEach(track => {
+        tracks.forEach(track => {
             const key = track.Artist.toLowerCase();
             if (!groups[key]) {
                 groups[key] = { count: 0 };
@@ -66,6 +70,7 @@ export function computeUnfilteredStats(entityType) {
     if (cacheEntry) {
         cacheEntry.source = state.allTracks;
         cacheEntry.length = state.allTracks.length;
+        cacheEntry.undated = state.undatedTracks;
         cacheEntry.mapping = mapping;
     }
 

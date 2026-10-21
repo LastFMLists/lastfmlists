@@ -14,6 +14,7 @@ import { getUserData, mergeData, saveUserData, topListsFromSavedData } from './d
 import { loadingDiv } from './dom.js';
 import { initGames } from './games/index.js';
 import { state } from './state.js';
+import { hasKnownDate } from './time.js';
 import { ensureRaceDateDefaults, updateRaceControlsVisibility } from './ui/charts.js';
 import './ui/entity-page.js';
 import './ui/equation-editor.js';
@@ -121,17 +122,18 @@ document.getElementById("username-form").addEventListener("submit", async (event
 
     // From here Save Data stores the full history, marked to rebuild its lists.
     state.historyLoad.phase = "finishing";
-    state.allTracks = history.tracks;
     state.historyProgress = history.progress;
     const syncedFromStorage = Boolean(saved);
-    
-    state.allTracks = state.allTracks.filter(track => {
-        if (!track.Date) {
-            console.warn("Skipping track due to missing date:", track);
-            return false;
-        }
-        return true;
-    });
+
+    // Scrobbles Last.fm has no date for are kept apart, so nothing that reads
+    // dates sees them and allTracks stays in time order.
+    state.allTracks = history.tracks.filter(hasKnownDate);
+    state.undatedTracks = history.tracks.filter(track => !hasKnownDate(track));
+    // Older saves numbered them as the first scrobbles; they have no place in the order.
+    state.undatedTracks.forEach(track => { delete track.order; });
+    if (state.undatedTracks.length) {
+        console.log(`${state.undatedTracks.length} scrobbles have no date; lists that use time leave them out.`);
+    }
 
     // Sort allTracks by date (assuming track.Date is a timestamp in milliseconds as a string)
     state.allTracks.sort((a, b) => parseInt(a.Date, 10) - parseInt(b.Date, 10));
@@ -177,7 +179,7 @@ document.getElementById("username-form").addEventListener("submit", async (event
         const artistTrackSets = Object.create(null);
         const albumTrackSets = Object.create(null);
 
-        state.allTracks.forEach(item => {
+        state.allTracks.concat(state.undatedTracks).forEach(item => {
             const artistKey = item.Artist.trim().toLowerCase();
             const albumKey = `${item.Album.trim().toLowerCase()}||${item.Artist.trim().toLowerCase()}`;
             const trackKey = item.Track.trim().toLowerCase();
@@ -367,7 +369,7 @@ document.getElementById("save-data").addEventListener("click", async () => {
     // While scrobbles are still downloading, only the pages that have fully
     // arrived are saved, with a note of the ones still missing, so the next
     // load of this username fetches just those.
-    let allTracks = state.allTracks;
+    let allTracks = state.allTracks.concat(state.undatedTracks);
     let historyProgress = state.historyProgress;
     if (load && load.phase === "history") {
         ({ allTracks, historyProgress } = load.snapshot());

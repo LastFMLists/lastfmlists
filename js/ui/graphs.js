@@ -9,6 +9,7 @@ import { trackEvent } from '../analytics.js';
 import { buildEntitiesFromTracks } from '../data/filters.js';
 import { getDefaultXValue, isSortingBasisUsingXValue } from '../data/metrics.js';
 import { state } from '../state.js';
+import { hasKnownDate } from '../time.js';
 import { clearCustomColor, colorLinkPairs, customColor, lineColors, setCustomColor } from './artist-colors.js';
 import { openColorPicker } from './color-picker.js';
 import { formatRaceValue } from './bar-race.js';
@@ -158,7 +159,7 @@ function sourcePlays() {
     if (sortedCache.from !== from) {
         sortedCache = {
             from,
-            plays: from.filter(play => Number.isFinite(Number(play.Date))).sort((a, b) => Number(a.Date) - Number(b.Date))
+            plays: from.filter(hasKnownDate).sort((a, b) => Number(a.Date) - Number(b.Date))
         };
     }
     return sortedCache.plays;

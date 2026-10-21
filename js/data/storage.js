@@ -11,6 +11,7 @@ import {
 } from '../config.js';
 import { loadingDiv } from '../dom.js';
 import { state } from '../state.js';
+import { isKnownScrobbleTime } from '../time.js';
 import { ensureRaceDateDefaults } from '../ui/charts.js';
 import { updateActiveFilters } from '../ui/filters-panel.js';
 import { displayEntities } from '../ui/lists.js';
@@ -262,6 +263,7 @@ if (csvFileInput) csvFileInput.addEventListener('change', async (event) => {
         // Was an implicit global; declared properly so it stays local (and so
         // this file can run in strict mode).
         const raw_data = [];
+        const undated = [];
         const firstScrobbles = { artists: {}, albums: {}, tracks: {} };
         const lastScrobbles = { artists: {}, albums: {}, tracks: {} };
         const artistTrackSets = Object.create(null);
@@ -269,7 +271,7 @@ if (csvFileInput) csvFileInput.addEventListener('change', async (event) => {
 
         // ✅ Iterate over allTracks to determine first scrobbles and track counts
         state.allTracks.forEach(track => {
-            if (!track.artist || !track.track || !track.date) {
+            if (!track.artist || !track.track) {
                 console.warn("Skipping track due to missing data:", track);
                 return;
             }
@@ -278,6 +280,12 @@ if (csvFileInput) csvFileInput.addEventListener('change', async (event) => {
             const albumKey = track.album?.trim() ? `${track.album.trim().toLowerCase()}_${artistKey}` : null;
             const trackKey = `${track.track.trim().toLowerCase()}_${artistKey}`;
             const uts = parseInt(track.date, 10); // Already in milliseconds
+
+            // No date: kept for play counts, left out of everything that uses time.
+            if (!isKnownScrobbleTime(uts)) {
+                undated.push({ Artist: track.artist, Album: track.album, Track: track.track, Date: null });
+                return;
+            }
 
             if (!firstScrobbles.artists[artistKey] || uts < firstScrobbles.artists[artistKey]) {
                 firstScrobbles.artists[artistKey] = uts;
@@ -325,6 +333,7 @@ if (csvFileInput) csvFileInput.addEventListener('change', async (event) => {
         });
 
         state.allTracks = raw_data; // Update allTracks with sorted data
+        state.undatedTracks = undated;
         buildHistoryContextMaps();
         ensureRaceDateDefaults(true);
 
