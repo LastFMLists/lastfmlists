@@ -36,6 +36,7 @@ function threadRenderRound() {
     const fb = document.getElementById("thread-feedback");
     fb.textContent = "";
     fb.className = "hl-feedback";
+    document.getElementById("thread-play").classList.remove("answered");
     document.getElementById("thread-next").hidden = true;
     document.getElementById("thread-actions").hidden = false;
     document.getElementById("thread-over").hidden = true;
@@ -71,6 +72,9 @@ export function threadPick(index) {
     const correct = round.statements[index] === round.answer;
     threadReveal(index);
 
+    // The revealed statements run past the screen, so the footer with the
+    // result and Next round sticks to the bottom of it from here.
+    document.getElementById("thread-play").classList.add("answered");
     gamesRecords.threadPlayed = (gamesRecords.threadPlayed || 0) + 1;
     const fb = document.getElementById("thread-feedback");
     if (correct) {

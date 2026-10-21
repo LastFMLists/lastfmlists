@@ -185,7 +185,7 @@ function buildStats(type) {
             const albumKey = topTwo(rel.trackAlbums.get(key)).top;
             if (albumKey) {
                 const onAlbum = standing(rel.albumTracks.get(albumKey), key);
-                if (onAlbum) st.vsAlbum = { ...onAlbum, album: albumNames.get(albumKey) };
+                if (onAlbum) st.vsAlbum = { ...onAlbum, album: albumNames.get(albumKey), albumKey };
             }
         }
         return st;
@@ -441,20 +441,25 @@ const FACTS = [
 
     // Where an item stands among its artist's or album's other items. The value
     // is its play count against the best of the rest, so above 1 means first.
+    // sharedBy names what the item is compared within: two tracks from one
+    // album can't both be its #1, so a round never holds two that share it.
     {
         id: "artisttoptrack", group: "relations", types: ["track"], kind: "number", scale: "ratio", absGap: 0, cap: Infinity,
+        sharedBy: st => st.artist.toLowerCase(),
         value: st => st.vsArtist?.ratio,
         statements: () => [{ lo: 1, hi: Infinity, text: "are your most played track by their artist" }],
         show: st => `#${st.vsArtist.place} of ${st.vsArtist.of} by ${st.artist}`
     },
     {
         id: "albumtoptrack", group: "relations", types: ["track"], kind: "number", scale: "ratio", absGap: 0, cap: Infinity,
+        sharedBy: st => st.vsAlbum?.albumKey,
         value: st => st.vsAlbum?.ratio,
         statements: () => [{ lo: 1, hi: Infinity, text: "are the most played track on their album" }],
         show: st => `#${st.vsAlbum.place} on ${st.vsAlbum.album}`
     },
     {
         id: "artisttopalbum", group: "relations", types: ["album"], kind: "number", scale: "ratio", absGap: 0, cap: Infinity,
+        sharedBy: st => st.artist.toLowerCase(),
         value: st => st.vsArtist?.ratio,
         statements: () => [{ lo: 1, hi: Infinity, text: "are your most played album by their artist" }],
         show: st => `#${st.vsArtist.place} of ${st.vsArtist.of} by ${st.artist}`
@@ -562,20 +567,35 @@ function paramsFor(fact, ctx) {
 }
 
 // Draw n items without replacement, by weight. Recently shown items keep a
-// quarter of theirs, so they can still come back in a small library.
-function weightedPick(list, n, memory) {
-    if (list.length < n) return null;
-    const left = list.map(x => ({ ...x, w: x.j.weight * (memory.recent.includes(x.st.key) ? RECENT_WEIGHT : 1) }));
+// quarter of theirs, so they can still come back in a small library. With
+// apart, no two items share its key, nor any key already in taken; the keys
+// drawn are added to taken.
+function weightedPick(list, n, memory, apart = null, taken = new Set()) {
+    let left = list
+        .filter(x => !apart || !taken.has(apart(x.st)))
+        .map(x => ({ ...x, w: x.j.weight * (memory.recent.includes(x.st.key) ? RECENT_WEIGHT : 1) }));
     const out = [];
     while (out.length < n) {
+        if (!left.length) return null;
         const total = left.reduce((s, x) => s + x.w, 0);
         let r = Math.random() * total;
         let i = 0;
         while (i < left.length - 1 && r >= left[i].w) { r -= left[i].w; i++; }
-        out.push(left[i]);
-        left.splice(i, 1);
+        const [picked] = left.splice(i, 1);
+        out.push(picked);
+        if (apart) {
+            const key = apart(picked.st);
+            taken.add(key);
+            left = left.filter(x => apart(x.st) !== key);
+        }
     }
     return out;
+}
+
+// Whether no two items share what the criterion compares them within.
+function itemsApart(fact, items) {
+    if (!fact.sharedBy) return true;
+    return new Set(items.map(fact.sharedBy)).size === items.length;
 }
 
 const setSignature = items => items.map(x => x.st.key).sort().join("\n");
@@ -612,8 +632,9 @@ export function buildOddRound(type, wins, memory, ctx) {
             const stmts = ftlShuffle(statementsFor(fact, param, ctx, pool, type)).slice(0, 25);
             for (const stmt of stmts) {
                 const judged = judgedPool(stmt, pool, tier).filter(x => x.j.clear);
-                const three = weightedPick(judged.filter(x => x.j.pass), 3, memory);
-                const one = three && weightedPick(judged.filter(x => !x.j.pass), 1, memory);
+                const taken = new Set();
+                const three = weightedPick(judged.filter(x => x.j.pass), 3, memory, fact.sharedBy, taken);
+                const one = three && weightedPick(judged.filter(x => !x.j.pass), 1, memory, fact.sharedBy, taken);
                 if (!one) continue;
                 const items = [...three, ...one];
                 if (setSignature(items) === memory.lastSet) continue;
@@ -634,6 +655,7 @@ export function buildOddRound(type, wins, memory, ctx) {
 // A wrong statement for these four items: one that fails for exactly `failing`
 // of them, each clearly, and holds for the rest.
 function findDistractor(fact, items, failing, tier, ctx, pool, type) {
+    if (!itemsApart(fact, items)) return null;
     for (const param of paramsFor(fact, ctx)) {
         const stmts = ftlShuffle(statementsFor(fact, param, ctx, pool, type));
         for (const stmt of stmts) {
@@ -696,7 +718,7 @@ export function buildThreadRound(type, wins, memory, ctx) {
                 if (!judged.length || judged.filter(x => x.j.pass).length / judged.length > THREAD_MAX_SHARE) continue;
                 const passers = judged.filter(x => x.j.pass && x.j.clear);
                 for (let attempt = 0; attempt < 4; attempt++) {
-                    const four = weightedPick(passers, 4, memory);
+                    const four = weightedPick(passers, 4, memory, fact.sharedBy);
                     if (!four) break;
                     if (setSignature(four) === memory.lastSet) continue;
                     const items = four.map(x => x.st);

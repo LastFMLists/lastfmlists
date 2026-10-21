@@ -30,6 +30,7 @@ function oddRenderRound() {
     const fb = document.getElementById("odd-feedback");
     fb.textContent = "";
     fb.className = "hl-feedback";
+    document.getElementById("odd-play").classList.remove("answered");
     document.getElementById("odd-next").hidden = true;
     document.getElementById("odd-actions").hidden = false;
     document.getElementById("odd-over").hidden = true;
@@ -55,6 +56,9 @@ export function oddPick(key) {
         else if (btn.dataset.key === key) btn.classList.add("wrong");
     }
 
+    // The footer with the result and Next round sticks to the bottom of the
+    // screen from here, so it stays in reach while the values are read.
+    document.getElementById("odd-play").classList.add("answered");
     gamesRecords.oddPlayed = (gamesRecords.oddPlayed || 0) + 1;
     const fb = document.getElementById("odd-feedback");
     if (correct) {

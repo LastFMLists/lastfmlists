@@ -311,6 +311,8 @@ A category is only used for an item when it is clear. A most played track or alb
 
 Rare criteria, such as a self-titled top album, only come up when the library has enough items that fit.
 
+A round with a relation statement never has two items compared within the same album or artist: two tracks from one album can't both be its most played, so the statement would give itself away. Odd One Out draws its four items from four different albums (or artists), and Common Thread only uses a relation statement as a wrong answer when its four items are already apart.
+
 ### Variety
 
 - Criteria sit in a queue. One used in the last 5 rounds goes to the back, and so does any criterion from the group (counts, dates, shape, names, relations) used in the last round or, less strongly, the round before. A run doesn't ask about counts three times in a row.
@@ -320,4 +322,4 @@ Rare criteria, such as a self-titled top album, only come up when the library ha
 
 ### The reveal
 
-After an answer, every card or statement shows the real values behind it. In Odd One Out each card shows its value for the statement, with the odd one in green and a wrong pick in red. In Common Thread each statement lists the four items with their values and a tick or a cross, so the player sees which item breaks each wrong statement. The reveal stays on screen until the player moves on, because reading it is how the player learns their library.
+After an answer, every card or statement shows the real values behind it. In Odd One Out each card shows its value for the statement, with the odd one in green and a wrong pick in red. In Common Thread each statement lists the four items with their values and a tick or a cross, so the player sees which item breaks each wrong statement. The reveal stays on screen until the player moves on, because reading it is how the player learns their library. Once a round is answered, the result, Next round and the run-over panel stick to the bottom of the screen, so the player can read the reveal and move on without scrolling down past it.
