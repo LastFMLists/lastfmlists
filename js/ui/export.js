@@ -177,7 +177,9 @@ async function exportCurrentListAsImage() {
 
     trimExportRows(resultsClone);
     // The color legend keeps its swatches but not the editing controls.
-    resultsClone.querySelectorAll('.race-legend-tools, .race-legend-reset, .race-swatch input, .comparison-rotate-hint').forEach(el => el.remove());
+    resultsClone.querySelectorAll('.race-legend-tools, .race-legend-reset, .race-swatch input, .comparison-switch').forEach(el => el.remove());
+    // An image of a comparison shows both lists, even when the page shows one at a time.
+    resultsClone.querySelectorAll('.comparison-results').forEach(el => el.classList.remove('is-one-at-a-time'));
     captureRoot.appendChild(resultsClone);
 
     document.body.appendChild(captureRoot);

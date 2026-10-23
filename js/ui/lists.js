@@ -37,7 +37,7 @@ import {
     renderBarRaceComparison,
     renderBarRaceSingle
 } from './charts.js';
-import { isComparisonEnabled, updateActiveFilters } from './filters-panel.js';
+import { getComparisonEditTarget, isComparisonEnabled, updateActiveFilters } from './filters-panel.js';
 
 // A list row: rank, cover, title with its artist and album underneath, and
 // the number the list is ranked by on the right. Clicking it opens the
@@ -336,10 +336,54 @@ export function getSelectedDisplayMode() {
     return DISPLAY_MODE_LIST;
 }
 
+// The two lists sit side by side when each gets this much room (the same
+// 300px as .comparison-lists in style.css, plus the 1rem gap between them).
+const MIN_COMPARISON_LIST_WIDTH = 300;
+const COMPARISON_GAP = 16;
+
+function comparisonFitsSideBySide(layout) {
+    return layout.clientWidth >= 2 * MIN_COMPARISON_LIST_WIDTH + COMPARISON_GAP;
+}
+
+// Too narrow for both: show one list at a time, with a Left / Right switch.
+// Opens on the side the filter panel is editing, so applying a change to the
+// right list shows the right list.
+let comparisonSideShown = "left";
+
+function addComparisonSwitch(layout) {
+    const group = document.createElement("div");
+    group.className = "comparison-switch";
+    group.setAttribute("role", "group");
+    group.setAttribute("aria-label", "List to show");
+    group.innerHTML = '<button type="button" data-side="left">Left list</button><button type="button" data-side="right">Right list</button>';
+    group.addEventListener("click", event => {
+        const button = event.target.closest("[data-side]");
+        if (!button) return;
+        comparisonSideShown = button.dataset.side;
+        showComparisonSide(layout);
+    });
+    layout.prepend(group);
+}
+
+function showComparisonSide(layout) {
+    const columns = layout.querySelectorAll(".comparison-column");
+    columns.forEach((column, index) => {
+        column.classList.toggle("is-other-side", (index === 0 ? "left" : "right") !== comparisonSideShown);
+    });
+    layout.querySelectorAll(".comparison-switch [data-side]").forEach(button => {
+        button.setAttribute("aria-pressed", String(button.dataset.side === comparisonSideShown));
+    });
+}
+
 // Side by side, row n of the left list and row n of the right list get the
-// same height so they line up. Stacked (narrow screens) they keep their own.
+// same height so they line up. One at a time, each keeps its own heights.
 function equalizeComparisonRowHeights(leftContainer, rightContainer) {
     if (!leftContainer || !rightContainer) return;
+    const layout = leftContainer.closest(".comparison-results");
+    if (!layout || !layout.clientWidth) return;
+
+    const sideBySide = comparisonFitsSideBySide(layout);
+    layout.classList.toggle("is-one-at-a-time", !sideBySide);
 
     const leftRows = Array.from(leftContainer.children);
     const rightRows = Array.from(rightContainer.children);
@@ -347,10 +391,7 @@ function equalizeComparisonRowHeights(leftContainer, rightContainer) {
         row.style.boxSizing = "border-box";
         row.style.height = "";
     });
-
-    const sideBySide = Math.abs(leftContainer.getBoundingClientRect().top - rightContainer.getBoundingClientRect().top) < 1;
-    if (leftContainer.offsetWidth) updateRotateHint(leftContainer.closest(".comparison-results"), sideBySide);
-    if (!sideBySide || !leftContainer.offsetWidth) return;
+    if (!sideBySide) return;
 
     const maxRows = Math.max(leftRows.length, rightRows.length);
     const heights = [];
@@ -361,22 +402,6 @@ function equalizeComparisonRowHeights(leftContainer, rightContainer) {
         if (leftRows[index]) leftRows[index].style.height = `${height}px`;
         if (rightRows[index]) rightRows[index].style.height = `${height}px`;
     });
-}
-
-// Stacked lists on a phone held upright: say that turning it puts them side
-// by side, when the screen's long side has room for two lists.
-const MIN_COMPARISON_LIST_WIDTH = 300;
-
-function updateRotateHint(layout, sideBySide) {
-    const hint = layout?.querySelector(".comparison-rotate-hint");
-    if (!hint) return;
-    const longSide = Math.max(window.screen?.width || 0, window.screen?.height || 0);
-    // Two lists, the gap between them and the page padding.
-    const rotatingHelps = longSide >= 2 * MIN_COMPARISON_LIST_WIDTH + 50;
-    hint.hidden = sideBySide
-        || !rotatingHelps
-        || !window.matchMedia("(orientation: portrait)").matches
-        || !window.matchMedia("(pointer: coarse)").matches;
 }
 
 // Row heights depend on the width, so match them again when it changes
@@ -534,11 +559,9 @@ export function displayEntities() {
             }
         } else {
             comparisonLayout.classList.add("comparison-lists");
-            const rotateHint = document.createElement("p");
-            rotateHint.className = "comparison-rotate-hint";
-            rotateHint.hidden = true;
-            rotateHint.innerHTML = '<i class="fas fa-mobile-screen-button" aria-hidden="true"></i> Turn your phone sideways to see the two lists next to each other.';
-            comparisonLayout.prepend(rotateHint);
+            comparisonSideShown = getComparisonEditTarget();
+            addComparisonSwitch(comparisonLayout);
+            showComparisonSide(comparisonLayout);
             renderEntitiesToContainer(leftEntities, leftEntityType, leftList, leftSortingBasis, leftCaps);
             renderEntitiesToContainer(rightEntities, rightEntityType, rightList, rightSortingBasis, rightCaps);
             equalizeComparisonRowHeights(leftList, rightList);
