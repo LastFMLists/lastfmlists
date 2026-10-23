@@ -1957,6 +1957,12 @@ label.inline-checkbox {
     gap: 1rem;
 }
 
+/* Two lists sit side by side whenever each gets 320px, whatever the screen
+   (a tablet with the filters tucked away has room); otherwise they stack */
+.comparison-results.comparison-lists {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+}
+
 .comparison-column {
     min-width: 0;
 }

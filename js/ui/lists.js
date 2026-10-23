@@ -516,6 +516,7 @@ export function displayEntities() {
                 renderBarChartEntities(rightEntities, rightEntityType, rightSortingBasis, rightList);
             }
         } else {
+            comparisonLayout.classList.add("comparison-lists");
             renderEntitiesToContainer(leftEntities, leftEntityType, leftList, leftSortingBasis, leftCaps);
             renderEntitiesToContainer(rightEntities, rightEntityType, rightList, rightSortingBasis, rightCaps);
             equalizeComparisonRowHeights(leftList, rightList);
