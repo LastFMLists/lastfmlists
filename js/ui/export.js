@@ -608,7 +608,7 @@ if (exportOptionsToggle && exportOptionsPanel) {
         // A race on screen exports as a GIF, which has no line of filters.
         const race = Boolean(state.activeRaceState);
         const title = document.getElementById("export-modal-title");
-        if (title) title.textContent = race ? "Export as GIF" : "Export as Image";
+        if (title) title.textContent = race ? "Export as GIF" : "Export as image";
         if (confirmExportButton) confirmExportButton.innerHTML = `<i class="fas fa-download" aria-hidden="true"></i>${race ? "Download GIF" : "Download PNG"}`;
         const filtersOption = document.getElementById("export-include-filters")?.closest("label");
         if (filtersOption) filtersOption.hidden = race;

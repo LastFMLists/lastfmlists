@@ -41,7 +41,7 @@
 			"Album cover collage grids",
 			"Side-by-side comparison of two lists",
 			"A page for every artist, album and track with your ranks and play history",
-			"Games: Higher or Lower, Fill the List, Put Them In Order, Odd One Out and Common Thread"
+			"Games: Higher or Lower, Fill the List, Put Them in Order, Odd One Out and Common Thread"
 		],
 		"sameAs": ["https://github.com/LastFMLists/lastfmlists"]
 	}
@@ -240,8 +240,7 @@
 
                         <hr class="separator">
 
-                        <span class="comparison-label">Two lists side by side</span>
-                        <button id="comparison-toggle" type="button" data-active="false">Comparison: Off</button>
+                        <button id="comparison-toggle" type="button" role="switch" aria-checked="false" data-active="false">Two lists side by side</button>
 
                     </div>
                 </div>
@@ -687,7 +686,7 @@
 
         <section id="results-section" class="content-block">
             <div class="results-header">
-                <h2>Top Tracks</h2>
+                <h2>Top tracks</h2>
                 <div class="results-actions">
                     <button type="button" id="open-filters-mobile" class="results-action filters-mobile-button" aria-controls="filters-section"><i class="fas fa-filter" aria-hidden="true"></i> Filters</button>
                     <button type="button" id="graph-this-list" class="results-action" hidden title="Graph how the top of this list changed over time"><i class="fas fa-chart-line" aria-hidden="true"></i> Graph</button>
@@ -727,7 +726,7 @@
 
         <section id="games-section" class="content-block">
             <div id="games-home" class="games-home">
-                <h2>Games</h2>
+                <h2 class="visually-hidden">Games</h2>
                 <p class="games-intro">These games use the scrobbles you have already loaded, so nothing extra is downloaded.</p>
                 <div class="games-grid">
                     <button type="button" class="game-card" id="open-higherlower">
@@ -742,7 +741,7 @@
                     </button>
                     <button type="button" class="game-card" id="open-ordering">
                         <span class="game-card-icon"><i class="fas fa-arrow-down-1-9" aria-hidden="true"></i></span>
-                        <span class="game-card-title">Put Them In Order</span>
+                        <span class="game-card-title">Put Them in Order</span>
                         <span class="game-card-desc">Put three to five artists, albums or tracks in order by one statistic, such as total plays or first listen.</span>
                     </button>
                     <button type="button" class="game-card" id="open-odd">
@@ -879,7 +878,7 @@
                 <button type="button" class="hl-back" id="ord-back"><i class="fas fa-arrow-left" aria-hidden="true"></i> All games</button>
 
                 <div id="ord-setup" class="hl-setup game-options">
-                    <h2>Put Them In Order</h2>
+                    <h2>Put Them in Order</h2>
                     <p class="game-options-intro">Each round gives you a few items and one statistic to sort them by. Rounds start with three items and grow to five as your streak grows. Choose what to put in order.</p>
                     <div class="hl-type-choice">
                         <button type="button" class="ord-type" data-type="artist"><i class="fas fa-microphone" aria-hidden="true"></i><span>Artists</span></button>
@@ -1002,7 +1001,7 @@
         <div id="export-modal" class="modal-overlay" aria-hidden="true">
             <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="export-modal-title">
                 <div class="modal-header">
-                    <h3 id="export-modal-title">Export as Image</h3>
+                    <h3 id="export-modal-title">Export as image</h3>
                     <button type="button" id="close-export-modal" class="modal-close" aria-label="Close export modal">&times;</button>
                 </div>
                 <div id="export-options" class="export-options">
@@ -1027,7 +1026,7 @@
         <div id="grid-export-modal" class="modal-overlay" aria-hidden="true">
             <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="grid-export-modal-title">
                 <div class="modal-header">
-                    <h3 id="grid-export-modal-title">Export as Grid</h3>
+                    <h3 id="grid-export-modal-title">Export album grid</h3>
                     <button type="button" id="close-grid-export-modal" class="modal-close" aria-label="Close grid export modal">&times;</button>
                 </div>
                 <div id="grid-export-options" class="export-options">

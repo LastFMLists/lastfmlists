@@ -634,7 +634,7 @@ export function resetFilterControls() {
     const comparisonButton = document.getElementById("comparison-toggle");
     if (comparisonButton) {
         comparisonButton.dataset.active = "false";
-        comparisonButton.textContent = "Comparison: Off";
+        comparisonButton.setAttribute("aria-checked", "false");
     }
 
     const comparisonEditTarget = document.getElementById("comparison-edit-target");
@@ -719,7 +719,8 @@ document.getElementById("comparison-toggle").addEventListener("click", () => {
     }
 
     button.dataset.active = nextValue ? "true" : "false";
-    button.textContent = nextValue ? "Comparison: On" : "Comparison: Off";
+
+    button.setAttribute("aria-checked", String(nextValue));
 
     if (nextValue) {
         const target = getComparisonEditTarget();
@@ -863,7 +864,7 @@ export function openListQuery(query, options = {}) {
     const comparisonButton = document.getElementById("comparison-toggle");
     if (comparisonButton && comparisonButton.dataset.active === "true") {
         comparisonButton.dataset.active = "false";
-        comparisonButton.textContent = "Comparison: Off";
+        comparisonButton.setAttribute("aria-checked", "false");
     }
     state.comparisonFilterStates = { left: {}, right: {} };
     state.comparisonStateInitialized = false;

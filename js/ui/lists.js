@@ -336,26 +336,28 @@ export function getSelectedDisplayMode() {
     return DISPLAY_MODE_LIST;
 }
 
-// The two lists sit side by side when each gets this much room (the same
-// 300px as .comparison-lists in style.css, plus the 1rem gap between them).
-const MIN_COMPARISON_LIST_WIDTH = 300;
+// The two sides sit side by side when each gets this much room (the same
+// widths as .comparison-lists and .comparison-charts in style.css, plus the
+// 1rem gap between them). Charts need more room than lists for their labels.
+const MIN_COMPARISON_WIDTH = { lists: 300, charts: 340 };
 const COMPARISON_GAP = 16;
 
 function comparisonFitsSideBySide(layout) {
-    return layout.clientWidth >= 2 * MIN_COMPARISON_LIST_WIDTH + COMPARISON_GAP;
+    const min = layout.classList.contains("comparison-charts") ? MIN_COMPARISON_WIDTH.charts : MIN_COMPARISON_WIDTH.lists;
+    return layout.clientWidth >= 2 * min + COMPARISON_GAP;
 }
 
-// Too narrow for both: show one list at a time, with a Left / Right switch.
+// Too narrow for both: show one side at a time, with a Left / Right switch.
 // Opens on the side the filter panel is editing, so applying a change to the
-// right list shows the right list.
+// right side shows the right side.
 let comparisonSideShown = "left";
 
-function addComparisonSwitch(layout) {
+function addComparisonSwitch(layout, noun) {
     const group = document.createElement("div");
     group.className = "comparison-switch";
     group.setAttribute("role", "group");
-    group.setAttribute("aria-label", "List to show");
-    group.innerHTML = '<button type="button" data-side="left">Left list</button><button type="button" data-side="right">Right list</button>';
+    group.setAttribute("aria-label", `${noun.charAt(0).toUpperCase()}${noun.slice(1)} to show`);
+    group.innerHTML = `<button type="button" data-side="left">Left ${noun}</button><button type="button" data-side="right">Right ${noun}</button>`;
     group.addEventListener("click", event => {
         const button = event.target.closest("[data-side]");
         if (!button) return;
@@ -375,15 +377,21 @@ function showComparisonSide(layout) {
     });
 }
 
+// Side by side or one at a time, by the room there is. Returns null while
+// the comparison is hidden (it is laid out again once it shows).
+function updateComparisonLayout(layout) {
+    if (!layout || !layout.clientWidth) return null;
+    const sideBySide = comparisonFitsSideBySide(layout);
+    layout.classList.toggle("is-one-at-a-time", !sideBySide);
+    return sideBySide;
+}
+
 // Side by side, row n of the left list and row n of the right list get the
 // same height so they line up. One at a time, each keeps its own heights.
 function equalizeComparisonRowHeights(leftContainer, rightContainer) {
     if (!leftContainer || !rightContainer) return;
-    const layout = leftContainer.closest(".comparison-results");
-    if (!layout || !layout.clientWidth) return;
-
-    const sideBySide = comparisonFitsSideBySide(layout);
-    layout.classList.toggle("is-one-at-a-time", !sideBySide);
+    const sideBySide = updateComparisonLayout(leftContainer.closest(".comparison-results"));
+    if (sideBySide === null) return;
 
     const leftRows = Array.from(leftContainer.children);
     const rightRows = Array.from(rightContainer.children);
@@ -404,12 +412,22 @@ function equalizeComparisonRowHeights(leftContainer, rightContainer) {
     });
 }
 
-// Row heights depend on the width, so match them again when it changes
-// (a resized window, a turned phone, the filter panel opening or closing,
-// or a comparison rendered while hidden behind an entity page).
+// The layout (and the row heights of lists) depends on the width, so it is
+// worked out again when the width changes: a resized window, a turned phone,
+// the filter panel opening or closing, or a comparison rendered while
+// hidden behind an entity page.
 let comparisonResizeObserver = null;
 
-function keepComparisonRowsMatched(layout, leftContainer, rightContainer) {
+function setUpComparison(layout, kind, leftContainer, rightContainer) {
+    layout.classList.add(kind === "lists" ? "comparison-lists" : "comparison-charts");
+    comparisonSideShown = getComparisonEditTarget();
+    addComparisonSwitch(layout, kind === "lists" ? "list" : "chart");
+    showComparisonSide(layout);
+    const refresh = kind === "lists"
+        ? () => equalizeComparisonRowHeights(leftContainer, rightContainer)
+        : () => updateComparisonLayout(layout);
+    refresh();
+
     comparisonResizeObserver?.disconnect();
     if (typeof ResizeObserver === "undefined") return;
     let lastWidth = layout.offsetWidth;
@@ -417,7 +435,7 @@ function keepComparisonRowsMatched(layout, leftContainer, rightContainer) {
         const width = layout.offsetWidth;
         if (width === lastWidth) return;
         lastWidth = width;
-        equalizeComparisonRowHeights(leftContainer, rightContainer);
+        refresh();
     });
     comparisonResizeObserver.observe(layout);
 }
@@ -532,12 +550,14 @@ export function displayEntities() {
         const sidesChartable = leftEntityType !== "scrobble" && rightEntityType !== "scrobble";
         const comparisonMode = sidesChartable ? renderMode : DISPLAY_MODE_LIST;
         if (comparisonMode === DISPLAY_MODE_BAR_CHART) {
+            setUpComparison(comparisonLayout, "charts", leftList, rightList);
             renderBarChartEntities(leftEntities, leftEntityType, leftSortingBasis, leftList);
             renderBarChartEntities(rightEntities, rightEntityType, rightSortingBasis, rightList);
         } else if (comparisonMode === DISPLAY_MODE_BAR_RACE) {
             if (raceCanRender) {
                 const raceView = createRaceView(resultsDiv);
                 raceView.charts.appendChild(comparisonLayout);
+                setUpComparison(comparisonLayout, "charts", leftList, rightList);
                 insertRacePlaybackToolbar(raceView.controls);
                 renderBarRaceComparison(
                     leftPipeline.tracks,
@@ -554,18 +574,14 @@ export function displayEntities() {
                     rightList
                 );
             } else {
+                setUpComparison(comparisonLayout, "charts", leftList, rightList);
                 renderBarChartEntities(leftEntities, leftEntityType, leftSortingBasis, leftList);
                 renderBarChartEntities(rightEntities, rightEntityType, rightSortingBasis, rightList);
             }
         } else {
-            comparisonLayout.classList.add("comparison-lists");
-            comparisonSideShown = getComparisonEditTarget();
-            addComparisonSwitch(comparisonLayout);
-            showComparisonSide(comparisonLayout);
             renderEntitiesToContainer(leftEntities, leftEntityType, leftList, leftSortingBasis, leftCaps);
             renderEntitiesToContainer(rightEntities, rightEntityType, rightList, rightSortingBasis, rightCaps);
-            equalizeComparisonRowHeights(leftList, rightList);
-            keepComparisonRowsMatched(comparisonLayout, leftList, rightList);
+            setUpComparison(comparisonLayout, "lists", leftList, rightList);
         }
 
         state.lastRenderedListState = {
@@ -577,13 +593,13 @@ export function displayEntities() {
 
         const resultsHeader = document.querySelector("#results-section h2");
         if (comparisonMode === DISPLAY_MODE_BAR_CHART) {
-            resultsHeader.textContent = "Comparison Bar Charts";
+            resultsHeader.textContent = "Comparison bar charts";
         } else if (comparisonMode === DISPLAY_MODE_BAR_RACE) {
             resultsHeader.textContent = raceCanRender
-                ? "Comparison Bar Chart Race"
-                : "Comparison Bar Charts (Race settings pending or Apply Filters required)";
+                ? "Comparison bar chart race"
+                : "Comparison bar charts (race settings pending, or Apply Filters needed)";
         } else {
-            resultsHeader.textContent = "Comparison Results";
+            resultsHeader.textContent = "Comparison";
         }
 
         state.filteredData = leftEntities;
@@ -625,19 +641,19 @@ export function displayEntities() {
 
     const resultsHeader = document.querySelector("#results-section h2");
     if (renderMode === DISPLAY_MODE_BAR_CHART) {
-        resultsHeader.textContent = "Bar Chart";
+        resultsHeader.textContent = "Bar chart";
     } else if (renderMode === DISPLAY_MODE_BAR_RACE) {
         resultsHeader.textContent = raceCanRender
-            ? "Bar Chart Race"
-            : "Bar Chart (Race settings pending or Apply Filters required)";
+            ? "Bar chart race"
+            : "Bar chart (race settings pending, or Apply Filters needed)";
     } else if (leftPipeline.hasOrderingStep && entityType === "track") {
-        resultsHeader.textContent = "Equation Results";
+        resultsHeader.textContent = "Equation results";
     } else if (entityType === "track") {
-        resultsHeader.textContent = "Top Tracks";
+        resultsHeader.textContent = "Top tracks";
     } else if (entityType === "album") {
-        resultsHeader.textContent = "Top Albums";
+        resultsHeader.textContent = "Top albums";
     } else if (entityType === "artist") {
-        resultsHeader.textContent = "Top Artists";
+        resultsHeader.textContent = "Top artists";
     } else if (entityType === "scrobble") {
         resultsHeader.textContent = "Scrobbles";
     }

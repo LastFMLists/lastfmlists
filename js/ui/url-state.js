@@ -218,14 +218,14 @@ export function applySettings(settings) {
         setControl("equations-right", rightEquations);
         if (comparisonButton) {
             comparisonButton.dataset.active = "true";
-            comparisonButton.textContent = "Comparison: On";
+            comparisonButton.setAttribute("aria-checked", "true");
         }
     } else {
         state.comparisonFilterStates = { left: {}, right: {} };
         state.comparisonStateInitialized = false;
         if (comparisonButton) {
             comparisonButton.dataset.active = "false";
-            comparisonButton.textContent = "Comparison: Off";
+            comparisonButton.setAttribute("aria-checked", "false");
         }
     }
 
