@@ -75,8 +75,11 @@ function fillEntityRow(row, type, identity, { rank = null, text, metric = null }
 }
 
 // Title, then "artist · album", then any detail lines (already escaped).
+// Phones put the artist and the album on lines of their own (see style.css).
 function rowText(title, subtitleParts, details = [], extra = "") {
-    const subtitle = subtitleParts.filter(Boolean).map(escapeHTML).join(" · ");
+    const subtitle = subtitleParts.filter(Boolean)
+        .map(part => `<span class="row-sub-part">${escapeHTML(part)}</span>`)
+        .join(`<span class="row-sub-sep" aria-hidden="true"> · </span>`);
     return `<span class="row-head"><strong class="row-title">${escapeHTML(title)}</strong>${extra}</span>`
         + (subtitle ? `<span class="row-sub">${subtitle}</span>` : "")
         + details.map(line => `<span class="row-details">${line}</span>`).join("");
@@ -587,7 +590,7 @@ function announceRenderedList(count, listInfo) {
     document.dispatchEvent(new CustomEvent("lists:rendered", { detail: { count, ...listInfo } }));
 }
 
-// "Graph over time" opens the list on screen in the graph builder: its top
+// "Graph" opens the list on screen in the graph builder: its top
 // items, ranked the same way, counted over the plays the list uses.
 function offerGraph(entityType, sortingBasis, xValue, tracks, entities) {
     const graphable = entityType !== "scrobble" && entities.length > 0;

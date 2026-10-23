@@ -28,11 +28,12 @@ work. Serve the folder over HTTP instead (`python3 -m http.server`).
 
 Unreleased:
 
-- List rows are shorter and easier to scan: the rank sits in its own column, the title has its artist and album on one line under it, and the number the list is ranked by (with its unit, such as "106 scrobbles" or "7 days in a row") sits on the right, where the numbers line up. Dates and other details go on a small line under the title, and the "Album:" and "Scrobbles:" labels are gone. Every other row is shaded only lightly.
+- List rows are shorter and easier to scan: the rank sits in its own column, the title has its artist and album under it (on one line, or on a line each on phones), and the number the list is ranked by (with its unit, such as "106 scrobbles" or "7 days in a row") sits on the right, where the numbers line up. Dates and other details go on a small line under the title, and the "Album:" and "Scrobbles:" labels are gone. Every other row is shaded only lightly.
 - Easier to read colors: buttons filled with the orange accent have dark text, as they already did in the dark theme, and orange text and links are a darker shade of the orange. The shading of every other row in the dark theme is lighter on the gray text.
 - Load Details and Load ALL Details are one Load Details button with a small menu, and Export Image and Export Grid are one Export button with Image and Album grid in its menu. Save Data stays a button of its own.
-- Explore, Lists, Graphs and Games are a tab bar with an underline under the open tab, so they no longer look like the buttons above them.
-- The font is Hanken Grotesk, and font sizes and corner rounding each come from a short set of steps instead of dozens of one-off values.
+- Explore, Lists, Graphs and Games are a centered tab bar with an underline under the open tab, so they no longer look like the buttons above them.
+- Graph over time above a list is now just Graph, so it fits beside the list's title on phones, and the buttons there keep their space above the list when they wrap under the title.
+- The font is IBM Plex Sans. Like the old one it covers accented Latin (Hungarian ő and ű included), Cyrillic, Greek and Vietnamese, and Japanese, Korean, Chinese and other scripts use the device's own fonts, as before. Font sizes and corner rounding each come from a short set of steps instead of dozens of one-off values.
 - The edge tab that opens and closes the filters is a quiet tab with an arrow icon instead of an orange bar. On the Games tab, each game's icon sits beside its name. The guide and FAQ have shorter lines.
 - A profile picture that fails to load shows the username's first letter instead of a broken image.
 
