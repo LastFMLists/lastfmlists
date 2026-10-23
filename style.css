@@ -3300,10 +3300,19 @@ footer a:hover {
    ========================================================================== */
 
 @media (max-width: 1024px) {
-    #session-panel {
-        grid-template-columns: 1fr;
-        justify-items: center;
-        gap: 0.55rem;
+    /* Name on its own line, then the buttons and the icons sharing a row
+       when they fit */
+    body.app-loaded #session-panel {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        align-items: center;
+        gap: 0.55rem 0.45rem;
+    }
+
+    #session-panel .session-user {
+        flex-basis: 100%;
+        justify-content: center;
     }
 }
 
@@ -3467,6 +3476,12 @@ footer a:hover {
     #session-panel .session-socials a {
         width: 40px;
         height: 40px;
+    }
+
+    /* GitHub and Reddit stay on the start page and in the footer; leaving
+       them out here fits every icon on one row */
+    #session-panel .session-socials .session-social-extra {
+        display: none;
     }
 
     .input-shell {
