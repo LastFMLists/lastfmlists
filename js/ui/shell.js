@@ -249,12 +249,16 @@ function syncSidebarLayoutState() {
     document.body.classList.toggle("sidebar-collapsed", sidebar.classList.contains("closed"));
 }
 
+// The edge tab's arrow points the way the panel will move.
+const SIDEBAR_CLOSE_ICON = '<i class="fas fa-chevron-left" aria-hidden="true"></i>';
+const SIDEBAR_OPEN_ICON = '<i class="fas fa-chevron-right" aria-hidden="true"></i>';
+
 function openFilterSidebar() {
     const sidebar = document.getElementById("filters-section");
     const toggle = document.getElementById("filters-section-toggle");
     if (!sidebar || !sidebar.classList.contains("closed")) return;
     sidebar.classList.remove("closed");
-    if (toggle) toggle.innerHTML = "&#10094;";
+    if (toggle) toggle.innerHTML = SIDEBAR_CLOSE_ICON;
     syncSidebarLayoutState();
 }
 
@@ -271,7 +275,7 @@ document.getElementById("filters-section-toggle").addEventListener("click", func
     syncSidebarLayoutState();
 
     // Change arrow direction
-    this.innerHTML = sidebar.classList.contains("closed") ? "&#10095;" : "&#10094;";
+    this.innerHTML = sidebar.classList.contains("closed") ? SIDEBAR_OPEN_ICON : SIDEBAR_CLOSE_ICON;
 });
 
 // Start with the filter drawer collapsed on small touchscreens so it
@@ -281,7 +285,7 @@ document.getElementById("filters-section-toggle").addEventListener("click", func
     const toggle = document.getElementById("filters-section-toggle");
     if (sidebar && toggle && window.matchMedia("(max-width: 768px)").matches) {
         sidebar.classList.add("closed");
-        toggle.innerHTML = "&#10095;";
+        toggle.innerHTML = SIDEBAR_OPEN_ICON;
     }
 })();
 

@@ -64,7 +64,7 @@
 	<link rel="apple-touch-icon" href="logo.png" sizes="180x180">
 	<link rel="preconnect" href="https://fonts.googleapis.com">
 	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-	<link href="https://fonts.googleapis.com/css2?family=Roboto+Flex:opsz,wght@8..144,300..800&display=swap" rel="stylesheet">
+	<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet">
 	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 	<link rel="stylesheet" href="style.css">
 </head>
@@ -107,11 +107,21 @@
                 </div>
             </div>
             <div class="session-actions">
-                <button type="button" id="load-detailed-data" disabled aria-label="Load details" title="Downloads Last.fm metadata for your top artists, albums and tracks: track length, genre and country tags, and global listener and play counts. This unlocks the duration, tag and global-stats filters and the “Time spent listening” and “Percentage of global scrobbles” sorts. It covers most uses and takes less time than “Load ALL Details”. Load your data first to use this."><i class="fas fa-circle-down" aria-hidden="true"></i><span class="btn-label">Load Details</span></button>
-                <button type="button" id="load-all-details" disabled aria-label="Load ALL details" title="Downloads the same metadata for every artist, album and track you have scrobbled, including the ones outside your top lists. This makes thousands of requests and can take hours. Load your data first to use this."><i class="fas fa-cloud-arrow-down" aria-hidden="true"></i><span class="btn-label">Load ALL Details</span></button>
+                <div class="menu" data-menu>
+                    <button type="button" id="details-menu-button" class="menu-trigger" aria-expanded="false" aria-controls="details-menu" disabled title="Download Last.fm metadata: track length, tags and global counts"><i class="fas fa-circle-down" aria-hidden="true"></i><span class="btn-label">Load Details</span><i class="fas fa-chevron-down menu-caret" aria-hidden="true"></i></button>
+                    <div class="menu-list" id="details-menu" hidden>
+                        <button type="button" id="load-detailed-data" class="menu-item" disabled title="Downloads Last.fm metadata for your top artists, albums and tracks: track length, genre and country tags, and global listener and play counts. This unlocks the duration, tag and global-stats filters and the “Time spent listening” and “Percentage of global scrobbles” sorts. It covers most uses and takes less time than “Load ALL Details”. Load your data first to use this."><span class="menu-item-title">Load Details</span><span class="menu-item-desc">Your top artists, albums and tracks. Enough for most statistics.</span></button>
+                        <button type="button" id="load-all-details" class="menu-item" disabled title="Downloads the same metadata for every artist, album and track you have scrobbled, including the ones outside your top lists. This makes thousands of requests and can take hours. Load your data first to use this."><span class="menu-item-title">Load ALL Details</span><span class="menu-item-desc">Everything you have scrobbled. Can take hours.</span></button>
+                    </div>
+                </div>
                 <button type="button" id="save-data" aria-label="Save data" title="Save your loaded data to this browser"><i class="fas fa-floppy-disk" aria-hidden="true"></i><span class="btn-label">Save Data</span></button>
-                <button type="button" id="open-export-options" aria-label="Export as image" title="Export the current list as a PNG image"><i class="fas fa-image" aria-hidden="true"></i><span class="btn-label">Export Image</span></button>
-                <button type="button" id="open-grid-export" aria-label="Export as grid" title="Export album artwork as a collage grid"><i class="fas fa-table-cells" aria-hidden="true"></i><span class="btn-label">Export Grid</span></button>
+                <div class="menu" data-menu>
+                    <button type="button" id="export-menu-button" class="menu-trigger" aria-expanded="false" aria-controls="export-menu" title="Export the list, chart or album covers"><i class="fas fa-image" aria-hidden="true"></i><span class="btn-label">Export</span><i class="fas fa-chevron-down menu-caret" aria-hidden="true"></i></button>
+                    <div class="menu-list" id="export-menu" hidden>
+                        <button type="button" id="open-export-options" class="menu-item" title="Export the current list as a PNG image"><span class="menu-item-title">Image</span><span class="menu-item-desc">The list or chart on screen as a PNG, or a race as a GIF.</span></button>
+                        <button type="button" id="open-grid-export" class="menu-item" title="Export album artwork as a collage grid"><span class="menu-item-title">Album grid</span><span class="menu-item-desc">Covers of your top albums as a collage.</span></button>
+                    </div>
+                </div>
             </div>
             <div class="session-socials">
                 <button type="button" id="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark theme"><i class="fas fa-moon"></i></button>
@@ -670,7 +680,7 @@
         </section>
 
         <!-- Sidebar toggle (placed outside) -->
-        <button id="filters-section-toggle" aria-label="Toggle filter sidebar">&#10094;</button>
+        <button id="filters-section-toggle" aria-label="Toggle filter sidebar"><i class="fas fa-chevron-left" aria-hidden="true"></i></button>
 
         <!-- Active Filters Section -->
         <div id="active-filters" class="active-filters content-block"></div>

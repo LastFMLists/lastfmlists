@@ -103,7 +103,7 @@ async function exportCurrentListAsImage() {
     captureRoot.style.padding = '16px';
     captureRoot.style.backgroundColor = 'var(--background-color)';
     captureRoot.style.color = 'var(--primary-text-color)';
-    captureRoot.style.fontFamily = 'Roboto Flex, sans-serif';
+    captureRoot.style.fontFamily = 'var(--font-stack)';
 
     const pageTheme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
     const captureTheme = exportTheme === 'current' ? pageTheme : exportTheme;
@@ -515,7 +515,7 @@ async function exportCurrentListAsGrid() {
     captureRoot.style.padding = '0';
     captureRoot.style.backgroundColor = 'var(--background-color)';
     captureRoot.style.color = 'var(--primary-text-color)';
-    captureRoot.style.fontFamily = 'Roboto Flex, sans-serif';
+    captureRoot.style.fontFamily = 'var(--font-stack)';
     
     // INCREASED: Base width is now 300px per column
     captureRoot.style.width = `${gridX * 300}px`;

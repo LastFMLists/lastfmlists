@@ -39,9 +39,11 @@ import {
 } from './charts.js';
 import { isComparisonEnabled, updateActiveFilters } from './filters-panel.js';
 
-// A list row with a cover on the left. Clicking it opens the entity's own
-// page (see ui/entity-page.js), so the row carries the entity's identity.
-function fillEntityRow(row, type, identity, html) {
+// A list row: rank, cover, title with its artist and album underneath, and
+// the number the list is ranked by on the right. Clicking it opens the
+// entity's own page (see ui/entity-page.js), so the row carries the entity's
+// identity.
+function fillEntityRow(row, type, identity, { rank = null, text, metric = null }) {
     row.classList.add("entity-row");
     row.tabIndex = 0;
     row.setAttribute("role", "button");
@@ -51,10 +53,43 @@ function fillEntityRow(row, type, identity, html) {
     if (identity.album) row.dataset.album = identity.album;
     row.title = `Show stats for ${identity.name}`;
 
-    const text = document.createElement("div");
-    text.className = "entity-row-text";
-    text.innerHTML = html;
-    row.append(createArtworkElement(type, identity.name, identity.artist, identity.album), text);
+    const parts = [];
+    if (rank !== null) {
+        const rankEl = document.createElement("span");
+        rankEl.className = "row-rank";
+        rankEl.textContent = rank;
+        parts.push(rankEl);
+    }
+    parts.push(createArtworkElement(type, identity.name, identity.artist, identity.album));
+    const textEl = document.createElement("div");
+    textEl.className = "entity-row-text";
+    textEl.innerHTML = text;
+    parts.push(textEl);
+    if (metric) {
+        const metricEl = document.createElement("div");
+        metricEl.className = "row-metric";
+        metricEl.innerHTML = metric;
+        parts.push(metricEl);
+    }
+    row.append(...parts);
+}
+
+// Title, then "artist · album", then any detail lines (already escaped).
+function rowText(title, subtitleParts, details = [], extra = "") {
+    const subtitle = subtitleParts.filter(Boolean).map(escapeHTML).join(" · ");
+    return `<span class="row-head"><strong class="row-title">${escapeHTML(title)}</strong>${extra}</span>`
+        + (subtitle ? `<span class="row-sub">${subtitle}</span>` : "")
+        + details.map(line => `<span class="row-details">${line}</span>`).join("");
+}
+
+function rowMetric(metric) {
+    if (!metric || metric.value === null || metric.value === undefined || metric.value === "") return null;
+    return `<strong>${escapeHTML(String(metric.value))}</strong>`
+        + (metric.unit ? `<small>${escapeHTML(metric.unit)}</small>` : "");
+}
+
+function unfilteredNote(info) {
+    return info ? ` <small class="row-unfiltered" title="Rank and scrobbles without filters">${escapeHTML(info)}</small>` : "";
 }
 
 function displayTopTracks(tracks, targetDiv = null, sortingBasisOverride = null) {
@@ -72,9 +107,7 @@ function displayTopTracks(tracks, targetDiv = null, sortingBasisOverride = null)
     tracks.slice(0, listLength).forEach((track, index) => {
         const trackDiv = document.createElement("div");
         trackDiv.classList.add("track");
-        let additionalInfo = '';
-        additionalInfo = getAdditionalInfo(sortingBasis, track);
-        
+        const rowInfo = getRowInfo(sortingBasis, track);
 
         // If the track appears on multiple albums, display the album with the highest scrobble count.
         let albumDisplay = '';
@@ -93,15 +126,15 @@ function displayTopTracks(tracks, targetDiv = null, sortingBasisOverride = null)
         if (showUnfiltered) {
             const key = `${track.Artist.toLowerCase()} - ${track.Track.toLowerCase()}`;
             if (unfilteredMapping[key]) {
-                unfilteredInfo = ` (#${unfilteredMapping[key].rank}, ${unfilteredMapping[key].count})`;
+                unfilteredInfo = `(#${unfilteredMapping[key].rank}, ${unfilteredMapping[key].count})`;
             }
         }
 
-        fillEntityRow(trackDiv, "track", { name: track.Track, artist: track.Artist, album: albumDisplay || null }, `
-            <strong>${index + 1}. ${escapeHTML(track.Track)}</strong> by ${escapeHTML(track.Artist)}${unfilteredInfo}
-            ${albumDisplay ? `<br>Album: ${escapeHTML(albumDisplay)}` : ''}
-            <br>${additionalInfo}
-        `);
+        fillEntityRow(trackDiv, "track", { name: track.Track, artist: track.Artist, album: albumDisplay || null }, {
+            rank: index + 1,
+            text: rowText(track.Track, [track.Artist, albumDisplay], rowInfo.details, unfilteredNote(unfilteredInfo)),
+            metric: rowMetric(rowInfo)
+        });
         fragment.appendChild(trackDiv);
     });
     resultsDiv.appendChild(fragment);
@@ -122,22 +155,21 @@ function displayTopAlbums(albums, targetDiv = null, sortingBasisOverride = null)
     albums.slice(0, listLength).forEach((album, index) => {
         const albumDiv = document.createElement("div");
         albumDiv.classList.add("album");
-        let additionalInfo = '';
-
-        additionalInfo = getAdditionalInfo(sortingBasis, album);
+        const rowInfo = getRowInfo(sortingBasis, album);
 
         let unfilteredInfo = '';
         if (showUnfiltered) {
             const key = `${album.name.toLowerCase()}||${album.artist.toLowerCase()}`;
             if (unfilteredMapping[key]) {
-                unfilteredInfo = ` (#${unfilteredMapping[key].rank}, ${unfilteredMapping[key].count})`;
+                unfilteredInfo = `(#${unfilteredMapping[key].rank}, ${unfilteredMapping[key].count})`;
             }
         }
 
-        fillEntityRow(albumDiv, "album", { name: album.name, artist: album.artist }, `
-            <strong>${index + 1}. ${escapeHTML(album.name)}</strong> by ${escapeHTML(album.artist)}${unfilteredInfo}<br>
-            ${additionalInfo}
-        `);
+        fillEntityRow(albumDiv, "album", { name: album.name, artist: album.artist }, {
+            rank: index + 1,
+            text: rowText(album.name, [album.artist], rowInfo.details, unfilteredNote(unfilteredInfo)),
+            metric: rowMetric(rowInfo)
+        });
         fragment.appendChild(albumDiv);
     });
     resultsDiv.appendChild(fragment);
@@ -158,28 +190,31 @@ function displayTopArtists(artists, targetDiv = null, sortingBasisOverride = nul
     artists.slice(0, listLength).forEach((artist, index) => {
         const artistDiv = document.createElement("div");
         artistDiv.classList.add("artist");
-        let additionalInfo = '';
-
-        additionalInfo = getAdditionalInfo(sortingBasis, artist);
+        const rowInfo = getRowInfo(sortingBasis, artist);
 
         let unfilteredInfo = '';
         if (showUnfiltered) {
             const key = artist.name.toLowerCase();
             if (unfilteredMapping[key]) {
-                unfilteredInfo = ` (#${unfilteredMapping[key].rank}, ${unfilteredMapping[key].count})`;
+                unfilteredInfo = `(#${unfilteredMapping[key].rank}, ${unfilteredMapping[key].count})`;
             }
         }
 
-        fillEntityRow(artistDiv, "artist", { name: artist.name, artist: artist.name }, `
-            <strong>${index + 1}. ${escapeHTML(artist.name)}</strong>${unfilteredInfo}<br>
-            ${additionalInfo}
-        `);
+        fillEntityRow(artistDiv, "artist", { name: artist.name, artist: artist.name }, {
+            rank: index + 1,
+            text: rowText(artist.name, [], rowInfo.details, unfilteredNote(unfilteredInfo)),
+            metric: rowMetric(rowInfo)
+        });
         fragment.appendChild(artistDiv);
     });
     resultsDiv.appendChild(fragment);
 }
 
-function getAdditionalInfo(sortingBasis, entity) {
+// What a row shows for the list's sort: the value it is ranked by (shown on
+// the right) with its unit, and detail lines such as dates (under the title,
+// already escaped). Lists with equation steps show the steps' values as
+// detail lines instead.
+function getRowInfo(sortingBasis, entity) {
     const hiddenByDefaultEquationDetailFields = new Set(["artist-name", "track-name"]);
     const sortHistory = Array.isArray(entity.equationPipelineSortHistory) ? entity.equationPipelineSortHistory : [];
     const showFields = Array.isArray(entity.equationPipelineShowFields) ? entity.equationPipelineShowFields : [];
@@ -225,50 +260,52 @@ function getAdditionalInfo(sortingBasis, entity) {
             }
         }
 
-        return lines.join("<br>");
+        return { value: null, unit: "", details: lines };
     }
 
-	if (sortingBasis === 'separate-days') {
-		return `Different days: ${entity.count}`;
-	} else if (sortingBasis === 'separate-weeks') {
-		return `Different weeks: ${entity.count}`;
-	} else if (sortingBasis === 'separate-months') {
-		return `Different months: ${entity.count}`;
-    } else if (sortingBasis === 'max-single-day') {
-        return `Max scrobbles in a day: ${entity.count}<br>Day: ${escapeHTML(entity.periodLabel)}`;
-    } else if (sortingBasis === 'max-single-week') {
-        return `Max scrobbles in a week: ${entity.count}<br>Week: ${escapeHTML(entity.periodLabel)}`;
-    } else if (sortingBasis === 'max-single-month') {
-        return `Max scrobbles in a month: ${entity.count}<br>Month: ${escapeHTML(entity.periodLabel)}`;
+    const plural = (count, one, many) => (Number(count) === 1 ? one : many);
+    const isoDate = timestamp => timestamp ? new Date(parseInt(timestamp, 10)).toISOString().split('T')[0] : 'N/A';
+    const periodNames = { "separate-days": ["day", "days"], "separate-weeks": ["week", "weeks"], "separate-months": ["month", "months"] };
+
+    if (periodNames[sortingBasis]) {
+        const [one, many] = periodNames[sortingBasis];
+        return { value: entity.count, unit: plural(entity.count, one, many), details: [] };
+    } else if (sortingBasis === 'max-single-day' || sortingBasis === 'max-single-week' || sortingBasis === 'max-single-month') {
+        const period = sortingBasis.replace('max-single-', '');
+        const label = period.charAt(0).toUpperCase() + period.slice(1);
+        return { value: entity.count, unit: `in one ${period}`, details: [`${label}: ${escapeHTML(entity.periodLabel)}`] };
     } else if (isRollingWindowSortingBasis(sortingBasis)) {
         const start = entity.windowStart ? new Date(entity.windowStart).toLocaleString() : 'N/A';
         const end = entity.windowEnd ? new Date(entity.windowEnd).toLocaleString() : 'N/A';
-        return `Max scrobbles in ${entity.windowHours}h: ${entity.count}<br>Window start: ${start}<br>Window end: ${end}`;
-	} else if (sortingBasis.startsWith('consecutive-')) {
-		const startDate = entity.startTime ? new Date(parseInt(entity.startTime)).toISOString().split('T')[0] : 'N/A';
-		const endDate = entity.endTime ? new Date(parseInt(entity.endTime)).toISOString().split('T')[0] : 'N/A';
-		let periodLabel = sortingBasis.replace('consecutive-', '').replace('-', ' ');
-		return `Max consecutive ${periodLabel}: ${entity.maxConsecutive}<br>Start: ${startDate}<br>End: ${endDate}`;
-	} else if (sortingBasis === 'highest-listening-percentage') {
-        return `Listening %: ${entity.listeningPercentage.toFixed(2)}%<br>Scrobbles: ${entity.scrobbles}<br>Playcount: ${entity.playcount}`;
+        return { value: entity.count, unit: `in ${entity.windowHours} hours`, details: [`From ${escapeHTML(start)} to ${escapeHTML(end)}`] };
+    } else if (sortingBasis.startsWith('consecutive-')) {
+        const period = sortingBasis.replace('consecutive-', '');
+        const unit = `${Number(entity.maxConsecutive) === 1 ? period.replace(/s$/, '') : period} in a row`;
+        return { value: entity.maxConsecutive, unit, details: [`${isoDate(entity.startTime)} to ${isoDate(entity.endTime)}`] };
+    } else if (sortingBasis === 'highest-listening-percentage') {
+        return {
+            value: `${entity.listeningPercentage.toFixed(2)}%`,
+            unit: "of its global scrobbles",
+            details: [`${escapeHTML(entity.scrobbles)} of ${escapeHTML(entity.playcount)} scrobbles on Last.fm`]
+        };
     } else if (sortingBasis === 'time-spent-listening') {
-        return `Listening time: ${formatDuration(entity.listeningDuration)}`;
+        return { value: formatDuration(entity.listeningDuration), unit: "listening", details: [] };
     } else if (sortingBasis === 'first-n-scrobbles') {
-        const firstScrobbleDate = entity.dates?.[0] ? new Date(parseInt(entity.dates[0], 10)).toISOString().split('T')[0] : 'N/A';
-		const reachedDate = entity.dateReached ? new Date(parseInt(entity.dateReached, 10)).toISOString().split('T')[0] : 'N/A';
-        return `First scrobble: ${firstScrobbleDate}<br>Date reached: ${reachedDate}`
+        return { value: isoDate(entity.dateReached), unit: "reached", details: [`First scrobble: ${isoDate(entity.dates?.[0])}`] };
     } else if (sortingBasis === 'fastest-n-scrobbles') {
-        const startFastest = entity.firstScrobble ? new Date(parseInt(entity.firstScrobble)).toISOString().split('T')[0] : 'N/A';
-		const endFastest = entity.dateReached ? new Date(parseInt(entity.dateReached)).toISOString().split('T')[0] : 'N/A';
-        return `Time to reach: ${formatDuration(entity.timeNeeded)}<br>First scrobble: ${startFastest}<br>Date reached: ${endFastest} `
+        return {
+            value: formatDuration(entity.timeNeeded),
+            unit: "to reach",
+            details: [`${isoDate(entity.firstScrobble)} to ${isoDate(entity.dateReached)}`]
+        };
     } else if (sortingBasis === 'oldest-average-listening-time' || sortingBasis === 'newest-average-listening-time') {
-        const avgDate = entity.averageListeningTimestamp
-            ? new Date(parseInt(entity.averageListeningTimestamp, 10)).toISOString().split('T')[0]
-            : 'N/A';
-        return `Average listening date: ${avgDate}<br>Scrobbles: ${entity.count}`;
-    } else {
-		return `Scrobbles: ${entity.count}`;
-	}
+        return {
+            value: isoDate(entity.averageListeningTimestamp),
+            unit: "average play",
+            details: [`${escapeHTML(entity.count)} ${plural(entity.count, "scrobble", "scrobbles")}`]
+        };
+    }
+    return { value: entity.count, unit: plural(entity.count, "scrobble", "scrobbles"), details: [] };
 }
 
 function renderEntitiesToContainer(entities, entityType, targetDiv, sortingBasis, caps) {
@@ -598,11 +635,10 @@ function displayScrobbles(scrobbles, targetDiv = null, order = "asc", caps = cur
             String(date.getHours()).padStart(2, "0") + ":" + 
             String(date.getMinutes()).padStart(2, "0");
 
-        fillEntityRow(trackDiv, "track", { name: track.Track, artist, album: track.Album }, `
-            <strong>${escapeHTML(track.Track)}</strong> by ${escapeHTML(artist)}
-            <br>Album: ${escapeHTML(track.Album || "Unknown")}
-            <br>Scrobbled on: ${formattedDate}
-        `);
+        fillEntityRow(trackDiv, "track", { name: track.Track, artist, album: track.Album }, {
+            text: rowText(track.Track, [artist, track.Album || "Unknown"]),
+            metric: rowMetric({ value: formattedDate.slice(0, 10), unit: formattedDate.slice(11) })
+        });
 
         fragment.appendChild(trackDiv);
     });
