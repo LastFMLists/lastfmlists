@@ -349,8 +349,8 @@ function ordRenderRound() {
             `<span class="ord-rank">${i + 1}.</span>` +
             `<span class="ord-name">${escapeHTML(item.name)}${sub}</span>` +
             `<span class="ord-value"></span>` +
-            `<span class="ord-moves"><button type="button" class="ord-up" aria-label="Move up">&#9650;</button>` +
-            `<button type="button" class="ord-down" aria-label="Move down">&#9660;</button></span>`;
+            `<span class="ord-moves"><button type="button" class="ord-up" aria-label="Move up"><i class="fas fa-chevron-up" aria-hidden="true"></i></button>` +
+            `<button type="button" class="ord-down" aria-label="Move down"><i class="fas fa-chevron-down" aria-hidden="true"></i></button></span>`;
         list.appendChild(li);
     });
     document.getElementById("ord-title").textContent = ordState.round.title;

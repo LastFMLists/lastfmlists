@@ -64,7 +64,7 @@
 	<link rel="apple-touch-icon" href="logo.png" sizes="180x180">
 	<link rel="preconnect" href="https://fonts.googleapis.com">
 	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-	<link href="https://fonts.googleapis.com/css2?family=Roboto+Flex:opsz,wght@8..144,300..800&display=swap" rel="stylesheet">
+	<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,100..700;1,100..700&display=swap" rel="stylesheet">
 	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 	<link rel="stylesheet" href="style.css">
 </head>
@@ -107,17 +107,27 @@
                 </div>
             </div>
             <div class="session-actions">
-                <button type="button" id="load-detailed-data" disabled aria-label="Load details" title="Downloads Last.fm metadata for your top artists, albums and tracks: track length, genre and country tags, and global listener and play counts. This unlocks the duration, tag and global-stats filters and the “Time spent listening” and “Percentage of global scrobbles” sorts. It covers most uses and takes less time than “Load ALL Details”. Load your data first to use this."><i class="fas fa-circle-down" aria-hidden="true"></i><span class="btn-label">Load Details</span></button>
-                <button type="button" id="load-all-details" disabled aria-label="Load ALL details" title="Downloads the same metadata for every artist, album and track you have scrobbled, including the ones outside your top lists. This makes thousands of requests and can take hours. Load your data first to use this."><i class="fas fa-cloud-arrow-down" aria-hidden="true"></i><span class="btn-label">Load ALL Details</span></button>
+                <div class="menu" data-menu>
+                    <button type="button" id="details-menu-button" class="menu-trigger" aria-expanded="false" aria-controls="details-menu" disabled title="Download Last.fm metadata: track length, tags and global counts"><i class="fas fa-circle-down" aria-hidden="true"></i><span class="btn-label">Load Details</span><i class="fas fa-chevron-down menu-caret" aria-hidden="true"></i></button>
+                    <div class="menu-list" id="details-menu" hidden>
+                        <button type="button" id="load-detailed-data" class="menu-item" disabled title="Downloads Last.fm metadata for your top artists, albums and tracks: track length, genre and country tags, and global listener and play counts. This unlocks the duration, tag and global-stats filters and the “Time spent listening” and “Percentage of global scrobbles” sorts. It covers most uses and takes less time than “Load ALL Details”. Load your data first to use this."><span class="menu-item-title">Load Details</span><span class="menu-item-desc">Your top artists, albums and tracks. Enough for most statistics.</span></button>
+                        <button type="button" id="load-all-details" class="menu-item" disabled title="Downloads the same metadata for every artist, album and track you have scrobbled, including the ones outside your top lists. This makes thousands of requests and can take hours. Load your data first to use this."><span class="menu-item-title">Load ALL Details</span><span class="menu-item-desc">Everything you have scrobbled. Can take hours.</span></button>
+                    </div>
+                </div>
                 <button type="button" id="save-data" aria-label="Save data" title="Save your loaded data to this browser"><i class="fas fa-floppy-disk" aria-hidden="true"></i><span class="btn-label">Save Data</span></button>
-                <button type="button" id="open-export-options" aria-label="Export as image" title="Export the current list as a PNG image"><i class="fas fa-image" aria-hidden="true"></i><span class="btn-label">Export Image</span></button>
-                <button type="button" id="open-grid-export" aria-label="Export as grid" title="Export album artwork as a collage grid"><i class="fas fa-table-cells" aria-hidden="true"></i><span class="btn-label">Export Grid</span></button>
+                <div class="menu" data-menu>
+                    <button type="button" id="export-menu-button" class="menu-trigger" aria-expanded="false" aria-controls="export-menu" title="Export the list, chart or album covers"><i class="fas fa-image" aria-hidden="true"></i><span class="btn-label">Export</span><i class="fas fa-chevron-down menu-caret" aria-hidden="true"></i></button>
+                    <div class="menu-list" id="export-menu" hidden>
+                        <button type="button" id="open-export-options" class="menu-item" title="Export the current list as a PNG image"><span class="menu-item-title">Image</span><span class="menu-item-desc">The list or chart on screen as a PNG, or a race as a GIF.</span></button>
+                        <button type="button" id="open-grid-export" class="menu-item" title="Export album artwork as a collage grid"><span class="menu-item-title">Album grid</span><span class="menu-item-desc">Covers of your top albums as a collage.</span></button>
+                    </div>
+                </div>
             </div>
             <div class="session-socials">
                 <button type="button" id="theme-toggle" aria-label="Toggle theme" title="Toggle light/dark theme"><i class="fas fa-moon"></i></button>
                 <a href="/guide/" aria-label="Guide" title="How to use this site"><i class="fas fa-circle-question"></i></a>
-                <a href="https://github.com/LastFMLists/lastfmlists" target="_blank" rel="noopener" aria-label="GitHub" title="GitHub"><i class="fab fa-github"></i></a>
-                <a href="https://www.reddit.com/user/Alet404/" target="_blank" rel="noopener" aria-label="Reddit" title="Reddit"><i class="fab fa-reddit"></i></a>
+                <a class="session-social-extra" href="https://github.com/LastFMLists/lastfmlists" target="_blank" rel="noopener" aria-label="GitHub" title="GitHub"><i class="fab fa-github"></i></a>
+                <a class="session-social-extra" href="https://www.reddit.com/user/Alet404/" target="_blank" rel="noopener" aria-label="Reddit" title="Reddit"><i class="fab fa-reddit"></i></a>
                 <a href="https://ko-fi.com/lastfmlists" target="_blank" rel="noopener" aria-label="Ko-fi" title="Support on Ko-fi"><i class="fas fa-mug-hot"></i></a>
             </div>
         </section>
@@ -670,7 +680,7 @@
         </section>
 
         <!-- Sidebar toggle (placed outside) -->
-        <button id="filters-section-toggle" aria-label="Toggle filter sidebar">&#10094;</button>
+        <button id="filters-section-toggle" aria-label="Toggle filter sidebar"><i class="fas fa-chevron-left" aria-hidden="true"></i></button>
 
         <!-- Active Filters Section -->
         <div id="active-filters" class="active-filters content-block"></div>
@@ -680,7 +690,7 @@
                 <h2>Top Tracks</h2>
                 <div class="results-actions">
                     <button type="button" id="open-filters-mobile" class="results-action filters-mobile-button" aria-controls="filters-section"><i class="fas fa-filter" aria-hidden="true"></i> Filters</button>
-                    <button type="button" id="graph-this-list" class="results-action" hidden title="Plot how the top of this list changed over time"><i class="fas fa-chart-line" aria-hidden="true"></i> Graph over time</button>
+                    <button type="button" id="graph-this-list" class="results-action" hidden title="Graph how the top of this list changed over time"><i class="fas fa-chart-line" aria-hidden="true"></i> Graph</button>
                 </div>
             </div>
             <div id="results"></div>
@@ -801,7 +811,8 @@
                     <h2>Fill the List</h2>
                     <p class="game-options-intro">Each round picks a top 10 from your history, such as your top tracks of one year. Name as many of the ten as you can.</p>
 
-                    <fieldset class="option-group">
+                    <div class="ftl-option-groups">
+                    <fieldset class="option-group ftl-types">
                         <legend>Answer types</legend>
                         <p class="option-hint">Pick at least one.</p>
                         <div class="option-chips">
@@ -811,7 +822,18 @@
                         </div>
                     </fieldset>
 
-                    <fieldset class="option-group">
+                    <fieldset class="option-group ftl-time">
+                        <legend>Time limit</legend>
+                        <p class="option-hint">How long you have for each list.</p>
+                        <div class="option-chips">
+                            <label class="option-chip"><input type="radio" name="ftl-timer" value="0" checked><span>No limit</span></label>
+                            <label class="option-chip"><input type="radio" name="ftl-timer" value="60"><span>1 min</span></label>
+                            <label class="option-chip"><input type="radio" name="ftl-timer" value="120"><span>2 min</span></label>
+                            <label class="option-chip"><input type="radio" name="ftl-timer" value="300"><span>5 min</span></label>
+                        </div>
+                    </fieldset>
+
+                    <fieldset class="option-group ftl-cats">
                         <legend>List categories</legend>
                         <p class="option-hint">Pick the kinds of lists you want to play.</p>
                         <div class="option-cards">
@@ -823,20 +845,14 @@
                         </div>
                     </fieldset>
 
-                    <fieldset class="option-group">
-                        <legend>Difficulty</legend>
+                    <fieldset class="ftl-hard-group">
+                        <legend class="visually-hidden">Difficulty</legend>
                         <label class="option-switch">
                             <span><strong>Hard mode</strong><small>Hide the artist on track and album answers</small></span>
                             <input type="checkbox" id="ftl-hard" role="switch">
                         </label>
-                        <p class="option-label" id="ftl-timer-label">Time limit</p>
-                        <div class="option-chips" role="radiogroup" aria-labelledby="ftl-timer-label">
-                            <label class="option-chip"><input type="radio" name="ftl-timer" value="0" checked><span>No limit</span></label>
-                            <label class="option-chip"><input type="radio" name="ftl-timer" value="60"><span>1 minute</span></label>
-                            <label class="option-chip"><input type="radio" name="ftl-timer" value="120"><span>2 minutes</span></label>
-                            <label class="option-chip"><input type="radio" name="ftl-timer" value="300"><span>5 minutes</span></label>
-                        </div>
                     </fieldset>
+                    </div>
 
                     <p id="ftl-setup-note" class="hl-setup-note" hidden></p>
                     <button type="button" id="ftl-start" class="hl-primary game-start">Start game</button>
@@ -886,7 +902,6 @@
                     <div class="ftl-actions" id="ord-actions">
                         <button type="button" id="ord-check" class="hl-primary">Check order</button>
                         <button type="button" id="ord-next" class="hl-secondary" hidden>Next round</button>
-                        <button type="button" id="ord-change-type" class="hl-secondary">Change type</button>
                     </div>
 
                     <div id="ord-over" class="ord-over" hidden>
@@ -927,7 +942,6 @@
                         <div id="odd-feedback" class="hl-feedback" aria-live="polite"></div>
                         <div class="ftl-actions" id="odd-actions">
                             <button type="button" id="odd-next" class="hl-primary" hidden>Next round</button>
-                            <button type="button" id="odd-change-type" class="hl-secondary">Change type</button>
                         </div>
 
                         <div id="odd-over" class="ord-over" hidden>
@@ -970,7 +984,6 @@
                         <div id="thread-feedback" class="hl-feedback" aria-live="polite"></div>
                         <div class="ftl-actions" id="thread-actions">
                             <button type="button" id="thread-next" class="hl-primary" hidden>Next round</button>
-                            <button type="button" id="thread-change-type" class="hl-secondary">Change type</button>
                         </div>
 
                         <div id="thread-over" class="ord-over" hidden>
@@ -1045,9 +1058,6 @@
         </div>
 
 	</main>
-    <footer>
-        <p>created by <a href="https://www.reddit.com/user/Alet404/" target="_blank" rel="noopener">u/Alet404</a></p>
-    </footer>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/gif.js.optimized@1.0.1/dist/gif.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>

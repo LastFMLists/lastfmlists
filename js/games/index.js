@@ -117,8 +117,6 @@ export function initGames() {
     const ordNextBtn = document.getElementById("ord-next");
     if (ordNextBtn) ordNextBtn.addEventListener("click", ordNextRound);
 
-    const ordChangeType = document.getElementById("ord-change-type");
-    if (ordChangeType) ordChangeType.addEventListener("click", () => ordShowSetup(false));
 
     const ordAgain = document.getElementById("ord-again");
     if (ordAgain) ordAgain.addEventListener("click", ordRestartCurrent);
@@ -130,6 +128,8 @@ export function initGames() {
 
     // Odd One Out and Common Thread share the same screens: a type choice, a
     // round with a Next round button, and a run-over panel under the reveal.
+    // Change type is only offered once a run is over; during a run, All games
+    // is the way out.
     const factGames = [
         { prefix: "odd", open: oddOpenGame, start: oddStart, next: oddNextRound, setup: oddShowSetup, again: oddRestartCurrent },
         { prefix: "thread", open: threadOpenGame, start: threadStart, next: threadNextRound, setup: threadShowSetup, again: threadRestartCurrent }
@@ -141,7 +141,6 @@ export function initGames() {
             btn.addEventListener("click", () => g.start(btn.dataset.type)));
         document.getElementById(`${g.prefix}-next`)?.addEventListener("click", g.next);
         document.getElementById(`${g.prefix}-again`)?.addEventListener("click", g.again);
-        document.getElementById(`${g.prefix}-change-type`)?.addEventListener("click", () => g.setup(false));
         document.getElementById(`${g.prefix}-over-change-type`)?.addEventListener("click", () => g.setup(false));
     }
 

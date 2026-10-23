@@ -103,7 +103,7 @@ async function exportCurrentListAsImage() {
     captureRoot.style.padding = '16px';
     captureRoot.style.backgroundColor = 'var(--background-color)';
     captureRoot.style.color = 'var(--primary-text-color)';
-    captureRoot.style.fontFamily = 'Roboto Flex, sans-serif';
+    captureRoot.style.fontFamily = 'var(--font-stack)';
 
     const pageTheme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
     const captureTheme = exportTheme === 'current' ? pageTheme : exportTheme;
@@ -177,7 +177,9 @@ async function exportCurrentListAsImage() {
 
     trimExportRows(resultsClone);
     // The color legend keeps its swatches but not the editing controls.
-    resultsClone.querySelectorAll('.race-legend-tools, .race-legend-reset, .race-swatch input').forEach(el => el.remove());
+    resultsClone.querySelectorAll('.race-legend-tools, .race-legend-reset, .race-swatch input, .comparison-switch').forEach(el => el.remove());
+    // An image of a comparison shows both lists, even when the page shows one at a time.
+    resultsClone.querySelectorAll('.comparison-results').forEach(el => el.classList.remove('is-one-at-a-time'));
     captureRoot.appendChild(resultsClone);
 
     document.body.appendChild(captureRoot);
@@ -515,7 +517,7 @@ async function exportCurrentListAsGrid() {
     captureRoot.style.padding = '0';
     captureRoot.style.backgroundColor = 'var(--background-color)';
     captureRoot.style.color = 'var(--primary-text-color)';
-    captureRoot.style.fontFamily = 'Roboto Flex, sans-serif';
+    captureRoot.style.fontFamily = 'var(--font-stack)';
     
     // INCREASED: Base width is now 300px per column
     captureRoot.style.width = `${gridX * 300}px`;

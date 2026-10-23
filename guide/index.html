@@ -33,7 +33,7 @@
 	<link rel="apple-touch-icon" href="../logo.png" sizes="180x180">
 	<link rel="preconnect" href="https://fonts.googleapis.com">
 	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-	<link href="https://fonts.googleapis.com/css2?family=Roboto+Flex:opsz,wght@8..144,300..800&display=swap" rel="stylesheet">
+	<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,100..700;1,100..700&display=swap" rel="stylesheet">
 	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 	<link rel="stylesheet" href="../style.css">
 	<link rel="stylesheet" href="../pages.css">
@@ -92,7 +92,7 @@
 				<p>&ldquo;Sort lists by&rdquo; decides how the list is ranked, see <a href="#sorts">Sorts</a> below. List length sets how many rows you see: the top 10, 25, 50 or 100, all of them, or a number you type.</p>
 				<p>Tick &ldquo;Show unfiltered stats in parentheses&rdquo; to see each row&rsquo;s all-time rank and play count next to its filtered numbers. This is useful when you&rsquo;ve filtered to one year and want to see how a song compares to the rest of your history.</p>
 				<p>Click any row to open its own page.</p>
-				<p id="sharing">The address bar always holds the list&rsquo;s settings. Copy it to share them: anyone who opens the link gets the same list for their own history once their data has loaded. To share the list itself, use <a href="#exporting">Export Image</a>.</p>
+				<p id="sharing">The address bar always holds the list&rsquo;s settings. Copy it to share them: anyone who opens the link gets the same list for their own history once their data has loaded. To share the list itself, use <a href="#exporting">Export, then Image</a>.</p>
 			</section>
 
 			<section id="sorts">
@@ -170,10 +170,10 @@
 
 			<section id="details">
 				<h2>Load Details and Load ALL Details</h2>
-				<p>Your listening history only has names and dates. Some filters and sorts need more than that: track length, tags, and how many listeners and plays something has on all of Last.fm. That&rsquo;s what the two buttons at the top download.</p>
+				<p>Your listening history only has names and dates. Some filters and sorts need more than that: track length, tags, and how many listeners and plays something has on all of Last.fm. That&rsquo;s what the Load Details button at the top downloads. It opens a menu with two choices: Load Details and Load ALL Details.</p>
 				<p>Load Details gets this info for everything you play often: artists you&rsquo;ve played more than 100 times, albums more than 10 times and tracks more than 5 times. It always covers at least your top 250 artists, 500 albums and 1,000 tracks. That&rsquo;s enough for almost everything on the site.</p>
 				<p>Load ALL Details does the same for every artist, album and track you&rsquo;ve ever scrobbled. It needs one request per item, and Last.fm only allows a few per second, so it can take hours on a big library. You don&rsquo;t have to do it in one go: click Save Data whenever you want to stop, and the next time you click the button it only downloads what&rsquo;s still missing.</p>
-				<p>Both buttons tell you how many items they will fetch and ask before they start. If everything already has details, they offer to download them again, since listener and play counts on Last.fm keep changing. When a run finishes, click Save Data so you don&rsquo;t have to download the details again.</p>
+				<p>Both choices tell you how many items they will fetch and ask before they start. If everything already has details, they offer to download them again, since listener and play counts on Last.fm keep changing. When a run finishes, click Save Data so you don&rsquo;t have to download the details again.</p>
 			</section>
 
 			<section id="charts">
@@ -188,13 +188,13 @@
 				<p>The Graphs tab draws lines over time for any artists, albums or tracks you pick, up to ten at once. Click Add, pick artists, albums or tracks, and type a name, or click My top 5 to replace the lines with your top 5 of that kind. Click a color to change it; your colors are shared with the bar charts and races. The round buttons next to the lines start over with your top 5 artists and download the graph as a PNG.</p>
 				<p>Under the graph, Graph picks a ready-made graph: plays per month, total plays over time, all-time rank over the years, rank in each year, longest streak each month and days played each week. Period sets whether each point is a day, week, month or year. Every ready-made graph is just a set of the settings behind Customize, so you can start from one and change it.</p>
 				<p>Customize has the rest. Measure is any of the sorts from the Lists tab. Show picks between the value itself (how many plays, days or weeks) and the rank, which is the place it would have in that list. Count decides what each point looks at: In each period only counts that month (or week, day, year), Up to each period counts everything from the start until then. So Rank with Up to each period and Year is where a song stood in your all-time list at the end of every year, and Rank with In each period is its place in each year&rsquo;s list on its own. Ranks shown sets how far down a rank graph goes (Auto goes just deep enough for your lines), Log spreads out the small values, and Show from and Show until pick the stretch of time you see. Dates decides what they do. Zoom only, the default, just zooms: the numbers still count your whole history (or the list&rsquo;s plays), so a total on the first day shown includes the years before it, and an all-time rank stays all-time. Count only these dates leaves the plays outside the dates out of the numbers, so totals start at 0 on the first date and ranks only compare plays between the dates.</p>
-				<p>On the Lists tab, Graph over time opens the list on screen here: its top 5, ranked the way the list ranks them and counted only from the plays the list uses, so all its filters still apply. Use all plays drops the filters again. On an artist, album or track page, Graph its rank over time opens its all-time rank here, since the page already shows its plays. The download button saves the graph with its legend.</p>
+				<p>On the Lists tab, the Graph button opens the list on screen here: its top 5, ranked the way the list ranks them and counted only from the plays the list uses, so all its filters still apply. Use all plays drops the filters again. On an artist, album or track page, Graph its rank over time opens its all-time rank here, since the page already shows its plays. The download button saves the graph with its legend.</p>
 				<p>The address bar keeps the graph&rsquo;s lines and settings, so you can share it as a link. Whoever opens it sees the same graph made from their own history, with your colors.</p>
 			</section>
 
 			<section id="comparison">
 				<h2>Comparison mode</h2>
-				<p>Comparison puts two lists side by side. Turn it on with the Comparison button under List settings. While it&rsquo;s on, Editing: Left list / Right list at the bottom of the filter panel chooses which side your changes go to. Each side has its own list type, sort, filters and equations. Display mode, list length and the chart settings are shared.</p>
+				<p>Comparison puts two lists side by side. Turn it on with the Comparison button under List settings. Where the screen is too narrow for two lists, such as a phone held upright, a Left list / Right list switch above them shows one at a time; turning the phone sideways shows both. While it&rsquo;s on, Editing: Left list / Right list at the bottom of the filter panel chooses which side your changes go to. Each side has its own list type, sort, filters and equations. Display mode, list length and the chart settings are shared.</p>
 				<p>Some ideas: this year against last year, summer against winter, or your top tracks now against your top tracks from your first 10,000 scrobbles.</p>
 			</section>
 
@@ -236,9 +236,9 @@ show track-name-length</code></pre>
 
 			<section id="exporting">
 				<h2>Exporting</h2>
-				<p>Export Image saves the current list or chart as a PNG. You can pick a light or dark theme, and whether the active filters are printed on it. If the display mode is Bar Chart Race, Export Image (or Download GIF under the race) saves the race as a GIF instead, with every bar it shows on screen.</p>
-				<p>Export Grid makes an album cover collage from the current list. Set the number of columns and rows, up to 20 each. Allow duplicate covers lets the same cover show up more than once, which happens on track lists when several songs come from one album. Skip missing artwork leaves out items without a cover instead of leaving gaps. Show artist &amp; album text prints the names on the covers.</p>
-				<p>For a classic 3x3 of your top albums: generate a list of Albums sorted by Scrobble count, add a time filter if you want one, then click Export Grid and set 3 columns and 3 rows.</p>
+				<p>The Export button at the top has two choices. Image saves the current list or chart as a PNG. You can pick a light or dark theme, and whether the active filters are printed on it. If the display mode is Bar Chart Race, Image (or Download GIF under the race) saves the race as a GIF instead, with every bar it shows on screen.</p>
+				<p>Album grid makes an album cover collage from the current list. Set the number of columns and rows, up to 20 each. Allow duplicate covers lets the same cover show up more than once, which happens on track lists when several songs come from one album. Skip missing artwork leaves out items without a cover instead of leaving gaps. Show artist &amp; album text prints the names on the covers.</p>
+				<p>For a classic 3x3 of your top albums: generate a list of Albums sorted by Scrobble count, add a time filter if you want one, then click Export, Album grid, and set 3 columns and 3 rows.</p>
 			</section>
 
 			<section id="games">
@@ -265,9 +265,6 @@ show track-name-length</code></pre>
 		</article>
 	</main>
 
-	<footer>
-		<p>created by <a href="https://www.reddit.com/user/Alet404/" target="_blank" rel="noopener">u/Alet404</a></p>
-	</footer>
 	<script data-goatcounter="https://lastfmlists.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
 	<script src="../js/page-theme.js"></script>
 	<script type="module" src="../js/page-links.js"></script>

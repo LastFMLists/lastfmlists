@@ -23,6 +23,7 @@ import './ui/graphs.js';
 import { openGraphFromLink } from './ui/graphs.js';
 import { applySettings, startFromUrl, takePendingGraph, takePendingSettings } from './ui/url-state.js';
 import './ui/export.js';
+import './ui/menus.js';
 import { initFilterControls } from './ui/filter-controls.js';
 import { failLoadNotice, finishLoadNotice, startLoadNotice } from './ui/load-notice.js';
 import './ui/support-banner.js';

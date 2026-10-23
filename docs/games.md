@@ -9,6 +9,7 @@ The site has five games that use the scrobble library the user has already loade
 - Anything that needs extended metadata (durations, tags, global stats) only appears once `extendedDataLoaded` is true, the same flag the metadata filters use.
 - Personal records are kept in `localStorage`: the best Higher or Lower streak per entity type, the best Fill the List score, and the best Put Them In Order, Odd One Out and Common Thread streaks.
 - Anonymous counts go to GoatCounter (`js/analytics.js`): which game and entity type is started, each Play again after a miss, and how far a run gets. A run reports reaching 1, 5, 10, 20, 50 and 100 answered rounds (lists finished, in Fill the List), so the dashboard shows how many runs last that long without one count per round.
+- Game mode: while a game is open (its setup, a round or the run-over screen), the header, the tabs and the footer are hidden and the game fills the screen, so nothing needs scrolling to play. All games brings them back, and is the way out during a run: Change type is only offered once a run is over, next to Play again. Each game is one screen tall: the board (cards, slots, rows or statements) gives up height when the screen is short, the buttons stay on screen, and only a reveal too long for the screen scrolls inside the board. Phones get tighter spacing and smaller covers. `games/screens.js` switches the mode, and the rules sit under "Game mode" in `style.css`.
 - Every right answer shows a green "Correct!" confirmation in the middle of the screen. It springs in, settles and fades out, and it restarts on each answer, so quick answers in Fill the List each get their own. With reduced motion turned on, it appears and disappears without moving.
 
 ---
@@ -70,7 +71,7 @@ The site picks a top 10 list from the user's library, shows what the list is (fo
 
 ### Setup screen
 
-- Answer types: artists, albums and tracks, as toggle chips. At least one is needed.
+- Answer types: artists, albums and tracks, as toggle chips in one row. At least one is needed. On wider screens the answer types and the time limit sit side by side above the categories, with Hard mode as one row under them.
 - List categories: Time, Names and words, Deep cuts, Streaks and milestones, and By artist, each a card with a one-line description. At least one is needed.
 - Hard mode, a switch that is off by default. It hides the artist on track and album answers. The default shows the artist and is not called "easy mode".
 - Time limit, as a row of choices.

@@ -47,6 +47,12 @@ export async function updateSessionAvatar(username) {
         const imageUrl = preferred?.['#text'];
 
         if (imageUrl) {
+            // A picture that fails to load (blocked, or gone from Last.fm)
+            // falls back to the initial instead of a broken-image icon.
+            avatar.onerror = () => {
+                avatar.style.display = 'none';
+                avatarFallback.style.display = 'inline';
+            };
             avatar.src = imageUrl;
             avatar.style.display = 'block';
             avatarFallback.style.display = 'none';
