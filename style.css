@@ -1957,10 +1957,33 @@ label.inline-checkbox {
     gap: 1rem;
 }
 
-/* Two lists sit side by side whenever each gets 320px, whatever the screen
-   (a tablet with the filters tucked away has room); otherwise they stack */
+/* Two lists sit side by side whenever each gets 300px, whatever the screen
+   (a tablet with the filters tucked away, a phone turned sideways);
+   otherwise they stack. Matches MIN_COMPARISON_LIST_WIDTH in lists.js. */
 .comparison-results.comparison-lists {
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+}
+
+.comparison-rotate-hint {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0.55rem 0.8rem;
+    background-color: var(--accent-soft);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    color: var(--primary-text-color);
+    font-size: var(--text-sm);
+}
+
+.comparison-rotate-hint[hidden] {
+    display: none;
+}
+
+.comparison-rotate-hint i {
+    color: var(--primary-accent-color);
 }
 
 .comparison-column {

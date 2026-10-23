@@ -349,6 +349,7 @@ function equalizeComparisonRowHeights(leftContainer, rightContainer) {
     });
 
     const sideBySide = Math.abs(leftContainer.getBoundingClientRect().top - rightContainer.getBoundingClientRect().top) < 1;
+    if (leftContainer.offsetWidth) updateRotateHint(leftContainer.closest(".comparison-results"), sideBySide);
     if (!sideBySide || !leftContainer.offsetWidth) return;
 
     const maxRows = Math.max(leftRows.length, rightRows.length);
@@ -360,6 +361,22 @@ function equalizeComparisonRowHeights(leftContainer, rightContainer) {
         if (leftRows[index]) leftRows[index].style.height = `${height}px`;
         if (rightRows[index]) rightRows[index].style.height = `${height}px`;
     });
+}
+
+// Stacked lists on a phone held upright: say that turning it puts them side
+// by side, when the screen's long side has room for two lists.
+const MIN_COMPARISON_LIST_WIDTH = 300;
+
+function updateRotateHint(layout, sideBySide) {
+    const hint = layout?.querySelector(".comparison-rotate-hint");
+    if (!hint) return;
+    const longSide = Math.max(window.screen?.width || 0, window.screen?.height || 0);
+    // Two lists, the gap between them and the page padding.
+    const rotatingHelps = longSide >= 2 * MIN_COMPARISON_LIST_WIDTH + 50;
+    hint.hidden = sideBySide
+        || !rotatingHelps
+        || !window.matchMedia("(orientation: portrait)").matches
+        || !window.matchMedia("(pointer: coarse)").matches;
 }
 
 // Row heights depend on the width, so match them again when it changes
@@ -517,6 +534,11 @@ export function displayEntities() {
             }
         } else {
             comparisonLayout.classList.add("comparison-lists");
+            const rotateHint = document.createElement("p");
+            rotateHint.className = "comparison-rotate-hint";
+            rotateHint.hidden = true;
+            rotateHint.innerHTML = '<i class="fas fa-mobile-screen-button" aria-hidden="true"></i> Turn your phone sideways to see the two lists next to each other.';
+            comparisonLayout.prepend(rotateHint);
             renderEntitiesToContainer(leftEntities, leftEntityType, leftList, leftSortingBasis, leftCaps);
             renderEntitiesToContainer(rightEntities, rightEntityType, rightList, rightSortingBasis, rightCaps);
             equalizeComparisonRowHeights(leftList, rightList);
