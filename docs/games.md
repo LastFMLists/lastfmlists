@@ -71,7 +71,7 @@ The site picks a top 10 list from the user's library, shows what the list is (fo
 
 ### Setup screen
 
-- Answer types: artists, albums and tracks, as toggle chips in one row. At least one is needed. On wider screens the answer types and the difficulty settings sit side by side above the categories.
+- Answer types: artists, albums and tracks, as toggle chips in one row. At least one is needed. On wider screens the answer types and the time limit sit side by side above the categories, with Hard mode as one row under them.
 - List categories: Time, Names and words, Deep cuts, Streaks and milestones, and By artist, each a card with a one-line description. At least one is needed.
 - Hard mode, a switch that is off by default. It hides the artist on track and album answers. The default shows the artist and is not called "easy mode".
 - Time limit, as a row of choices.

@@ -1,6 +1,6 @@
 // Shows one panel of the Games tab (the menu or one game) and hides the rest.
-// While a game is open the page is in game mode (body.in-game): the header,
-// tabs and footer step aside and the game fills the screen. The menu brings
+// While a game is open the page is in game mode (body.in-game): the header
+// and tabs step aside and the game fills the screen. The menu brings
 // them back.
 
 export function showGamePanel(id) {

@@ -25,7 +25,6 @@
     /* Labels on accent-filled buttons: dark, like the dark theme, since white
        on this orange is hard to read */
     --on-accent: #2B1D14;
-    --footer-bg: var(--secondary-accent-color);
     --scrim: rgba(59, 47, 36, 0.45);
 
     --shadow-sm: 0 1px 2px rgba(59, 47, 36, 0.05), 0 2px 10px rgba(59, 47, 36, 0.06);
@@ -68,7 +67,6 @@
     --accent-soft: rgba(96, 165, 250, 0.16);
     --accent-text: #85BBFB;
     --on-accent: #0B1424;
-    --footer-bg: var(--sidebar-color);
     --scrim: rgba(2, 6, 16, 0.55);
 
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.25), 0 2px 10px rgba(0, 0, 0, 0.22);
@@ -204,7 +202,6 @@ body:not(.app-loaded) #view-tabs,
 body:not(.app-loaded) #games-section,
 body:not(.app-loaded) #explore-section,
 body:not(.app-loaded) #graphs-section,
-body:not(.app-loaded) footer,
 body:not(.app-loaded) #loading-stats {
     display: none !important;
 }
@@ -422,6 +419,21 @@ body.app-loaded #input-section {
 
 #load-data:active:not(:disabled) {
     transform: scale(0.97);
+}
+
+.welcome-credit {
+    margin: 1.1rem 0 0;
+    color: var(--secondary-text-color);
+    font-size: var(--text-sm);
+}
+
+.welcome-credit a {
+    color: inherit;
+    text-underline-offset: 2px;
+}
+
+.welcome-credit a:hover {
+    color: var(--accent-text);
 }
 
 .top-links {
@@ -3278,35 +3290,6 @@ button.entity-stat:hover {
 }
 
 /* ==========================================================================
-   Footer
-   ========================================================================== */
-
-footer {
-    padding: 1.1rem 1rem calc(1.1rem + env(safe-area-inset-bottom));
-    text-align: center;
-    background-color: var(--footer-bg);
-    border-top: 1px solid var(--border-color);
-    color: var(--secondary-text-color);
-    font-size: var(--text-sm);
-    transition: padding-left 0.28s cubic-bezier(0.2, 0.7, 0.3, 1);
-}
-
-footer p {
-    margin: 0;
-    font-style: italic;
-}
-
-footer a {
-    color: inherit;
-    text-decoration: none;
-    border-bottom: 1px dotted currentColor;
-}
-
-footer a:hover {
-    color: var(--accent-text);
-}
-
-/* ==========================================================================
    Animations
    ========================================================================== */
 
@@ -3360,10 +3343,6 @@ footer a:hover {
 @media (min-width: 769px) {
     body.app-loaded:not(.sidebar-collapsed):not(.view-games):not(.view-explore):not(.view-graphs):not(.view-entity) main {
         padding-left: calc(var(--sidebar-width) + clamp(1rem, 3vw, 2rem));
-    }
-
-    body.app-loaded:not(.sidebar-collapsed):not(.view-games):not(.view-explore):not(.view-graphs):not(.view-entity) footer {
-        padding-left: calc(var(--sidebar-width) + 1rem);
     }
 }
 
@@ -3550,8 +3529,8 @@ footer a:hover {
         height: 40px;
     }
 
-    /* GitHub and Reddit stay on the start page and in the footer; leaving
-       them out here fits every icon on one row */
+    /* GitHub and Reddit stay on the start page; leaving them out here fits
+       every icon on one row */
     #session-panel .session-socials .session-social-extra {
         display: none;
     }
@@ -4572,7 +4551,9 @@ button.game-card:hover {
 
 /* --- Fill the List --- */
 
-/* Setup: answer types and difficulty side by side, the categories under them */
+/* Setup: answer types and the time limit side by side (each a heading and a
+   row of chips, so the two cards match), the categories and hard mode under
+   them; one column on phones */
 .ftl-option-groups {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -4584,36 +4565,37 @@ button.game-card:hover {
     margin: 0;
 }
 
-.ftl-option-groups .ftl-types {
-    grid-column: 1;
-    grid-row: 1;
-}
-
-.ftl-option-groups .ftl-difficulty {
-    grid-column: 2;
-    grid-row: 1;
-}
-
-.ftl-option-groups .ftl-cats {
+.ftl-option-groups .ftl-cats,
+.ftl-option-groups .ftl-hard-group {
     grid-column: 1 / -1;
-    grid-row: 2;
+}
+
+.ftl-hard-group {
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: none;
+}
+
+.ftl-hard-group .option-switch {
+    background: var(--sidebar-color);
 }
 
 /* The chip rows hold their few choices on one line, in equal widths */
 .ftl-types .option-chips,
-.ftl-difficulty .option-chips {
+.ftl-time .option-chips {
     flex-wrap: nowrap;
 }
 
 .ftl-types .option-chip,
-.ftl-difficulty .option-chip {
+.ftl-time .option-chip {
     display: flex;
     flex: 1 1 0;
     min-width: 0;
 }
 
 .ftl-types .option-chip span,
-.ftl-difficulty .option-chip span {
+.ftl-time .option-chip span {
     flex: 1 1 auto;
     justify-content: center;
     padding-inline: 0.5rem;
@@ -4625,26 +4607,18 @@ button.game-card:hover {
         grid-template-columns: minmax(0, 1fr);
     }
 
-    .ftl-option-groups .ftl-types,
-    .ftl-option-groups .ftl-difficulty,
-    .ftl-option-groups .ftl-cats {
-        grid-column: 1;
-        grid-row: auto;
-    }
-
     .ftl-types .option-chips,
-    .ftl-difficulty .option-chips {
+    .ftl-time .option-chips {
         gap: 0.35rem;
     }
 
     .ftl-types .option-chip span,
-    .ftl-difficulty .option-chip span {
+    .ftl-time .option-chip span {
         gap: 0.35rem;
         padding: 0.5rem 0.3rem;
         font-size: var(--text-sm);
     }
 }
-
 
 .ftl-group {
     border: 1px solid var(--border-color);
@@ -4962,19 +4936,6 @@ button.game-card:hover {
 
 /* --- Odd One Out and Common Thread: the footer under a round --- */
 
-/* Once a round is answered, the result, Next round and the run-over panel
-   stick to the bottom of the screen while the reveal above is read. */
-.answered .game-footer {
-    position: sticky;
-    bottom: 0;
-    z-index: 5;
-    margin: 0 -0.75rem;
-    padding: 0.6rem 0.75rem 0.75rem;
-    background: var(--background-color);
-    border-top: 1px solid var(--border-color);
-    box-shadow: 0 -10px 24px -18px rgba(0, 0, 0, 0.35);
-}
-
 .game-footer .ftl-actions {
     margin-top: 0.5rem;
 }
@@ -5210,12 +5171,11 @@ button.game-card:hover {
    Game mode: an open game fills the screen on its own
    ========================================================================== */
 
-/* The header, tabs and footer step aside while a game is open (see
+/* The header and tabs step aside while a game is open (see
    games/screens.js); All games brings them back. */
 body.view-games.in-game #session-panel,
 body.view-games.in-game #view-tabs,
 body.view-games.in-game #loading-stats,
-body.view-games.in-game footer,
 body.view-games.in-game .support-banner {
     display: none !important;
 }
@@ -5287,18 +5247,6 @@ body.in-game .thread-statements {
     padding: 4px;
     margin-left: -4px;
     margin-right: -4px;
-}
-
-/* The result and Next round sit under the board, always on screen, so they
-   drop the floating-panel look (an edge line, a shadow, a band) that kept
-   them in view while the page scrolled */
-body.in-game .answered .game-footer {
-    position: static;
-    margin: 0;
-    padding: 0.4rem 0 0;
-    background: none;
-    border-top: none;
-    box-shadow: none;
 }
 
 /* Setup screens scroll when they must, with Start always in reach. Like the
@@ -5449,9 +5397,10 @@ body.in-game .hl-option {
         margin-bottom: 0.2rem;
     }
 
+    /* A clear gap between the four items and the statements about them */
     body.in-game .thread-items {
         gap: 0.4rem;
-        margin-bottom: 0.5rem;
+        margin-bottom: 1rem;
     }
 
     body.in-game .thread-item {
@@ -5526,6 +5475,10 @@ body.in-game .hl-option {
 
     body.in-game .thread-item {
         padding: 0.3rem 0.4rem;
+    }
+
+    body.in-game .thread-items {
+        margin-bottom: 0.8rem;
     }
 
     body.in-game .entity-art.thread-item-art {

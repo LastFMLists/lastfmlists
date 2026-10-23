@@ -93,6 +93,7 @@
                     <a href="https://www.reddit.com/user/Alet404/" target="_blank" rel="noopener" aria-label="Reddit" title="Reddit"><i class="fab fa-reddit"></i></a>
                     <a href="https://ko-fi.com/lastfmlists" target="_blank" rel="noopener" aria-label="Ko-fi" title="Support on Ko-fi"><i class="fas fa-mug-hot"></i></a>
                 </div>
+                <p class="welcome-credit">Made by <a href="https://www.reddit.com/user/Alet404/" target="_blank" rel="noopener">u/Alet404</a></p>
             </div>
         </section>
 
@@ -822,6 +823,17 @@
                         </div>
                     </fieldset>
 
+                    <fieldset class="option-group ftl-time">
+                        <legend>Time limit</legend>
+                        <p class="option-hint">How long you have for each list.</p>
+                        <div class="option-chips">
+                            <label class="option-chip"><input type="radio" name="ftl-timer" value="0" checked><span>No limit</span></label>
+                            <label class="option-chip"><input type="radio" name="ftl-timer" value="60"><span>1 min</span></label>
+                            <label class="option-chip"><input type="radio" name="ftl-timer" value="120"><span>2 min</span></label>
+                            <label class="option-chip"><input type="radio" name="ftl-timer" value="300"><span>5 min</span></label>
+                        </div>
+                    </fieldset>
+
                     <fieldset class="option-group ftl-cats">
                         <legend>List categories</legend>
                         <p class="option-hint">Pick the kinds of lists you want to play.</p>
@@ -834,19 +846,12 @@
                         </div>
                     </fieldset>
 
-                    <fieldset class="option-group ftl-difficulty">
-                        <legend>Difficulty</legend>
+                    <fieldset class="ftl-hard-group">
+                        <legend class="visually-hidden">Difficulty</legend>
                         <label class="option-switch">
                             <span><strong>Hard mode</strong><small>Hide the artist on track and album answers</small></span>
                             <input type="checkbox" id="ftl-hard" role="switch">
                         </label>
-                        <p class="option-label" id="ftl-timer-label">Time limit</p>
-                        <div class="option-chips" role="radiogroup" aria-labelledby="ftl-timer-label">
-                            <label class="option-chip"><input type="radio" name="ftl-timer" value="0" checked><span>No limit</span></label>
-                            <label class="option-chip"><input type="radio" name="ftl-timer" value="60"><span>1 min</span></label>
-                            <label class="option-chip"><input type="radio" name="ftl-timer" value="120"><span>2 min</span></label>
-                            <label class="option-chip"><input type="radio" name="ftl-timer" value="300"><span>5 min</span></label>
-                        </div>
                     </fieldset>
                     </div>
 
@@ -1054,9 +1059,6 @@
         </div>
 
 	</main>
-    <footer>
-        <p>created by <a href="https://www.reddit.com/user/Alet404/" target="_blank" rel="noopener">u/Alet404</a></p>
-    </footer>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/gif.js.optimized@1.0.1/dist/gif.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
