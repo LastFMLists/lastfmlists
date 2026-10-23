@@ -1956,12 +1956,17 @@ label.inline-checkbox {
 
 /* Two lists sit side by side whenever each gets 300px, whatever the screen
    (a tablet with the filters tucked away, a phone turned sideways).
-   Matches MIN_COMPARISON_LIST_WIDTH in lists.js. */
+   Matches MIN_COMPARISON_WIDTH in lists.js. */
 .comparison-results.comparison-lists {
     grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
 }
 
-/* Narrower than that: one list at a time, picked with a Left / Right switch */
+/* Bar charts and races need a little more room for their labels */
+.comparison-results.comparison-charts {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
+}
+
+/* Narrower than that: one side at a time, picked with a Left / Right switch */
 .comparison-switch {
     display: none;
 }

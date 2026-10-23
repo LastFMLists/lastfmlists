@@ -526,6 +526,8 @@ function isDateMetricSorting(sortingBasis) {
 
 function createBarChartInCanvas(canvas, labels, values, sortingBasis, chartTitle = "") {
     if (!canvas || typeof Chart === "undefined") return null;
+    // Labels and ticks in the page's font rather than Chart.js's own default.
+    Chart.defaults.font.family = getComputedStyle(document.body).fontFamily || Chart.defaults.font.family;
 
     const orientation = getSelectedChartOrientation();
     const chartScale = getSelectedChartScale();
