@@ -4504,6 +4504,21 @@ button.game-card:hover {
     max-width: 620px;
 }
 
+/* The screens that only ask for a type sit on the middle of the screen
+   instead of hugging the left edge of a wide window */
+.hl-setup.game-options {
+    align-items: center;
+    text-align: center;
+}
+
+.hl-setup .game-options-intro {
+    margin-inline: auto;
+}
+
+.hl-setup .hl-type-choice {
+    width: 100%;
+}
+
 .game-options .hl-type,
 .game-options .ord-type,
 .game-options .odd-type,
@@ -5316,6 +5331,12 @@ body.in-game .hl-option {
        Lower and Odd One Out fill the rest: bigger targets for a thumb */
     body.in-game #games-section > div > div:not([hidden]) {
         margin-block: 0;
+    }
+
+    /* A screen that only asks for a type stays in the middle, like on
+       larger screens */
+    body.in-game #games-section > div > .hl-setup:not([hidden]) {
+        margin-block: auto;
     }
 
     body.in-game #games-section #hl-play,
