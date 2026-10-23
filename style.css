@@ -4504,6 +4504,21 @@ button.game-card:hover {
     max-width: 620px;
 }
 
+/* The screens that only ask for a type sit on the middle of the screen
+   instead of hugging the left edge of a wide window */
+.hl-setup.game-options {
+    align-items: center;
+    text-align: center;
+}
+
+.hl-setup .game-options-intro {
+    margin-inline: auto;
+}
+
+.hl-setup .hl-type-choice {
+    width: 100%;
+}
+
 .game-options .hl-type,
 .game-options .ord-type,
 .game-options .odd-type,
@@ -5189,110 +5204,132 @@ button.game-card:hover {
 }
 
 /* ==========================================================================
-   Game mode: an open game fills the screen on its own
+   Game mode: on small screens an open game fills the screen on its own
    ========================================================================== */
 
-/* The header and tabs step aside while a game is open (see
-   games/screens.js); All games brings them back. */
-body.view-games.in-game #session-panel,
-body.view-games.in-game #view-tabs,
-body.view-games.in-game #loading-stats,
-body.view-games.in-game .support-banner {
-    display: none !important;
+/* Phones, small tablets and phones turned sideways only: on a laptop or
+   desktop the game sits under the header and tabs and fits as it is */
+@media (max-width: 768px), (max-height: 540px) {
+    /* The header and tabs step aside while a game is open (see
+       games/screens.js); All games brings them back. */
+    body.view-games.in-game #session-panel,
+    body.view-games.in-game #view-tabs,
+    body.view-games.in-game #loading-stats,
+    body.view-games.in-game .support-banner {
+        display: none !important;
+    }
+
+    body.view-games.in-game main {
+        padding-top: 0;
+        padding-bottom: 0;
+    }
+
+    /* Exactly one screen tall: the game is a column whose board shrinks to fit,
+       so its buttons are always on screen and the page never scrolls */
+    body.view-games.in-game #games-section {
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        height: 100dvh;
+        padding-top: max(0.5rem, env(safe-area-inset-top, 0px));
+        padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
+    }
+
+    body.in-game #games-section > div:not([hidden]) {
+        flex: 1 1 auto;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* The open screen sits in the middle of the space under All games, so a
+       short round doesn't leave the bottom of a large screen empty */
+    body.in-game #games-section > div > div:not([hidden]) {
+        flex: 0 1 auto;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        margin-block: auto;
+    }
+
+    body.in-game .hl-back {
+        flex: none;
+        align-self: flex-start;
+        margin-bottom: 0.35rem;
+    }
+
+    body.in-game .hl-scorebar,
+    body.in-game .ftl-topbar,
+    body.in-game .ord-topbar,
+    body.in-game .ftl-guess-form,
+    body.in-game .thread-items,
+    body.in-game .ftl-actions,
+    body.in-game .game-footer,
+    body.in-game .ord-hint,
+    body.in-game .hl-feedback {
+        flex: none;
+    }
+
+    /* The board: the part that gives up height when the screen is short, and
+       scrolls on its own only when it can't fit (a long reveal). The padding
+       keeps hover lifts and answer rings from being clipped. */
+    body.in-game .hl-round,
+    body.in-game .ftl-slots,
+    body.in-game .ord-list,
+    body.in-game .odd-options,
+    body.in-game .thread-statements {
+        position: relative;
+        flex: 0 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        padding: 4px;
+        margin-left: -4px;
+        margin-right: -4px;
+    }
+
+    /* Setup screens scroll when they must, with Start always in reach. Like the
+       boards, they anchor their visually hidden inputs and labels, which would
+       otherwise stretch the page. */
+    body.in-game .game-options {
+        position: relative;
+        overflow-y: auto;
+    }
+
+    body.in-game .game-options .game-start {
+        position: sticky;
+        bottom: 0;
+        align-self: flex-start;
+        margin-top: 0.4rem;
+        box-shadow: 0 -0.75rem 1rem var(--background-color);
+    }
+
+    /* Higher or Lower: the two cards share the height */
+    body.in-game .hl-round {
+        grid-template-rows: minmax(0, 1fr);
+    }
+
+    body.in-game .hl-option {
+        min-height: 0;
+    }
 }
 
-body.view-games.in-game main {
-    padding-top: 0;
-    padding-bottom: 0;
-}
+/* Laptops and desktops: the page scrolls instead of the board, so the
+   buttons under a long answer stay pinned to the bottom of the window, with
+   the page fading out above them instead of a line */
+@media (min-width: 769px) and (min-height: 541px) {
+    body.in-game .game-footer {
+        position: sticky;
+        bottom: 0;
+        z-index: 5;
+        padding: 0.5rem 0 0.75rem;
+        background: var(--background-color);
+        box-shadow: 0 -1rem 1rem -0.25rem var(--background-color);
+    }
 
-/* Exactly one screen tall: the game is a column whose board shrinks to fit,
-   so its buttons are always on screen and the page never scrolls */
-body.view-games.in-game #games-section {
-    display: flex;
-    flex-direction: column;
-    height: 100vh;
-    height: 100dvh;
-    padding-top: max(0.5rem, env(safe-area-inset-top, 0px));
-    padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
-}
-
-body.in-game #games-section > div:not([hidden]) {
-    flex: 1 1 auto;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-}
-
-/* The open screen sits in the middle of the space under All games, so a
-   short round doesn't leave the bottom of a large screen empty */
-body.in-game #games-section > div > div:not([hidden]) {
-    flex: 0 1 auto;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-    margin-block: auto;
-}
-
-body.in-game .hl-back {
-    flex: none;
-    align-self: flex-start;
-    margin-bottom: 0.35rem;
-}
-
-body.in-game .hl-scorebar,
-body.in-game .ftl-topbar,
-body.in-game .ord-topbar,
-body.in-game .ftl-guess-form,
-body.in-game .thread-items,
-body.in-game .ftl-actions,
-body.in-game .game-footer,
-body.in-game .ord-hint,
-body.in-game .hl-feedback {
-    flex: none;
-}
-
-/* The board: the part that gives up height when the screen is short, and
-   scrolls on its own only when it can't fit (a long reveal). The padding
-   keeps hover lifts and answer rings from being clipped. */
-body.in-game .hl-round,
-body.in-game .ftl-slots,
-body.in-game .ord-list,
-body.in-game .odd-options,
-body.in-game .thread-statements {
-    position: relative;
-    flex: 0 1 auto;
-    min-height: 0;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    padding: 4px;
-    margin-left: -4px;
-    margin-right: -4px;
-}
-
-/* Setup screens scroll when they must, with Start always in reach. Like the
-   boards, they anchor their visually hidden inputs and labels, which would
-   otherwise stretch the page. */
-body.in-game .game-options {
-    position: relative;
-    overflow-y: auto;
-}
-
-body.in-game .game-options .game-start {
-    position: sticky;
-    bottom: 0;
-    align-self: flex-start;
-    margin-top: 0.4rem;
-    box-shadow: 0 -0.75rem 1rem var(--background-color);
-}
-
-/* Higher or Lower: the two cards share the height */
-body.in-game .hl-round {
-    grid-template-rows: minmax(0, 1fr);
-}
-
-body.in-game .hl-option {
-    min-height: 0;
+    body.in-game .game-options .game-start {
+        align-self: flex-start;
+    }
 }
 
 /* Small screens: tighter spacing so a whole round fits a phone */
@@ -5316,6 +5353,12 @@ body.in-game .hl-option {
        Lower and Odd One Out fill the rest: bigger targets for a thumb */
     body.in-game #games-section > div > div:not([hidden]) {
         margin-block: 0;
+    }
+
+    /* A screen that only asks for a type stays in the middle, like on
+       larger screens */
+    body.in-game #games-section > div > .hl-setup:not([hidden]) {
+        margin-block: auto;
     }
 
     body.in-game #games-section #hl-play,
