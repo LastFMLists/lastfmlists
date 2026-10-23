@@ -1778,7 +1778,7 @@ label.inline-checkbox {
 /* ---- List row parts: rank, cover, title and subtitle, value ---- */
 
 .row-rank {
-    flex: 0 0 4ch;
+    flex: 0 0 var(--rank-width, 4ch);
     font-variant-numeric: tabular-nums;
     text-align: right;
     font-weight: 700;
@@ -1835,6 +1835,33 @@ label.inline-checkbox {
 
 .row-metric small {
     font-size: var(--text-xs);
+}
+
+.nowrap {
+    white-space: nowrap;
+}
+
+/* A list or comparison side narrower than a phone screen: smaller cover and
+   spacing, so names get the room */
+#results,
+.comparison-column {
+    container: list / inline-size;
+}
+
+@container list (max-width: 460px) {
+    #results .entity-row {
+        gap: 0.55rem;
+        padding: 0.5rem 0.6rem;
+    }
+
+    #results .entity-row > .entity-art {
+        width: 34px;
+        height: 34px;
+    }
+
+    #results .row-metric {
+        max-width: 6.5rem;
+    }
 }
 
 /* ---- Rows that open an entity page ---- */

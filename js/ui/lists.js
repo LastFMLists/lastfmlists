@@ -268,6 +268,8 @@ function getRowInfo(sortingBasis, entity) {
 
     const plural = (count, one, many) => (Number(count) === 1 ? one : many);
     const isoDate = timestamp => timestamp ? new Date(parseInt(timestamp, 10)).toISOString().split('T')[0] : 'N/A';
+    // A date wraps as a whole, never at its hyphens.
+    const unbroken = text => `<span class="nowrap">${escapeHTML(text)}</span>`;
     const periodNames = { "separate-days": ["day", "days"], "separate-weeks": ["week", "weeks"], "separate-months": ["month", "months"] };
 
     if (periodNames[sortingBasis]) {
@@ -284,7 +286,7 @@ function getRowInfo(sortingBasis, entity) {
     } else if (sortingBasis.startsWith('consecutive-')) {
         const period = sortingBasis.replace('consecutive-', '');
         const unit = `${Number(entity.maxConsecutive) === 1 ? period.replace(/s$/, '') : period} in a row`;
-        return { value: entity.maxConsecutive, unit, details: [`${isoDate(entity.startTime)} to ${isoDate(entity.endTime)}`] };
+        return { value: entity.maxConsecutive, unit, details: [`${unbroken(isoDate(entity.startTime))} to ${unbroken(isoDate(entity.endTime))}`] };
     } else if (sortingBasis === 'highest-listening-percentage') {
         return {
             value: `${entity.listeningPercentage.toFixed(2)}%`,
@@ -299,7 +301,7 @@ function getRowInfo(sortingBasis, entity) {
         return {
             value: formatDuration(entity.timeNeeded),
             unit: "to reach",
-            details: [`${isoDate(entity.firstScrobble)} to ${isoDate(entity.dateReached)}`]
+            details: [`${unbroken(isoDate(entity.firstScrobble))} to ${unbroken(isoDate(entity.dateReached))}`]
         };
     } else if (sortingBasis === 'oldest-average-listening-time' || sortingBasis === 'newest-average-listening-time') {
         return {
@@ -312,6 +314,9 @@ function getRowInfo(sortingBasis, entity) {
 }
 
 function renderEntitiesToContainer(entities, entityType, targetDiv, sortingBasis, caps) {
+    // The rank column is as wide as the longest rank in this list.
+    const lastRank = Math.min(entities.length, getListLengthLimit());
+    targetDiv.style.setProperty("--rank-width", `${String(Math.max(lastRank, 1)).length + 0.5}ch`);
     if (entityType === "track") {
         displayTopTracks(entities, targetDiv, sortingBasis);
     } else if (entityType === "album") {
@@ -331,37 +336,53 @@ export function getSelectedDisplayMode() {
     return DISPLAY_MODE_LIST;
 }
 
+// Side by side, row n of the left list and row n of the right list get the
+// same height so they line up. Stacked (narrow screens) they keep their own.
 function equalizeComparisonRowHeights(leftContainer, rightContainer) {
     if (!leftContainer || !rightContainer) return;
 
     const leftRows = Array.from(leftContainer.children);
     const rightRows = Array.from(rightContainer.children);
+    [...leftRows, ...rightRows].forEach(row => {
+        row.style.boxSizing = "border-box";
+        row.style.height = "";
+    });
+
+    const sideBySide = Math.abs(leftContainer.getBoundingClientRect().top - rightContainer.getBoundingClientRect().top) < 1;
+    if (!sideBySide || !leftContainer.offsetWidth) return;
+
     const maxRows = Math.max(leftRows.length, rightRows.length);
-
+    const heights = [];
     for (let index = 0; index < maxRows; index++) {
-        const leftRow = leftRows[index] || null;
-        const rightRow = rightRows[index] || null;
-
-        if (leftRow) {
-            leftRow.style.boxSizing = "border-box";
-            leftRow.style.height = "";
-        }
-        if (rightRow) {
-            rightRow.style.boxSizing = "border-box";
-            rightRow.style.height = "";
-        }
-
-        const leftHeight = leftRow ? leftRow.offsetHeight : 0;
-        const rightHeight = rightRow ? rightRow.offsetHeight : 0;
-        const targetHeight = Math.max(leftHeight, rightHeight);
-
-        if (leftRow) leftRow.style.height = `${targetHeight}px`;
-        if (rightRow) rightRow.style.height = `${targetHeight}px`;
+        heights.push(Math.max(leftRows[index]?.offsetHeight || 0, rightRows[index]?.offsetHeight || 0));
     }
+    heights.forEach((height, index) => {
+        if (leftRows[index]) leftRows[index].style.height = `${height}px`;
+        if (rightRows[index]) rightRows[index].style.height = `${height}px`;
+    });
+}
+
+// Row heights depend on the width, so match them again when it changes
+// (a resized window, a turned phone, the filter panel opening or closing,
+// or a comparison rendered while hidden behind an entity page).
+let comparisonResizeObserver = null;
+
+function keepComparisonRowsMatched(layout, leftContainer, rightContainer) {
+    comparisonResizeObserver?.disconnect();
+    if (typeof ResizeObserver === "undefined") return;
+    let lastWidth = layout.offsetWidth;
+    comparisonResizeObserver = new ResizeObserver(() => {
+        const width = layout.offsetWidth;
+        if (width === lastWidth) return;
+        lastWidth = width;
+        equalizeComparisonRowHeights(leftContainer, rightContainer);
+    });
+    comparisonResizeObserver.observe(layout);
 }
 
 export function displayEntities() {
     destroyVisualizationState();
+    comparisonResizeObserver?.disconnect();
     ensureRaceDateDefaults();
     // The address bar follows the list on screen (ui/url-state.js).
     document.dispatchEvent(new CustomEvent("list:rendered"));
@@ -498,6 +519,7 @@ export function displayEntities() {
             renderEntitiesToContainer(leftEntities, leftEntityType, leftList, leftSortingBasis, leftCaps);
             renderEntitiesToContainer(rightEntities, rightEntityType, rightList, rightSortingBasis, rightCaps);
             equalizeComparisonRowHeights(leftList, rightList);
+            keepComparisonRowsMatched(comparisonLayout, leftList, rightList);
         }
 
         state.lastRenderedListState = {
