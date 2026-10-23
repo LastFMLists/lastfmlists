@@ -811,7 +811,8 @@
                     <h2>Fill the List</h2>
                     <p class="game-options-intro">Each round picks a top 10 from your history, such as your top tracks of one year. Name as many of the ten as you can.</p>
 
-                    <fieldset class="option-group">
+                    <div class="ftl-option-groups">
+                    <fieldset class="option-group ftl-types">
                         <legend>Answer types</legend>
                         <p class="option-hint">Pick at least one.</p>
                         <div class="option-chips">
@@ -821,7 +822,7 @@
                         </div>
                     </fieldset>
 
-                    <fieldset class="option-group">
+                    <fieldset class="option-group ftl-cats">
                         <legend>List categories</legend>
                         <p class="option-hint">Pick the kinds of lists you want to play.</p>
                         <div class="option-cards">
@@ -833,7 +834,7 @@
                         </div>
                     </fieldset>
 
-                    <fieldset class="option-group">
+                    <fieldset class="option-group ftl-difficulty">
                         <legend>Difficulty</legend>
                         <label class="option-switch">
                             <span><strong>Hard mode</strong><small>Hide the artist on track and album answers</small></span>
@@ -842,11 +843,12 @@
                         <p class="option-label" id="ftl-timer-label">Time limit</p>
                         <div class="option-chips" role="radiogroup" aria-labelledby="ftl-timer-label">
                             <label class="option-chip"><input type="radio" name="ftl-timer" value="0" checked><span>No limit</span></label>
-                            <label class="option-chip"><input type="radio" name="ftl-timer" value="60"><span>1 minute</span></label>
-                            <label class="option-chip"><input type="radio" name="ftl-timer" value="120"><span>2 minutes</span></label>
-                            <label class="option-chip"><input type="radio" name="ftl-timer" value="300"><span>5 minutes</span></label>
+                            <label class="option-chip"><input type="radio" name="ftl-timer" value="60"><span>1 min</span></label>
+                            <label class="option-chip"><input type="radio" name="ftl-timer" value="120"><span>2 min</span></label>
+                            <label class="option-chip"><input type="radio" name="ftl-timer" value="300"><span>5 min</span></label>
                         </div>
                     </fieldset>
+                    </div>
 
                     <p id="ftl-setup-note" class="hl-setup-note" hidden></p>
                     <button type="button" id="ftl-start" class="hl-primary game-start">Start game</button>
@@ -896,7 +898,6 @@
                     <div class="ftl-actions" id="ord-actions">
                         <button type="button" id="ord-check" class="hl-primary">Check order</button>
                         <button type="button" id="ord-next" class="hl-secondary" hidden>Next round</button>
-                        <button type="button" id="ord-change-type" class="hl-secondary">Change type</button>
                     </div>
 
                     <div id="ord-over" class="ord-over" hidden>
@@ -937,7 +938,6 @@
                         <div id="odd-feedback" class="hl-feedback" aria-live="polite"></div>
                         <div class="ftl-actions" id="odd-actions">
                             <button type="button" id="odd-next" class="hl-primary" hidden>Next round</button>
-                            <button type="button" id="odd-change-type" class="hl-secondary">Change type</button>
                         </div>
 
                         <div id="odd-over" class="ord-over" hidden>
@@ -980,7 +980,6 @@
                         <div id="thread-feedback" class="hl-feedback" aria-live="polite"></div>
                         <div class="ftl-actions" id="thread-actions">
                             <button type="button" id="thread-next" class="hl-primary" hidden>Next round</button>
-                            <button type="button" id="thread-change-type" class="hl-secondary">Change type</button>
                         </div>
 
                         <div id="thread-over" class="ord-over" hidden>

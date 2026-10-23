@@ -4572,6 +4572,80 @@ button.game-card:hover {
 
 /* --- Fill the List --- */
 
+/* Setup: answer types and difficulty side by side, the categories under them */
+.ftl-option-groups {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.8rem;
+    margin-bottom: 1rem;
+}
+
+.ftl-option-groups .option-group {
+    margin: 0;
+}
+
+.ftl-option-groups .ftl-types {
+    grid-column: 1;
+    grid-row: 1;
+}
+
+.ftl-option-groups .ftl-difficulty {
+    grid-column: 2;
+    grid-row: 1;
+}
+
+.ftl-option-groups .ftl-cats {
+    grid-column: 1 / -1;
+    grid-row: 2;
+}
+
+/* The chip rows hold their few choices on one line, in equal widths */
+.ftl-types .option-chips,
+.ftl-difficulty .option-chips {
+    flex-wrap: nowrap;
+}
+
+.ftl-types .option-chip,
+.ftl-difficulty .option-chip {
+    display: flex;
+    flex: 1 1 0;
+    min-width: 0;
+}
+
+.ftl-types .option-chip span,
+.ftl-difficulty .option-chip span {
+    flex: 1 1 auto;
+    justify-content: center;
+    padding-inline: 0.5rem;
+    white-space: nowrap;
+}
+
+@media (max-width: 700px) {
+    .ftl-option-groups {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .ftl-option-groups .ftl-types,
+    .ftl-option-groups .ftl-difficulty,
+    .ftl-option-groups .ftl-cats {
+        grid-column: 1;
+        grid-row: auto;
+    }
+
+    .ftl-types .option-chips,
+    .ftl-difficulty .option-chips {
+        gap: 0.35rem;
+    }
+
+    .ftl-types .option-chip span,
+    .ftl-difficulty .option-chip span {
+        gap: 0.35rem;
+        padding: 0.5rem 0.3rem;
+        font-size: var(--text-sm);
+    }
+}
+
+
 .ftl-group {
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
@@ -4728,8 +4802,10 @@ button.game-card:hover {
     flex-wrap: wrap;
 }
 
-/* The row is hidden once a run ends, leaving the run-over panel's buttons. */
-.ftl-actions[hidden] {
+/* The row is hidden once a run ends, leaving the run-over panel's buttons,
+   and while every button in it is hidden (a round not yet answered). */
+.ftl-actions[hidden],
+.ftl-actions:not(:has(> :not([hidden]))) {
     display: none;
 }
 
@@ -5213,6 +5289,18 @@ body.in-game .thread-statements {
     margin-right: -4px;
 }
 
+/* The result and Next round sit under the board, always on screen, so they
+   drop the floating-panel look (an edge line, a shadow, a band) that kept
+   them in view while the page scrolled */
+body.in-game .answered .game-footer {
+    position: static;
+    margin: 0;
+    padding: 0.4rem 0 0;
+    background: none;
+    border-top: none;
+    box-shadow: none;
+}
+
 /* Setup screens scroll when they must, with Start always in reach. Like the
    boards, they anchor their visually hidden inputs and labels, which would
    otherwise stretch the page. */
@@ -5255,10 +5343,25 @@ body.in-game .hl-option {
         gap: 0.3rem;
     }
 
-    /* The two cards fill the screen: bigger targets for a thumb */
+    /* Phones start a game at the top, and the answer cards of Higher or
+       Lower and Odd One Out fill the rest: bigger targets for a thumb */
+    body.in-game #games-section > div > div:not([hidden]) {
+        margin-block: 0;
+    }
+
     body.in-game #games-section #hl-play,
-    body.in-game #hl-play .hl-round {
+    body.in-game #hl-play .hl-round,
+    body.in-game #games-section #odd-play,
+    body.in-game #odd-play .odd-options {
         flex-grow: 1;
+    }
+
+    body.in-game .odd-options {
+        grid-template-rows: repeat(2, minmax(0, 1fr));
+    }
+
+    body.in-game .odd-option {
+        justify-content: center;
     }
 
     body.in-game .entity-art.hl-option-art {
@@ -5385,6 +5488,10 @@ body.in-game .hl-option {
     body.in-game .game-options-intro {
         margin-bottom: 0.8rem;
         font-size: var(--text-sm);
+    }
+
+    body.in-game .game-options .game-start {
+        align-self: stretch;
     }
 
     body.in-game .game-options .hl-type-choice {
