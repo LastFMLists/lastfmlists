@@ -1,4 +1,4 @@
-// Put Them In Order: rank a handful of entities by a chosen metric.
+// Put Them in Order: rank a handful of entities by a chosen metric.
 
 import { trackGameRound } from '../analytics.js';
 import { escapeHTML } from '../dom.js';

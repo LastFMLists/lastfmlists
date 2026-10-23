@@ -1,13 +1,13 @@
 # Games design doc
 
-The site has five games that use the scrobble library the user has already loaded: Higher or Lower, Fill the List, Put Them In Order, Odd One Out and Common Thread. They make no API calls, so they work as soon as a library is loaded and do not use any of the Last.fm request budget.
+The site has five games that use the scrobble library the user has already loaded: Higher or Lower, Fill the List, Put Them in Order, Odd One Out and Common Thread. They make no API calls, so they work as soon as a library is loaded and do not use any of the Last.fm request budget.
 
 ## Where the games live
 
 - A Games tab sits next to the Lists tab. It stays disabled until data is loaded, and its tooltip says so (the same gating as Load Details).
 - Switching between Games and Lists takes one click. Nothing reloads and neither side loses its state.
 - Anything that needs extended metadata (durations, tags, global stats) only appears once `extendedDataLoaded` is true, the same flag the metadata filters use.
-- Personal records are kept in `localStorage`: the best Higher or Lower streak per entity type, the best Fill the List score, and the best Put Them In Order, Odd One Out and Common Thread streaks.
+- Personal records are kept in `localStorage`: the best Higher or Lower streak per entity type, the best Fill the List score, and the best Put Them in Order, Odd One Out and Common Thread streaks.
 - Anonymous counts go to GoatCounter (`js/analytics.js`): which game and entity type is started, each Play again after a miss, and how far a run gets. A run reports reaching 1, 5, 10, 20, 50 and 100 answered rounds (lists finished, in Fill the List), so the dashboard shows how many runs last that long without one count per round.
 - Game mode: while a game is open (its setup, a round or the run-over screen), the header, the tabs and the footer are hidden and the game fills the screen, so nothing needs scrolling to play. All games brings them back, and is the way out during a run: Change type is only offered once a run is over, next to Play again. Each game is one screen tall: the board (cards, slots, rows or statements) gives up height when the screen is short, the buttons stay on screen, and only a reveal too long for the screen scrolls inside the board. Phones get tighter spacing and smaller covers. `games/screens.js` switches the mode, and the rules sit under "Game mode" in `style.css`.
 - Every right answer shows a green "Correct!" confirmation in the middle of the screen. It springs in, settles and fades out, and it restarts on each answer, so quick answers in Fill the List each get their own. With reduced motion turned on, it appears and disappears without moving.
@@ -168,7 +168,7 @@ For a list filtered by time, name or artist, each entry shows its scrobble count
 
 ---
 
-## Game 3: Put Them In Order
+## Game 3: Put Them in Order
 
 The player gets a few items from their library and one statistic to sort them by, puts them in order, and checks. One item in the wrong place ends the run.
 
@@ -271,7 +271,7 @@ No item may sit close to the line, so that every answer can be reasoned out. Dis
 - The floor shrinks over the first 20 wins: from 1.3x to 1.1x for counts, and from 120 days to 21 for dates. For "more than 100" at the start of a run, a passing item has at least 130 and a failing one at most 77.
 - The floor is the only hard limit on difficulty. Above it, items are drawn on a curve that favours values near the floor but allows larger gaps, so the same items don't come up for every statement of the same kind. A round can come out easier than the floor, never harder.
 - There is also a cap: no item further than 2.5x (or three years) from the line. This keeps the odd one from being an obvious outlier, such as 12 scrobbles against three items with 150.
-- Counts also need a gap of at least 2, as in Put Them In Order, so "5+ in a row" never comes down to 4 against 5.
+- Counts also need a gap of at least 2, as in Put Them in Order, so "5+ in a row" never comes down to 4 against 5.
 - Inside a range with two ends ("between 100 and 200", "in 2021"), the room is shared: the square root of the floor from each end for counts, half the days for dates.
 - A window statement such as "played in the last 30 days" asks for at most half the window as its margin.
 - In Common Thread, the floor applies to every item of the true statement and to the items a wrong statement fails for. Items a wrong statement holds for need no margin, because misreading them only makes the player rule it out, which is right anyway.

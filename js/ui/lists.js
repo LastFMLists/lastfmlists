@@ -593,13 +593,13 @@ export function displayEntities() {
 
         const resultsHeader = document.querySelector("#results-section h2");
         if (comparisonMode === DISPLAY_MODE_BAR_CHART) {
-            resultsHeader.textContent = "Comparison Bar Charts";
+            resultsHeader.textContent = "Comparison bar charts";
         } else if (comparisonMode === DISPLAY_MODE_BAR_RACE) {
             resultsHeader.textContent = raceCanRender
-                ? "Comparison Bar Chart Race"
-                : "Comparison Bar Charts (Race settings pending or Apply Filters required)";
+                ? "Comparison bar chart race"
+                : "Comparison bar charts (race settings pending, or Apply Filters needed)";
         } else {
-            resultsHeader.textContent = "Comparison Results";
+            resultsHeader.textContent = "Comparison";
         }
 
         state.filteredData = leftEntities;
@@ -641,19 +641,19 @@ export function displayEntities() {
 
     const resultsHeader = document.querySelector("#results-section h2");
     if (renderMode === DISPLAY_MODE_BAR_CHART) {
-        resultsHeader.textContent = "Bar Chart";
+        resultsHeader.textContent = "Bar chart";
     } else if (renderMode === DISPLAY_MODE_BAR_RACE) {
         resultsHeader.textContent = raceCanRender
-            ? "Bar Chart Race"
-            : "Bar Chart (Race settings pending or Apply Filters required)";
+            ? "Bar chart race"
+            : "Bar chart (race settings pending, or Apply Filters needed)";
     } else if (leftPipeline.hasOrderingStep && entityType === "track") {
-        resultsHeader.textContent = "Equation Results";
+        resultsHeader.textContent = "Equation results";
     } else if (entityType === "track") {
-        resultsHeader.textContent = "Top Tracks";
+        resultsHeader.textContent = "Top tracks";
     } else if (entityType === "album") {
-        resultsHeader.textContent = "Top Albums";
+        resultsHeader.textContent = "Top albums";
     } else if (entityType === "artist") {
-        resultsHeader.textContent = "Top Artists";
+        resultsHeader.textContent = "Top artists";
     } else if (entityType === "scrobble") {
         resultsHeader.textContent = "Scrobbles";
     }

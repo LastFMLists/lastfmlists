@@ -101,7 +101,7 @@ export function initGames() {
     const ftlNext = document.getElementById("ftl-next");
     if (ftlNext) ftlNext.addEventListener("click", ftlNextPuzzle);
 
-    // Put Them In Order
+    // Put Them in Order
     const openOrd = document.getElementById("open-ordering");
     if (openOrd) openOrd.addEventListener("click", ordOpenGame);
 
