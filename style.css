@@ -421,21 +421,6 @@ body.app-loaded #input-section {
     transform: scale(0.97);
 }
 
-.welcome-credit {
-    margin: 1.1rem 0 0;
-    color: var(--secondary-text-color);
-    font-size: var(--text-sm);
-}
-
-.welcome-credit a {
-    color: inherit;
-    text-underline-offset: 2px;
-}
-
-.welcome-credit a:hover {
-    color: var(--accent-text);
-}
-
 .top-links {
     display: flex;
     justify-content: center;
