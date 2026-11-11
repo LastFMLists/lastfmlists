@@ -46,7 +46,8 @@ export async function updateSessionAvatar(username) {
         const preferred = images.find(img => img.size === 'extralarge' || img.size === 'large') || images[images.length - 1];
         const imageUrl = preferred?.['#text'];
 
-        if (imageUrl) {
+        // Only a web address is used as the picture; anything else is ignored.
+        if (typeof imageUrl === 'string' && /^https?:\/\//.test(imageUrl)) {
             // A picture that fails to load (blocked, or gone from Last.fm)
             // falls back to the initial instead of a broken-image icon.
             avatar.onerror = () => {

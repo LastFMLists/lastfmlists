@@ -48,12 +48,12 @@ export function factDifficulty(wins) {
 // ---- Statistics ----
 
 let relationsCache = null;
-let statsCache = {};
+let statsCache = Object.create(null);
 
 // Call when a game starts, since the history may have changed since the last one.
 export function resetFactStats() {
     relationsCache = null;
-    statsCache = {};
+    statsCache = Object.create(null);
 }
 
 function bump(map, outer, inner) {

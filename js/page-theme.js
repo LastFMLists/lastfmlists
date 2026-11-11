@@ -1,5 +1,5 @@
-// Theme toggle for the text pages (guide, FAQ). The app wires its own toggle
-// in index.html; both use the same storage key, so the choice carries over.
+// Theme toggle for every page (the app, guide and FAQ). The choice is stored
+// under one key, so it carries over between them.
 (function () {
     const toggle = document.getElementById("theme-toggle");
     if (!toggle) return;

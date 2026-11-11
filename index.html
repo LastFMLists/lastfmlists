@@ -3,6 +3,10 @@
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+	<!-- Only this site's own scripts and the pinned libraries below may run, and
+	     the page may only talk to Last.fm and the visit counter. This is a second
+	     line of defence should a name from Last.fm ever reach the page unescaped. -->
+	<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net/npm/chart.js@4.4.2/ https://cdn.jsdelivr.net/npm/gif.js.optimized@1.0.1/ https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: blob: https:; connect-src 'self' https://ws.audioscrobbler.com https://cdn.jsdelivr.net/npm/gif.js.optimized@1.0.1/ https://lastfmlists.goatcounter.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'">
 	<title>lastfmlists: lists and statistics for Last.fm</title>
 	<meta name="description" content="Free Last.fm stats: bar chart races, graphs over time, listening streaks, ready-made lists, album collages and games. No login, runs in your browser.">
 	<meta name="theme-color" content="#FFFCF8">
@@ -46,26 +50,14 @@
 		"sameAs": ["https://github.com/LastFMLists/lastfmlists"]
 	}
 	</script>
-	<script>
-		// Runs before the stylesheet paints, so a saved dark theme doesn't flash light.
-		(function () {
-			try {
-				var stored = localStorage.getItem('lastfmlists-theme');
-				var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-				var theme = stored || (prefersDark ? 'dark' : 'light');
-				document.documentElement.setAttribute('data-theme', theme);
-			} catch (e) {
-				document.documentElement.setAttribute('data-theme', 'light');
-			}
-		})();
-	</script>
+	<script src="js/theme-init.js"></script>
 	<link rel="icon" type="image/png" href="logo.png" sizes="32x32">
 	<link rel="icon" type="image/png" href="logo.png" sizes="16x16">
 	<link rel="apple-touch-icon" href="logo.png" sizes="180x180">
 	<link rel="preconnect" href="https://fonts.googleapis.com">
 	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 	<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,100..700;1,100..700&display=swap" rel="stylesheet">
-	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" integrity="sha384-PPIZEGYM1v8zp5Py7UjFb79S58UeqCL9pYVnVPURKEqvioPROaVAJKKLzvH2rDnI" crossorigin="anonymous" referrerpolicy="no-referrer">
 	<link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -1057,41 +1049,18 @@
         </div>
 
 	</main>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/gif.js.optimized@1.0.1/dist/gif.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <!-- The libraries are pinned to one version and checked against its hash,
+         so a changed file on the CDN is refused instead of run. -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js" integrity="sha384-e6cc9LaIG7xZ3XD5B+jtr1NhTWPQGQdRCh6xiZ+ZFUtWCpg4ycv3Sh+SkZoopvUY" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gif.js.optimized@1.0.1/dist/gif.js" integrity="sha384-NRBudS8j0C4n1zt6ZpidRjH724QT7VXARyeGDI9SYn4b0X7JUxBIP0JlUxXXyZPc" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js" integrity="sha384-ZZ1pncU3bQe8y31yfZdMFdSpttDoPmOZg2wguVK9almUodir1PghgT0eY7Mrty8H" crossorigin="anonymous"></script>
     <script type="module" src="js/main.js"></script>
-    <!-- Anonymous visit and feature counts; see js/analytics.js -->
-    <script>
-        // Page views count the path only. The address bar holds the username
-        // and list settings, which must never reach the counter.
-        window.goatcounter = { path: function () { return location.pathname || "/"; } };
-    </script>
+    <!-- Anonymous visit and feature counts; see js/analytics.js. count.js is
+         GoatCounter's script, kept in this repository so it cannot change unseen. -->
+    <script src="js/goatcounter-config.js"></script>
     <script id="goatcounter-script" data-goatcounter="https://lastfmlists.goatcounter.com/count"
-            async src="https://gc.zgo.at/count.js"></script>
-
-    <script>
-        const themeToggle = document.getElementById('theme-toggle');
-        const THEME_STORAGE_KEY = 'lastfmlists-theme';
-
-        const paintThemeToggle = (theme) => {
-            themeToggle.innerHTML = theme === 'dark' ? '<i class="fas fa-sun"></i>' : '<i class="fas fa-moon"></i>';
-            themeToggle.setAttribute('aria-label', theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme');
-        };
-
-        paintThemeToggle(document.documentElement.getAttribute('data-theme'));
-
-        themeToggle.addEventListener('click', () => {
-            const currentTheme = document.documentElement.getAttribute('data-theme');
-            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-            document.documentElement.setAttribute('data-theme', newTheme);
-            paintThemeToggle(newTheme);
-            try {
-                localStorage.setItem(THEME_STORAGE_KEY, newTheme);
-            } catch (e) {
-                // Private browsing with storage blocked: the toggle still works for this visit.
-            }
-        });
-    </script>
+            async src="js/vendor/goatcounter-count.js"></script>
+    <script src="js/page-theme.js"></script>
+    <script src="js/icon-fallback.js"></script>
 </body>
 </html>

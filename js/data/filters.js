@@ -537,11 +537,11 @@ export function buildEntitiesFromTracks(sourceTracks, entityType, sortingBasis, 
 
     if (sortingBasis === 'scrobbles') {
         if (entityType === 'track') {
-            const trackGroups = {};
+            const trackGroups = Object.create(null);
             entities.forEach(track => {
                 const key = `${track.Artist.toLowerCase()} - ${track.Track.toLowerCase()}`;
                 if (!trackGroups[key]) {
-                    trackGroups[key] = { ...track, count: 0, albumCounts: {} };
+                    trackGroups[key] = { ...track, count: 0, albumCounts: Object.create(null) };
                 }
                 trackGroups[key].count++;
                 const albumName = track.Album;
@@ -552,7 +552,7 @@ export function buildEntitiesFromTracks(sourceTracks, entityType, sortingBasis, 
             });
             entities = Object.values(trackGroups);
         } else if (entityType === 'album') {
-            const albumGroups = {};
+            const albumGroups = Object.create(null);
             entities.forEach(track => {
                 const key = `${track.Album.toLowerCase()}||${track.Artist.toLowerCase()}`;
                 if (!albumGroups[key]) {
@@ -563,7 +563,7 @@ export function buildEntitiesFromTracks(sourceTracks, entityType, sortingBasis, 
             });
             entities = Object.values(albumGroups);
         } else if (entityType === 'artist') {
-            const artistGroups = {};
+            const artistGroups = Object.create(null);
             entities.forEach(track => {
                 const key = track.Artist.toLowerCase();
                 if (!artistGroups[key]) {
@@ -663,7 +663,7 @@ function dedupeOrderedTrackEntities(tracks) {
             entitiesByKey.set(key, {
                 ...track,
                 count: 0,
-                albumCounts: {}
+                albumCounts: Object.create(null)
             });
         }
 

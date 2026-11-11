@@ -38,9 +38,9 @@ function ordDifficulty(wins) {
 const ORD_CRITERION_COOLDOWN = 5;
 
 let ordState = null;
-let ordConsecutiveCache = {};
-let ordTrackStatsCache = {};
-let ordDayStatsCache = {};
+let ordConsecutiveCache = Object.create(null);
+let ordTrackStatsCache = Object.create(null);
+let ordDayStatsCache = Object.create(null);
 let ordDragEl = null;
 
 // Key for a raw scrobble, matching the entity keys used by the index.
@@ -446,9 +446,9 @@ export function ordNextRound() {
 
 export function ordStart(type) {
     rebuildScrobbleIndex();
-    ordConsecutiveCache = {};
-    ordTrackStatsCache = {};
-    ordDayStatsCache = {};
+    ordConsecutiveCache = Object.create(null);
+    ordTrackStatsCache = Object.create(null);
+    ordDayStatsCache = Object.create(null);
     if (ordBasePool(type, Infinity).length < ordDifficulty(0).items) {
         ordState = { type, round: null, checked: false, rounds: 0, streak: 0, criterionLastUsed: new Map(), lastAnswer: "" };
         ordShowSetup(true);

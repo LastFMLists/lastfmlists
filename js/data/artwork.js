@@ -32,7 +32,7 @@ function isNamedAlbum(album) {
 
 export function rememberAlbumArt(album, artist, url) {
     if (!isNamedAlbum(album) || !artist || !isUsableImageUrl(url)) return;
-    if (!state.albumArt) state.albumArt = {};
+    if (!state.albumArt) state.albumArt = Object.create(null);
     state.albumArt[albumArtKey(album, artist)] = url;
 }
 
@@ -106,7 +106,7 @@ async function loadArt(album, artist) {
         pendingLookups.set(key, (async () => {
             const url = await fetchAlbumCoverUrl(album, artist).catch(() => null);
             const usable = isUsableImageUrl(url) ? url : "";
-            if (!state.albumArt) state.albumArt = {};
+            if (!state.albumArt) state.albumArt = Object.create(null);
             state.albumArt[key] = usable;
             pendingLookups.delete(key);
             return usable;

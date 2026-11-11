@@ -113,7 +113,7 @@ function sanitizeForIndexedDb(value, seen = new WeakSet()) {
     }
 
     if (value instanceof Map) {
-        const mapped = {};
+        const mapped = Object.create(null);
         value.forEach((entryValue, entryKey) => {
             const key = String(entryKey);
             const safeEntryValue = sanitizeForIndexedDb(entryValue, seen);
@@ -130,7 +130,7 @@ function sanitizeForIndexedDb(value, seen = new WeakSet()) {
         }
         seen.add(value);
 
-        const result = {};
+        const result = Object.create(null);
         Object.keys(value).forEach(key => {
             const safeValue = sanitizeForIndexedDb(value[key], seen);
             if (safeValue !== undefined) {
@@ -264,8 +264,8 @@ if (csvFileInput) csvFileInput.addEventListener('change', async (event) => {
         // this file can run in strict mode).
         const raw_data = [];
         const undated = [];
-        const firstScrobbles = { artists: {}, albums: {}, tracks: {} };
-        const lastScrobbles = { artists: {}, albums: {}, tracks: {} };
+        const firstScrobbles = { artists: Object.create(null), albums: Object.create(null), tracks: Object.create(null) };
+        const lastScrobbles = { artists: Object.create(null), albums: Object.create(null), tracks: Object.create(null) };
         const artistTrackSets = Object.create(null);
         const albumTrackSets = Object.create(null);
 
@@ -396,21 +396,21 @@ if (csvFileInput) csvFileInput.addEventListener('change', async (event) => {
         state.artistDataMap = state.artistsData.reduce((map, artist) => {
             map[artist.name.toLowerCase()] = artist;
             return map;
-        }, {});
+        }, Object.create(null));
     
         loadingDiv.innerHTML = "<p>Mapping albums...</p>";
         
         state.albumDataMap = state.albumsData.reduce((map, album) => {
             map[`${album.name.toLowerCase()}||${album.artist.toLowerCase()}`] = album;
             return map;
-        }, {});
+        }, Object.create(null));
     
         loadingDiv.innerHTML = "<p>Mapping tracks...</p>";
         
         state.trackDataMap = state.tracksData.reduce((map, track) => {
             map[`${track.name.toLowerCase()}||${track.artist.toLowerCase()}`] = track;
             return map;
-        }, {});
+        }, Object.create(null));
 
         // ✅ Enable "Load Detailed Data" button
         const loadDetailedBtn = document.getElementById("load-detailed-data");

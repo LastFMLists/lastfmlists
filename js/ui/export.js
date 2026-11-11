@@ -209,8 +209,13 @@ async function getGifWorkerScriptUrl() {
         return gifWorkerBlobUrl;
     }
 
-    const workerCdnUrl = 'https://cdn.jsdelivr.net/npm/gif.js.optimized/dist/gif.worker.js';
-    const response = await fetch(workerCdnUrl);
+    // Pinned to the version of gif.js that index.html loads and checked
+    // against its hash: the worker runs with this page's access to the saved
+    // data, so a changed file on the CDN must be refused, not run.
+    const workerCdnUrl = 'https://cdn.jsdelivr.net/npm/gif.js.optimized@1.0.1/dist/gif.worker.js';
+    const response = await fetch(workerCdnUrl, {
+        integrity: 'sha384-kE4zaIXt15UeV84vDNrzY5BGTHMmgVcRVStIQ+zGPT19/ilKoG445bpO9KjrhO4N'
+    });
     if (!response.ok) {
         throw new Error(`Failed to fetch GIF worker script (HTTP ${response.status})`);
     }
@@ -351,7 +356,7 @@ function getMostCommonAlbumName(entity) {
 
 function getTopAlbumForArtist(artistName) {
     if (!artistName) return "";
-    const counts = {};
+    const counts = Object.create(null);
     state.allTracks.forEach(track => {
         if ((track.Artist || "").toLowerCase() !== artistName.toLowerCase()) return;
         const albumName = (track.Album || "").trim();

@@ -649,7 +649,7 @@ export function applyEquationPipeline(tracks, equationsInput, equationContext = 
 
         if (step.type === "unique") {
             hasOrderingStep = true;
-            const perUniqueCounts = {};
+            const perUniqueCounts = Object.create(null);
             const uniqueTracks = [];
 
             for (const track of currentTracks) {

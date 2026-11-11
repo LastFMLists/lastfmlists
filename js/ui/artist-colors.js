@@ -53,12 +53,12 @@ function load() {
             other: isHex(saved?.other) ? saved.other : null
         };
     } catch (e) {
-        return { colors: {}, auto: true, other: null };
+        return { colors: Object.create(null), auto: true, other: null };
     }
 }
 
 const store = load();
-let fromLink = { colors: {}, auto: null, other: null };
+let fromLink = { colors: Object.create(null), auto: null, other: null };
 
 function changed() {
     document.dispatchEvent(new CustomEvent("artist-colors:changed"));
@@ -418,7 +418,7 @@ export function colorLinkPairs(keys = shownKeys) {
 // Reads a link's colors. They apply for this visit on top of the
 // visitor's own, and picking a color replaces the link's for that name.
 export function applyLinkColors(params) {
-    const next = { colors: {}, auto: null, other: null };
+    const next = { colors: Object.create(null), auto: null, other: null };
     params.getAll("color").forEach(value => {
         const split = value.indexOf(":");
         const color = `#${value.slice(0, split)}`;

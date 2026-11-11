@@ -3,6 +3,10 @@
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+	<!-- Only this site's own scripts and the pinned libraries below may run, and
+	     the page may only talk to Last.fm and the visit counter. This is a second
+	     line of defence should a name from Last.fm ever reach the page unescaped. -->
+	<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: https:; connect-src 'self' https://lastfmlists.goatcounter.com; object-src 'none'; base-uri 'self'; form-action 'self'">
 	<title>FAQ · lastfmlists</title>
 	<meta name="description" content="Answers about lastfmlists: what it does, where your data is stored, why loading takes time, and how to make streak lists, album collages, bar chart races and graphs.">
 	<meta name="theme-color" content="#FFFCF8">
@@ -192,25 +196,13 @@
 	 ]
 	}
 	</script>
-	<script>
-		// Runs before the stylesheet paints, so a saved dark theme doesn't flash light.
-		(function () {
-			try {
-				var stored = localStorage.getItem('lastfmlists-theme');
-				var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-				var theme = stored || (prefersDark ? 'dark' : 'light');
-				document.documentElement.setAttribute('data-theme', theme);
-			} catch (e) {
-				document.documentElement.setAttribute('data-theme', 'light');
-			}
-		})();
-	</script>
+	<script src="../js/theme-init.js"></script>
 	<link rel="icon" type="image/png" href="../logo.png" sizes="32x32">
 	<link rel="apple-touch-icon" href="../logo.png" sizes="180x180">
 	<link rel="preconnect" href="https://fonts.googleapis.com">
 	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 	<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,100..700;1,100..700&display=swap" rel="stylesheet">
-	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" integrity="sha384-PPIZEGYM1v8zp5Py7UjFb79S58UeqCL9pYVnVPURKEqvioPROaVAJKKLzvH2rDnI" crossorigin="anonymous" referrerpolicy="no-referrer">
 	<link rel="stylesheet" href="../style.css">
 	<link rel="stylesheet" href="../pages.css">
 </head>
@@ -340,8 +332,9 @@
 		</article>
 	</main>
 
-	<script data-goatcounter="https://lastfmlists.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
+	<script data-goatcounter="https://lastfmlists.goatcounter.com/count" async src="../js/vendor/goatcounter-count.js"></script>
 	<script src="../js/page-theme.js"></script>
+	<script src="../js/icon-fallback.js"></script>
 	<script type="module" src="../js/page-links.js"></script>
 </body>
 </html>
