@@ -101,7 +101,7 @@ function displayTopTracks(tracks, targetDiv = null, sortingBasisOverride = null)
     const sortingBasis = sortingBasisOverride || document.getElementById("sorting-basis").value;
     const listLength = getListLengthLimit();
     const showUnfiltered = document.getElementById("unfiltered-stats").checked;
-    let unfilteredMapping = {};
+    let unfilteredMapping = Object.create(null);
     if (showUnfiltered) {
         unfilteredMapping = computeUnfilteredStats("track");
     }
@@ -149,7 +149,7 @@ function displayTopAlbums(albums, targetDiv = null, sortingBasisOverride = null)
     const sortingBasis = sortingBasisOverride || document.getElementById("sorting-basis").value;
     const listLength = getListLengthLimit();
     const showUnfiltered = document.getElementById("unfiltered-stats").checked;
-    let unfilteredMapping = {};
+    let unfilteredMapping = Object.create(null);
     if (showUnfiltered) {
         unfilteredMapping = computeUnfilteredStats("album");
     }
@@ -184,7 +184,7 @@ function displayTopArtists(artists, targetDiv = null, sortingBasisOverride = nul
     const sortingBasis = sortingBasisOverride || document.getElementById("sorting-basis").value;
     const listLength = getListLengthLimit();
     const showUnfiltered = document.getElementById("unfiltered-stats").checked;
-    let unfilteredMapping = {};
+    let unfilteredMapping = Object.create(null);
     if (showUnfiltered) {
         unfilteredMapping = computeUnfilteredStats("artist");
     }

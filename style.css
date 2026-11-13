@@ -351,7 +351,8 @@ body.app-loaded #input-section {
 }
 
 .load-error {
-    margin: 0.9rem auto 0;
+    /* Sits between the form (1.5rem below it) and the links, with an even gap on both sides. */
+    margin: -0.6rem auto 0.9rem;
     max-width: 34rem;
     padding: 0.6rem 1rem;
     border: 1px solid var(--accent-strong);
@@ -2707,6 +2708,8 @@ button.race-swatch[aria-expanded="true"] {
     border-bottom: 1px dotted currentColor;
     color: var(--primary-text-color);
     font-weight: 600;
+    /* A name long enough to wrap lines up with the title above it. */
+    text-align: left;
     cursor: pointer;
 }
 
@@ -3307,6 +3310,12 @@ button.entity-stat:hover {
         right: 1rem;
         left: 1rem;
         width: auto;
+    }
+
+    /* Three choices don't fit one row on a phone and the third would wrap
+       alone under the first. The close button already means "Not now". */
+    .support-secondary button[data-support="later"] {
+        display: none;
     }
 }
 
@@ -5724,6 +5733,8 @@ button.game-card:hover {
 }
 
 .graph-series-name {
+    min-width: 0;
+    max-width: 100%;
     overflow: hidden;
     font-weight: 650;
     color: var(--primary-text-color);
@@ -5732,9 +5743,17 @@ button.game-card:hover {
 }
 
 .graph-series-kind {
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
     font-size: var(--text-xs);
     color: var(--secondary-text-color);
+    text-overflow: ellipsis;
     white-space: nowrap;
+}
+/* A long name shortens with an ellipsis; the remove button keeps its place. */
+.graph-series-chip .race-legend-reset {
+    flex: none;
 }
 
 .graph-add {
@@ -5961,4 +5980,46 @@ button.game-card:hover {
     .view-tab i {
         display: none;
     }
+}
+
+/* ---- Icons failed to load ----
+   js/icon-fallback.js adds .icons-missing when Font Awesome's stylesheet is
+   blocked or fails. Icon-only buttons and links then show their label as text
+   instead of an empty circle, and buttons with a hidden label show it. */
+.icons-missing .fas,
+.icons-missing .fab,
+.icons-missing .far {
+    display: none;
+}
+.icons-missing :is(button, a)[aria-label]:has(> i:only-child) {
+    width: auto !important;
+    min-width: 0;
+    height: auto !important;
+    min-height: 2rem;
+    aspect-ratio: auto;
+    padding: 0.3rem 0.75rem !important;
+    border-radius: 999px !important;
+    font-size: var(--text-sm) !important;
+    font-weight: 600;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+.icons-missing :is(button, a)[aria-label]:has(> i:only-child)::after {
+    content: attr(aria-label);
+}
+.icons-missing #session-panel .session-actions .btn-label {
+    display: inline !important;
+}
+.icons-missing .top-links,
+.icons-missing #session-panel .session-socials,
+.icons-missing #session-panel .session-actions {
+    flex-wrap: wrap;
+    justify-content: center;
+}
+.icons-missing #session-panel .session-actions > button,
+.icons-missing #session-panel .session-actions .menu-trigger {
+    width: auto;
+    height: auto;
+    min-height: 2rem;
+    padding: 0.3rem 0.75rem;
 }

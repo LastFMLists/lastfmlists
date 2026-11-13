@@ -32,7 +32,7 @@ export function computeUnfilteredStats(entityType) {
 
     const undated = state.undatedTracks || [];
     const tracks = undated.length ? state.allTracks.concat(undated) : state.allTracks;
-    const groups = {};
+    const groups = Object.create(null);
     if (entityType === 'track') {
         tracks.forEach(track => {
             const key = `${track.Artist.toLowerCase()} - ${track.Track.toLowerCase()}`;
@@ -62,7 +62,7 @@ export function computeUnfilteredStats(entityType) {
     const groupArray = Object.entries(groups).map(([key, data]) => ({ key, count: data.count }));
     groupArray.sort((a, b) => b.count - a.count);
     // Now assign ranking (1-indexed)
-    const mapping = {};
+    const mapping = Object.create(null);
     groupArray.forEach((item, index) => {
         mapping[item.key] = { rank: index + 1, count: item.count };
     });
@@ -142,7 +142,7 @@ export function calculateSeparateScrobbles(tracks, period, entityType = 'track')
             }
         }
         return acc;
-    }, {});
+    }, Object.create(null));
 
     return Object.values(groups);
 }
@@ -157,7 +157,7 @@ export function calculateConsecutiveScrobbles(tracks, entityType = 'track') {
         return `${track.Artist} - ${track.Track}`;
     };
 
-    const groups = {};
+    const groups = Object.create(null);
     let previousKey = null;
     let previousOrder = null;
 
@@ -229,8 +229,8 @@ export function calculateConsecutivePeriods(tracks, period, entityType = 'track'
         }
     };
 
-	const results = {};
-    const states = {};
+	const results = Object.create(null);
+    const states = Object.create(null);
 
     for (const track of sortedTracks) {
         const timestamp = parseInt(track.Date, 10);
@@ -373,7 +373,7 @@ export function calculateListeningPercentage(tracks, entityType = 'track') {
         acc[key].playcount += playcount;
 
         return acc;
-    }, {});
+    }, Object.create(null));
 
     // Convert the grouped data into an array for returning
     const result = Object.values(groups);
@@ -394,13 +394,13 @@ export function calculateListeningDuration(filteredData, entityType = 'track') {
     console.log(`Calculating listening duration for entityType: ${entityType}`);
 
     // Step 1: Group tracks by Artist + Track
-    const trackGroups = {};
+    const trackGroups = Object.create(null);
 
     filteredData.forEach(track => {
         const key = `${track.Artist.toLowerCase()} - ${track.Track.toLowerCase()}`;
         
         if (!trackGroups[key]) {
-            trackGroups[key] = { ...track, count: 0, albumCounts: {}, duration: 0 };
+            trackGroups[key] = { ...track, count: 0, albumCounts: Object.create(null), duration: 0 };
         }
         trackGroups[key].count++;
 
@@ -445,7 +445,7 @@ export function calculateListeningDuration(filteredData, entityType = 'track') {
         acc[entityKey].listeningDuration += track.duration * track.count;
     
         return acc;
-    }, {});
+    }, Object.create(null));
 
     // Convert aggregated data into an array and sort by listeningDuration
     const sortedAggregatedData = Object.values(aggregatedData).sort((a, b) => b.listeningDuration - a.listeningDuration);
@@ -464,7 +464,7 @@ export function calculateAverageListeningTime(tracks, entityType = 'track', minS
         if (entityType === 'track') {
             key = `${track.Artist.toLowerCase()} - ${track.Track.toLowerCase()}`;
             if (!acc[key]) {
-                acc[key] = { ...track, count: 0, timestampSum: 0, albumCounts: {} };
+                acc[key] = { ...track, count: 0, timestampSum: 0, albumCounts: Object.create(null) };
             }
             acc[key].count += 1;
             acc[key].timestampSum += timestamp;
@@ -493,7 +493,7 @@ export function calculateAverageListeningTime(tracks, entityType = 'track', minS
         acc[key].count += 1;
         acc[key].timestampSum += timestamp;
         return acc;
-    }, {});
+    }, Object.create(null));
 
     return Object.values(groups)
         .filter(entity => entity.count >= threshold)
@@ -553,7 +553,7 @@ export function calculateFirstToXScrobbles(tracks, x, entityType = 'track') {
             }
         }
         return acc;
-    }, {});
+    }, Object.create(null));
 
     return Object.values(groups).filter(item => item.count >= x);
 }
@@ -609,7 +609,7 @@ export function calculateFastestToXScrobbles(tracks, x, entityType = 'track') {
             }
         }
         return acc;
-    }, {});
+    }, Object.create(null));
 
     return Object.values(groups)
         .filter(item => item.count >= x)
@@ -635,8 +635,8 @@ function getEntityKeyAndSample(track, entityType) {
 }
 
 export function calculateMaxScrobblesInSinglePeriod(tracks, period, entityType = 'track') {
-    const periodCounts = {};
-    const entityBest = {};
+    const periodCounts = Object.create(null);
+    const entityBest = Object.create(null);
 
     tracks.forEach(track => {
         const timestamp = parseInt(track.Date, 10);
@@ -663,7 +663,7 @@ export function calculateMaxScrobblesInSinglePeriod(tracks, period, entityType =
 
 export function calculateMaxScrobblesInRollingWindow(tracks, windowHours, entityType = 'track') {
     const windowMs = windowHours * 60 * 60 * 1000;
-    const grouped = {};
+    const grouped = Object.create(null);
 
     tracks.forEach(track => {
         const timestamp = parseInt(track.Date, 10);
@@ -753,7 +753,7 @@ export function getTrackAverageListeningMap(minScrobbles = 1) {
         return trackAverageListeningCache.mapping;
     }
 
-    const grouped = {};
+    const grouped = Object.create(null);
     state.allTracks.forEach(track => {
         const key = `${track.Track?.toLowerCase() || ""}||${track.Artist?.toLowerCase() || ""}`;
         if (!key || key === "||") return;
@@ -768,7 +768,7 @@ export function getTrackAverageListeningMap(minScrobbles = 1) {
         grouped[key].timestampSum += timestamp;
     });
 
-    const mapping = {};
+    const mapping = Object.create(null);
     Object.entries(grouped).forEach(([key, value]) => {
         if (value.count >= threshold) {
             mapping[key] = Math.floor(value.timestampSum / value.count);

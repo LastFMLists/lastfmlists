@@ -78,7 +78,7 @@ function buildScrobbleIndex() {
         track: [...track.values()],
         years,
         byArtistEligible: { track: eligible(track), album: eligible(album) },
-        seq: {}
+        seq: Object.create(null)
     };
 }
 

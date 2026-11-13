@@ -15,9 +15,9 @@ export const state = {
     artistsData: [],  // [{ name, listeners, playcount, debutYear }]
     albumsData: [],   // [{ title, artist, releaseDate, playcount }]
     tracksData: [],   // [{ title, album, listeners, playcount }]
-    artistDataMap: {},
-    albumDataMap: {},
-    trackDataMap: {},
+    artistDataMap: Object.create(null),
+    albumDataMap: Object.create(null),
+    trackDataMap: Object.create(null),
     topArtists: [],
     topAlbums: [],
     topTracks: [],
@@ -35,7 +35,7 @@ export const state = {
 
     // Album cover URLs keyed "album||artist" (lowercase). "" marks an album
     // Last.fm has no cover for. Saved with the rest of the dataset.
-    albumArt: {},
+    albumArt: Object.create(null),
 
     // Per-scrobble context, keyed by scrobble order (see buildHistoryContextMaps)
     previousScrobbleTimestampByOrder: {},
