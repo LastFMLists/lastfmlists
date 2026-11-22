@@ -3187,35 +3187,149 @@ button.entity-stat:hover {
 }
 
 /* ==========================================================================
-   Support banner
+   Support strip
    ========================================================================== */
 
-.support-banner {
-    position: fixed;
-    right: 1.2rem;
-    bottom: calc(1.2rem + env(safe-area-inset-bottom));
-    z-index: 1500;
-    display: none;
-    flex-direction: column;
-    gap: 0.75rem;
-    width: min(360px, calc(100vw - 2rem));
-    padding: 1rem 1rem 0.8rem;
-    background: var(--background-color);
+/* A slim notice at the top of the page flow: it scrolls away with the page
+   and never covers anything. See js/ui/support-banner.js. */
+.support-strip {
+    position: relative;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) minmax(220px, 280px);
+    align-items: center;
+    gap: 0.4rem 1rem;
+    margin-bottom: 1.1rem;
+    padding: 0.75rem 2.8rem 0.75rem 0.9rem;
+    background: var(--accent-soft);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-lg);
+    color: var(--primary-text-color);
+    animation: rise 0.25s ease;
+}
+
+.support-strip-icon {
+    align-self: start;
+    width: 2.2rem;
+    height: 2.2rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--background-color);
+    border-radius: var(--radius-md);
+    color: var(--primary-accent-color);
+}
+
+.support-strip-text p {
+    margin: 0;
+}
+
+.support-strip-title {
+    font-size: var(--text-base);
+    line-height: 1.35;
+}
+
+.support-strip-when {
+    color: var(--secondary-text-color);
+    font-weight: 600;
+}
+
+.support-strip-body {
+    margin-top: 0.15rem !important;
+    color: var(--secondary-text-color);
+    font-size: var(--text-sm);
+    line-height: 1.45;
+}
+
+.support-strip-side {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.support-meter {
+    position: relative;
+    height: 0.5rem;
+    background: var(--background-color);
+    border: 1px solid var(--border-color);
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.support-meter-fill {
+    position: absolute;
+    inset: 0 auto 0 0;
+    background: var(--primary-accent-color);
+    border-radius: 999px;
+}
+
+/* Marks the first month on the bar */
+.support-meter-tick {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: var(--secondary-text-color);
+    opacity: 0.6;
+}
+
+.support-meter-label {
+    margin: 0;
+    color: var(--secondary-text-color);
+    font-size: var(--text-xs);
+}
+
+.support-meter-label strong {
     color: var(--primary-text-color);
 }
 
-.support-banner.is-visible {
+.support-strip-actions {
     display: flex;
-    animation: pop-up 0.25s ease;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.support-strip-donate {
+    flex: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    padding: 0.45rem 0.8rem;
+    background: var(--primary-accent-color);
+    color: var(--on-accent);
+    border-radius: var(--radius-sm);
+    font-size: var(--text-sm);
+    font-weight: 700;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: background-color 0.15s ease;
+}
+
+.support-strip-donate:hover {
+    background: var(--accent-strong);
+}
+
+.support-strip-done {
+    padding: 0.45rem 0.5rem;
+    background: none;
+    border: none;
+    border-radius: var(--radius-sm);
+    color: var(--secondary-text-color);
+    font-size: var(--text-sm);
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.support-strip-done:hover {
+    background: var(--background-color);
+    color: var(--primary-text-color);
 }
 
 .support-close {
     position: absolute;
-    top: 0.5rem;
-    right: 0.5rem;
+    top: 0.45rem;
+    right: 0.45rem;
     width: 2rem;
     height: 2rem;
     display: inline-flex;
@@ -3230,92 +3344,49 @@ button.entity-stat:hover {
 }
 
 .support-close:hover {
-    background: var(--accent-soft);
+    background: var(--background-color);
     color: var(--primary-text-color);
 }
 
-.support-body {
-    display: flex;
-    gap: 0.75rem;
-    padding-right: 1.6rem;
+.support-strip.is-thanks {
+    grid-template-columns: auto minmax(0, 1fr);
 }
 
-.support-icon {
-    flex-shrink: 0;
-    width: 2.6rem;
-    height: 2.6rem;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--accent-soft);
-    border-radius: var(--radius-md);
-    color: var(--primary-accent-color);
-    font-size: var(--text-lg);
+/* The welcome screen centers its card; with the strip on top, the card
+   centers in the space left under it */
+body.has-support-strip:not(.app-loaded) main {
+    flex-direction: column;
+    justify-content: flex-start;
 }
 
-.support-text strong {
-    font-size: var(--text-base);
+body.has-support-strip:not(.app-loaded) #input-section {
+    margin-block: auto;
 }
 
-.support-text p {
-    margin: 0.2rem 0 0;
-    color: var(--secondary-text-color);
-    font-size: var(--text-sm);
-    line-height: 1.45;
+.support-strip-short {
+    display: none;
 }
 
-.support-primary {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    padding: 0.6rem 0.9rem;
-    background: var(--primary-accent-color);
-    color: var(--on-accent);
-    border-radius: var(--radius-sm);
-    font-weight: 700;
-    text-decoration: none;
-    transition: background-color 0.15s ease;
-}
-
-.support-primary:hover {
-    background: var(--accent-strong);
-}
-
-.support-secondary {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: space-between;
-    gap: 0.2rem;
-}
-
-.support-secondary button {
-    padding: 0.35rem 0.4rem;
-    background: none;
-    border: none;
-    border-radius: var(--radius-sm);
-    color: var(--secondary-text-color);
-    font-size: var(--text-sm);
-    font-weight: 600;
-    cursor: pointer;
-}
-
-.support-secondary button:hover {
-    background: var(--accent-soft);
-    color: var(--primary-text-color);
-}
-
-@media (max-width: 520px) {
-    .support-banner {
-        right: 1rem;
-        left: 1rem;
-        width: auto;
+@media (max-width: 768px) {
+    .support-strip {
+        grid-template-columns: auto minmax(0, 1fr);
+        padding: 0.7rem 2.6rem 0.75rem 0.75rem;
     }
 
-    /* Three choices don't fit one row on a phone and the third would wrap
-       alone under the first. The close button already means "Not now". */
-    .support-secondary button[data-support="later"] {
+    .support-strip-side {
+        grid-column: 1 / -1;
+    }
+
+    .support-strip-icon {
         display: none;
+    }
+
+    .support-strip-long {
+        display: none;
+    }
+
+    .support-strip-short {
+        display: inline;
     }
 }
 
@@ -5224,7 +5295,7 @@ button.game-card:hover {
     body.view-games.in-game #session-panel,
     body.view-games.in-game #view-tabs,
     body.view-games.in-game #loading-stats,
-    body.view-games.in-game .support-banner {
+    body.view-games.in-game .support-strip {
         display: none !important;
     }
 
