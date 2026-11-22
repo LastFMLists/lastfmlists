@@ -12,7 +12,7 @@ import { trackEvent, trackEventOnce } from '../analytics.js';
 // ---- Update these by hand ----
 // RAISED is the total from Ko-fi so far, in dollars. The strip disappears
 // for everyone once it reaches GOAL.
-const RAISED = 0;
+const RAISED = 20;
 const GOAL = 50;        // a year of Last.fm Pro
 const MONTH_COST = 5;   // one month of Last.fm Pro
 // Local midnight at the start of December 1, 2026.
