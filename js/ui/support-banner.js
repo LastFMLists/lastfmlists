@@ -68,8 +68,8 @@ function copy(now) {
         return {
             icon: "fa-triangle-exclamation",
             title: `lastfmlists stops working on December 1 <span class="support-strip-when">(${daysLeftText(now)})</span>`,
-            body: `Last.fm is putting its API behind a paid Pro subscription, a change outside my control, and the site can't load any scrobbles without it. I'm a uni student and can't cover another ${money(MONTH_COST)} a month myself, so lastfmlists keeps running only if donations pay for it.`,
-            short: `Last.fm is putting its API behind a paid subscription. I'm a student and can't pay for it, so the site only keeps running on donations.`,
+            body: `Last.fm is putting its API behind a paid Pro subscription, a change outside my control, and the site can't load any scrobbles without it. It's a cost I can't cover out of my own pocket right now, so lastfmlists keeps running only if donations pay for it.`,
+            short: `Last.fm is putting its API behind a paid subscription I can't cover myself, so the site only keeps running on donations.`,
             meter: `first ${money(MONTH_COST)} keeps it on in December`
         };
     }
