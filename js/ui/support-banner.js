@@ -1,39 +1,34 @@
-// A slim strip at the top of the page about the Last.fm Pro requirement.
-// From December 1, 2026 Last.fm only serves its API to paid Pro accounts,
-// so the site runs only as long as donations pay for one. The strip sits in
-// the page flow (it scrolls away with the page and never covers anything),
-// shows a progress bar toward a year of Pro, and goes away for good once the
-// goal is met or someone says they donated. Closing it puts it off for a few
-// days. Its state stays in this browser; analytics.js only counts that the
-// strip was shown and which button was pressed.
+// A small banner asking for a donation, shown once someone has clearly
+// found the site useful: five different lists viewed, or ten minutes spent
+// with a library loaded. It can be put off for 30 days or hidden for good,
+// and it never returns for anyone who says they already donated or who
+// follows a Ko-fi link. Its counters stay in this browser; analytics.js only
+// counts that the banner was shown and which button was pressed.
 
 import { trackEvent, trackEventOnce } from '../analytics.js';
+import { readCurrentFilterInputState } from '../data/filters.js';
+import { state } from '../state.js';
 
-// ---- Update these by hand ----
-// RAISED is the total from Ko-fi so far, in dollars. The strip disappears
-// for everyone once it reaches GOAL.
-const RAISED = 0;
-const GOAL = 50;        // a year of Last.fm Pro
-const MONTH_COST = 5;   // one month of Last.fm Pro
-// Local midnight at the start of December 1, 2026.
-const DEADLINE = new Date(2026, 11, 1);
-// -------------------------------
-
+const STORAGE_KEY = "lastfmlists-support";
 const KOFI_URL = "https://ko-fi.com/lastfmlists";
-// A new key, so people who turned off the old donation popup still hear
-// once that the site is about to stop working.
-const STORAGE_KEY = "lastfmlists-support-pro";
-const SNOOZE_DAYS = 3;
-const DAY_MS = 86400000;
+const LISTS_NEEDED = 5;
+const SECONDS_NEEDED = 10 * 60;
+const SNOOZE_DAYS = 30;
+// A list counts once it has been on screen this long, so clicking through
+// filters quickly does not count as viewing lists.
+const VIEW_DELAY_MS = 1500;
+const TICK_SECONDS = 15;
 
 function load() {
     try {
         const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
-        if (saved && typeof saved === "object") return { hidden: false, snoozedUntil: 0, ...saved };
+        if (saved && typeof saved === "object") {
+            return { lists: [], seconds: 0, hidden: false, snoozedUntil: 0, ...saved };
+        }
     } catch (e) {
         // Blocked or malformed storage: start fresh, and nothing persists.
     }
-    return { hidden: false, snoozedUntil: 0 };
+    return { lists: [], seconds: 0, hidden: false, snoozedUntil: 0 };
 }
 
 let record = load();
@@ -42,7 +37,7 @@ function save() {
     try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(record));
     } catch (e) {
-        // Private browsing with storage blocked: the strip just won't remember.
+        // Private browsing with storage blocked: the banner just won't remember.
     }
 }
 
@@ -52,125 +47,143 @@ function hideForGood(reason) {
     save();
 }
 
-function money(amount) {
-    return Number.isInteger(amount) ? `$${amount}` : `$${amount.toFixed(2)}`;
+// Short, stable fingerprint of the list on screen.
+function hashText(text) {
+    let hash = 2166136261;
+    for (let i = 0; i < text.length; i++) {
+        hash ^= text.charCodeAt(i);
+        hash = Math.imul(hash, 16777619);
+    }
+    return (hash >>> 0).toString(36);
 }
 
-function daysLeftText(now) {
-    const days = Math.ceil((DEADLINE - now) / DAY_MS);
-    if (days <= 1) return "tomorrow";
-    return `in ${days} days`;
+function currentListSignature() {
+    const comparison = document.getElementById("comparison-toggle")?.dataset.active === "true";
+    const clean = (values) => Object.fromEntries(Object.entries(values || {})
+        .filter(([, value]) => (value ?? "").toString().trim() !== "")
+        .sort(([a], [b]) => a.localeCompare(b)));
+    return hashText(JSON.stringify({
+        comparison,
+        filters: comparison ? null : clean(readCurrentFilterInputState()),
+        equations: (document.getElementById("equations")?.value || "").trim(),
+        left: comparison ? clean(state.comparisonFilterStates.left) : null,
+        right: comparison ? clean(state.comparisonFilterStates.right) : null,
+        // An empty box shows ten rows, the same list as typing 10.
+        length: document.getElementById("list-length")?.value || "10"
+    }));
 }
 
-// What the strip says depends on the date and on how much has come in.
-function copy(now) {
-    if (now < DEADLINE) {
-        return {
-            icon: "fa-triangle-exclamation",
-            title: `lastfmlists stops working on December 1 <span class="support-strip-when">(${daysLeftText(now)})</span>`,
-            body: `Last.fm is putting its API behind a paid Pro subscription, a change outside my control, and the site can't load any scrobbles without it. It's a cost I can't cover out of my own pocket right now, so lastfmlists keeps running only if donations pay for it.`,
-            short: `Last.fm is putting its API behind a paid subscription I can't cover myself, so the site only keeps running on donations.`,
-            meter: `first ${money(MONTH_COST)} keeps it on in December`
-        };
-    }
-    if (RAISED < MONTH_COST) {
-        return {
-            icon: "fa-circle-pause",
-            title: "lastfmlists is paused",
-            body: `Since December 1, Last.fm only serves its API to paid Pro accounts, and I can't pay for one myself. The site comes back as soon as donations reach ${money(MONTH_COST)}.`,
-            short: `Last.fm now charges for its API and I can't pay for it. ${money(MONTH_COST)} in donations brings the site back.`,
-            meter: `${money(MONTH_COST)} brings it back for a month`
-        };
-    }
-    return {
-        icon: "fa-heart",
-        title: "lastfmlists runs on donations",
-        body: `Since December 1, Last.fm only serves its API to paid Pro accounts. Your donations pay for it: every ${money(MONTH_COST)} keeps the site running for another month.`,
-        short: `Last.fm now charges for its API. Every ${money(MONTH_COST)} keeps the site running for another month.`,
-        meter: "a full year of Last.fm Pro"
-    };
+function onListsView() {
+    const body = document.body;
+    return body.classList.contains("app-loaded")
+        && !body.classList.contains("view-games")
+        && !document.querySelector(".modal-overlay.is-open");
 }
 
 function isDue() {
-    if (RAISED >= GOAL) return false;
-    return !record.hidden && Date.now() >= (record.snoozedUntil || 0);
+    if (record.hidden || Date.now() < (record.snoozedUntil || 0)) return false;
+    return record.lists.length >= LISTS_NEEDED || record.seconds >= SECONDS_NEEDED;
 }
 
-// ---- The strip ----
+// ---- The banner ----
 
-let strip = null;
+let banner = null;
 
-function buildStrip() {
-    const text = copy(new Date());
-    const filled = Math.min(100, (RAISED / GOAL) * 100);
-    const tick = (MONTH_COST / GOAL) * 100;
-
-    strip = document.createElement("aside");
-    strip.className = "support-strip content-block";
-    strip.setAttribute("aria-label", "Donations keep lastfmlists running");
-    strip.innerHTML = `
-        <span class="support-strip-icon" aria-hidden="true"><i class="fas ${text.icon}"></i></span>
-        <div class="support-strip-text">
-            <p class="support-strip-title"><strong>${text.title}</strong></p>
-            <p class="support-strip-body"><span class="support-strip-long">${text.body}</span><span class="support-strip-short">${text.short}</span></p>
-        </div>
-        <div class="support-strip-side">
-            <div class="support-meter" role="progressbar" aria-valuemin="0" aria-valuemax="${GOAL}" aria-valuenow="${RAISED}" aria-valuetext="${money(RAISED)} of ${money(GOAL)} raised">
-                <span class="support-meter-fill" style="width: ${filled}%"></span>
-                <span class="support-meter-tick" style="left: ${tick}%"></span>
-            </div>
-            <p class="support-meter-label"><strong>${money(RAISED)} of ${money(GOAL)}</strong> · ${text.meter}</p>
-            <div class="support-strip-actions">
-                <a class="support-strip-donate" href="${KOFI_URL}" target="_blank" rel="noopener" data-support="kofi"><i class="fas fa-mug-hot" aria-hidden="true"></i>Donate on Ko-fi</a>
-                <button type="button" class="support-strip-done" data-support="donated">I've donated</button>
+function buildBanner() {
+    banner = document.createElement("aside");
+    banner.className = "support-banner";
+    banner.setAttribute("aria-label", "Support lastfmlists");
+    banner.innerHTML = `
+        <button type="button" class="support-close" data-support="later" aria-label="Close for now"><i class="fas fa-xmark" aria-hidden="true"></i></button>
+        <div class="support-body">
+            <span class="support-icon" aria-hidden="true"><i class="fas fa-mug-hot"></i></span>
+            <div class="support-text">
+                <strong>Enjoying lastfmlists?</strong>
+                <p>I build and maintain lastfmlists on my own. If it is useful to you, a small donation helps me keep working on it. Every feature stays free.</p>
             </div>
         </div>
-        <button type="button" class="support-close" data-support="later" aria-label="Hide for ${SNOOZE_DAYS} days" title="Hide for ${SNOOZE_DAYS} days"><i class="fas fa-xmark" aria-hidden="true"></i></button>`;
-
-    strip.addEventListener("click", (event) => {
+        <a class="support-primary" href="${KOFI_URL}" target="_blank" rel="noopener" data-support="kofi"><i class="fas fa-heart" aria-hidden="true"></i>Support on Ko-fi</a>
+        <div class="support-secondary">
+            <button type="button" data-support="later">Not now</button>
+            <button type="button" data-support="donated">I already donated</button>
+            <button type="button" data-support="never">Don't show again</button>
+        </div>`;
+    banner.addEventListener("click", (event) => {
         const action = event.target.closest("[data-support]")?.dataset.support;
         if (!action) return;
-        trackEvent(`support/${action}`, `Donation strip: ${action}`);
+        trackEvent(`support/${action}`, `Donation banner: ${action}`);
         if (action === "later") {
-            record.snoozedUntil = Date.now() + SNOOZE_DAYS * DAY_MS;
+            record.snoozedUntil = Date.now() + SNOOZE_DAYS * 86400000;
             save();
-            hideStrip();
+            hideBanner();
+        } else if (action === "never") {
+            hideForGood("dismissed");
+            hideBanner();
         } else if (action === "donated") {
             hideForGood("donated");
             showThanks();
         } else if (action === "kofi") {
             hideForGood("kofi");
-            // Leave it on screen while the Ko-fi tab opens; it is gone next visit.
+            hideBanner();
         }
     });
-
-    const main = document.querySelector("main");
-    if (main) main.prepend(strip);
-    document.body.classList.add("has-support-strip");
+    document.body.appendChild(banner);
 }
 
-function hideStrip() {
-    if (strip) strip.remove();
-    strip = null;
-    document.body.classList.remove("has-support-strip");
+function showBanner() {
+    if (!banner) buildBanner();
+    if (!banner.classList.contains("is-visible")) trackEventOnce("support/shown", "Donation banner shown");
+    banner.classList.add("is-visible");
+}
+
+function hideBanner() {
+    if (banner) banner.classList.remove("is-visible");
 }
 
 function showThanks() {
-    if (!strip) return;
-    strip.classList.add("is-thanks");
-    strip.querySelector(".support-strip-icon i").className = "fas fa-heart";
-    strip.querySelector(".support-strip-text").innerHTML = "<p class=\"support-strip-title\"><strong>Thank you!</strong></p><p class=\"support-strip-body\">You're the reason lastfmlists keeps running. This message won't show again.</p>";
-    strip.querySelector(".support-strip-side").remove();
-    setTimeout(hideStrip, 4000);
+    if (!banner) return;
+    banner.querySelector(".support-text").innerHTML = "<strong>Thank you!</strong><p>Your support means a lot. This message won't appear again.</p>";
+    banner.querySelector(".support-primary").remove();
+    banner.querySelector(".support-secondary").remove();
+    setTimeout(hideBanner, 3000);
 }
 
-if (isDue()) {
-    buildStrip();
-    trackEventOnce("support/shown", "Donation strip shown");
+function maybeShow() {
+    if (isDue() && onListsView()) showBanner();
 }
 
-// Anyone who opens a Ko-fi link elsewhere on the page is not asked again.
+// ---- Counting ----
+
+let viewTimer = null;
+
+document.addEventListener("lists:rendered", (event) => {
+    clearTimeout(viewTimer);
+    if (record.hidden || !(event.detail && event.detail.count > 0)) return;
+    const signature = currentListSignature();
+    viewTimer = setTimeout(() => {
+        if (!onListsView() || document.body.classList.contains("view-entity")) return;
+        if (!record.lists.includes(signature)) {
+            record.lists.push(signature);
+            if (record.lists.length > 50) record.lists.shift();
+            save();
+        }
+        maybeShow();
+    }, VIEW_DELAY_MS);
+});
+
+setInterval(() => {
+    if (record.hidden || document.visibilityState !== "visible") return;
+    if (!document.body.classList.contains("app-loaded")) return;
+    record.seconds += TICK_SECONDS;
+    save();
+    maybeShow();
+}, TICK_SECONDS * 1000);
+
+// Anyone who opens a Ko-fi link on their own is not asked again.
 document.addEventListener("click", (event) => {
     const link = event.target.closest('a[href*="ko-fi.com"]');
-    if (link && !link.closest(".support-strip") && !record.hidden) hideForGood("kofi");
+    if (link && !link.closest(".support-banner") && !record.hidden) {
+        hideForGood("kofi");
+        hideBanner();
+    }
 });

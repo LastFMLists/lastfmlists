@@ -18,7 +18,7 @@ loads `js/main.js` as an ES module; the browser resolves the rest.
     js/data/              history loading, IndexedDB storage, metrics, equations, filtering
     js/ui/                shell, lists, charts and the race, artist colors, graphs, Explore,
                           filter panel and its controls, entity pages, exporting, the
-                          donation strip
+                          support banner
     js/games/             shared scrobble index, records, the right-answer confirmation,
                           the facts behind Odd One Out and Common Thread, and the five games
     js/main.js            entry point: loads a user's data and wires the flows that span modules
@@ -28,7 +28,6 @@ work. Serve the folder over HTTP instead (`python3 -m http.server`).
 
 Unreleased:
 
-- From December 1, 2026 Last.fm serves its API only to paid Pro accounts, so the site now runs on donations. A slim strip at the top of the page says so: before December 1 it warns that the site stops working that day and counts down, afterwards it says whether the site is paused or running on donations. A bar shows the amount raised toward a year of Pro ($50), with a mark at the first month ($5), and links to Ko-fi. It sits in the page flow instead of covering it, the close button hides it for three days, and "I've donated" or opening Ko-fi hides it for good in that browser. The amount raised and the costs are constants at the top of `js/ui/support-banner.js`; the strip disappears for everyone once the goal is reached. It replaces the old donation popup in the bottom corner, which appeared after five lists or ten minutes.
 - Safer against tampering. Each page now carries a Content-Security-Policy: only the site's own scripts and three pinned libraries may run, inline scripts are refused, and the page may only contact Last.fm and the visit counter. Chart.js, gif.js, html2canvas and Font Awesome are checked against a hash of the exact version (the GIF worker too, which used to be fetched without a version), and GoatCounter's `count.js` is served from this repository (`js/vendor/`) instead of a third-party host. The small inline scripts moved to `js/theme-init.js`, `js/goatcounter-config.js` and `js/page-theme.js`.
 - An artist, album or track named like a JavaScript built-in (`constructor`, `__proto__`, `toString`, `hasOwnProperty`) no longer breaks lists or Explore boxes or gets wrong counts. Anyone can scrobble such a name, so loading that account used to fail in places.
 - If the icon font cannot load (blocked CDN, offline cache), icon-only buttons show their name as text instead of an empty circle.

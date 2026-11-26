@@ -667,8 +667,9 @@ export function displayEntities() {
     });
 }
 
-// Lets other parts of the page react to a new list, such as the usage
-// counts in analytics.js.
+// Lets other parts of the page react to a new list, such as the support
+// banner counting how many different lists were viewed and the usage counts
+// in analytics.js.
 function announceRenderedList(count, listInfo) {
     document.dispatchEvent(new CustomEvent("lists:rendered", { detail: { count, ...listInfo } }));
 }

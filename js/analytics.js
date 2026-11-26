@@ -11,8 +11,8 @@ import { linkEvent } from './link-events.js';
 // ready. The cap keeps a blocked script from growing the queue all visit.
 const pending = [];
 const MAX_PENDING = 50;
-// A list counts once it has been on screen this long, so clicking through
-// settings counts only the last one.
+// A list counts once it has been on screen this long, the same delay the
+// support banner uses, so clicking through settings counts only the last one.
 const LIST_VIEW_DELAY_MS = 1500;
 
 function flush() {
@@ -163,7 +163,7 @@ export function trackGameRound(game, rounds) {
 document.addEventListener("click", (event) => {
     const target = event.target.closest("button, a");
     if (!target) return;
-    // Links count by destination. The donation strip counts its own.
+    // Links count by destination. The donation banner counts its own.
     if (target.tagName === "A" && !target.closest("[data-support]")) {
         const link = linkEvent(target);
         if (link) trackEvent(...link);
