@@ -66,6 +66,12 @@ function copyCanvasBitmaps(sourceRoot, clonedRoot) {
     }
 }
 
+// Lets other parts of the page react to a finished download, such as the
+// donation popup, which asks right after an export.
+function announceExport(kind) {
+    document.dispatchEvent(new CustomEvent("export:done", { detail: { kind } }));
+}
+
 async function exportCurrentListAsImage() {
     // A race on screen exports as a GIF; anything else (a list, or the bar
     // chart shown until a race is applied) as a PNG.
@@ -196,6 +202,7 @@ async function exportCurrentListAsImage() {
         downloadLink.href = canvas.toDataURL('image/png');
         downloadLink.download = `lastfmlists-${stamp}.png`;
         downloadLink.click();
+        announceExport("image");
     } catch (error) {
         console.error('Export failed:', error);
         alert('Export failed. Please try again.');
@@ -333,6 +340,7 @@ async function exportCurrentRaceAsGif() {
         downloadLink.download = `lastfmlists-race-${stamp}.gif`;
         downloadLink.click();
         setTimeout(() => URL.revokeObjectURL(downloadLink.href), 30000);
+        announceExport("gif");
     } catch (error) {
         console.error('GIF export failed:', error);
         alert('GIF export failed. Please try again.');
@@ -600,6 +608,7 @@ async function exportCurrentListAsGrid() {
         downloadLink.href = canvas.toDataURL('image/png');
         downloadLink.download = `lastfmlists-grid-${stamp}.png`;
         downloadLink.click();
+        announceExport("grid");
     } catch (error) {
         console.error('Grid export failed:', error);
         alert('Grid export failed. Please try again.');

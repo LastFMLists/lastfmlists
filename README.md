@@ -28,6 +28,7 @@ work. Serve the folder over HTTP instead (`python3 -m http.server`).
 
 Unreleased:
 
+- The donation popup now appears right after a finished export (an image, a race GIF or an album grid) instead of after five lists or ten minutes on the site. Its headline names what was just exported. "Not now" still puts it off for 30 days, and "I already donated", "Don't show again" or opening Ko-fi still hide it for good.
 - Safer against tampering. Each page now carries a Content-Security-Policy: only the site's own scripts and three pinned libraries may run, inline scripts are refused, and the page may only contact Last.fm and the visit counter. Chart.js, gif.js, html2canvas and Font Awesome are checked against a hash of the exact version (the GIF worker too, which used to be fetched without a version), and GoatCounter's `count.js` is served from this repository (`js/vendor/`) instead of a third-party host. The small inline scripts moved to `js/theme-init.js`, `js/goatcounter-config.js` and `js/page-theme.js`.
 - An artist, album or track named like a JavaScript built-in (`constructor`, `__proto__`, `toString`, `hasOwnProperty`) no longer breaks lists or Explore boxes or gets wrong counts. Anyone can scrobble such a name, so loading that account used to fail in places.
 - If the icon font cannot load (blocked CDN, offline cache), icon-only buttons show their name as text instead of an empty circle.

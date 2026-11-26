@@ -1,34 +1,28 @@
-// A small banner asking for a donation, shown once someone has clearly
-// found the site useful: five different lists viewed, or ten minutes spent
-// with a library loaded. It can be put off for 30 days or hidden for good,
-// and it never returns for anyone who says they already donated or who
-// follows a Ko-fi link. Its counters stay in this browser; analytics.js only
-// counts that the banner was shown and which button was pressed.
+// A small popup asking for a donation, shown right after someone exports an
+// image, a race GIF or an album grid: the moment they have just taken
+// something from the site. It can be put off for 30 days or hidden for
+// good, and it never returns for anyone who says they already donated or
+// who follows a Ko-fi link. Its state stays in this browser; analytics.js
+// only counts that the popup was shown and which button was pressed.
 
 import { trackEvent, trackEventOnce } from '../analytics.js';
-import { readCurrentFilterInputState } from '../data/filters.js';
-import { state } from '../state.js';
 
 const STORAGE_KEY = "lastfmlists-support";
 const KOFI_URL = "https://ko-fi.com/lastfmlists";
-const LISTS_NEEDED = 5;
-const SECONDS_NEEDED = 10 * 60;
 const SNOOZE_DAYS = 30;
-// A list counts once it has been on screen this long, so clicking through
-// filters quickly does not count as viewing lists.
-const VIEW_DELAY_MS = 1500;
-const TICK_SECONDS = 15;
+// Wait for the export window to close and the download to start first.
+const SHOW_DELAY_MS = 800;
 
 function load() {
     try {
         const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
         if (saved && typeof saved === "object") {
-            return { lists: [], seconds: 0, hidden: false, snoozedUntil: 0, ...saved };
+            return { hidden: false, snoozedUntil: 0, ...saved };
         }
     } catch (e) {
         // Blocked or malformed storage: start fresh, and nothing persists.
     }
-    return { lists: [], seconds: 0, hidden: false, snoozedUntil: 0 };
+    return { hidden: false, snoozedUntil: 0 };
 }
 
 let record = load();
@@ -37,7 +31,7 @@ function save() {
     try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(record));
     } catch (e) {
-        // Private browsing with storage blocked: the banner just won't remember.
+        // Private browsing with storage blocked: the popup just won't remember.
     }
 }
 
@@ -47,47 +41,19 @@ function hideForGood(reason) {
     save();
 }
 
-// Short, stable fingerprint of the list on screen.
-function hashText(text) {
-    let hash = 2166136261;
-    for (let i = 0; i < text.length; i++) {
-        hash ^= text.charCodeAt(i);
-        hash = Math.imul(hash, 16777619);
-    }
-    return (hash >>> 0).toString(36);
-}
-
-function currentListSignature() {
-    const comparison = document.getElementById("comparison-toggle")?.dataset.active === "true";
-    const clean = (values) => Object.fromEntries(Object.entries(values || {})
-        .filter(([, value]) => (value ?? "").toString().trim() !== "")
-        .sort(([a], [b]) => a.localeCompare(b)));
-    return hashText(JSON.stringify({
-        comparison,
-        filters: comparison ? null : clean(readCurrentFilterInputState()),
-        equations: (document.getElementById("equations")?.value || "").trim(),
-        left: comparison ? clean(state.comparisonFilterStates.left) : null,
-        right: comparison ? clean(state.comparisonFilterStates.right) : null,
-        // An empty box shows ten rows, the same list as typing 10.
-        length: document.getElementById("list-length")?.value || "10"
-    }));
-}
-
-function onListsView() {
-    const body = document.body;
-    return body.classList.contains("app-loaded")
-        && !body.classList.contains("view-games")
-        && !document.querySelector(".modal-overlay.is-open");
-}
-
 function isDue() {
-    if (record.hidden || Date.now() < (record.snoozedUntil || 0)) return false;
-    return record.lists.length >= LISTS_NEEDED || record.seconds >= SECONDS_NEEDED;
+    return !record.hidden && Date.now() >= (record.snoozedUntil || 0);
 }
 
-// ---- The banner ----
+// ---- The popup ----
 
 let banner = null;
+
+const HEADLINES = {
+    image: "Enjoy your image!",
+    gif: "Enjoy your GIF!",
+    grid: "Enjoy your album grid!"
+};
 
 function buildBanner() {
     banner = document.createElement("aside");
@@ -98,7 +64,7 @@ function buildBanner() {
         <div class="support-body">
             <span class="support-icon" aria-hidden="true"><i class="fas fa-mug-hot"></i></span>
             <div class="support-text">
-                <strong>Enjoying lastfmlists?</strong>
+                <strong></strong>
                 <p>I build and maintain lastfmlists on my own. If it is useful to you, a small donation helps me keep working on it. Every feature stays free.</p>
             </div>
         </div>
@@ -130,8 +96,9 @@ function buildBanner() {
     document.body.appendChild(banner);
 }
 
-function showBanner() {
+function showBanner(kind) {
     if (!banner) buildBanner();
+    banner.querySelector(".support-text strong").textContent = HEADLINES[kind] || "Enjoying lastfmlists?";
     if (!banner.classList.contains("is-visible")) trackEventOnce("support/shown", "Donation banner shown");
     banner.classList.add("is-visible");
 }
@@ -148,36 +115,13 @@ function showThanks() {
     setTimeout(hideBanner, 3000);
 }
 
-function maybeShow() {
-    if (isDue() && onListsView()) showBanner();
-}
-
-// ---- Counting ----
-
-let viewTimer = null;
-
-document.addEventListener("lists:rendered", (event) => {
-    clearTimeout(viewTimer);
-    if (record.hidden || !(event.detail && event.detail.count > 0)) return;
-    const signature = currentListSignature();
-    viewTimer = setTimeout(() => {
-        if (!onListsView() || document.body.classList.contains("view-entity")) return;
-        if (!record.lists.includes(signature)) {
-            record.lists.push(signature);
-            if (record.lists.length > 50) record.lists.shift();
-            save();
-        }
-        maybeShow();
-    }, VIEW_DELAY_MS);
+document.addEventListener("export:done", (event) => {
+    if (!isDue()) return;
+    const kind = event.detail && event.detail.kind;
+    setTimeout(() => {
+        if (isDue()) showBanner(kind);
+    }, SHOW_DELAY_MS);
 });
-
-setInterval(() => {
-    if (record.hidden || document.visibilityState !== "visible") return;
-    if (!document.body.classList.contains("app-loaded")) return;
-    record.seconds += TICK_SECONDS;
-    save();
-    maybeShow();
-}, TICK_SECONDS * 1000);
 
 // Anyone who opens a Ko-fi link on their own is not asked again.
 document.addEventListener("click", (event) => {

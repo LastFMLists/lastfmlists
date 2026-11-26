@@ -11,8 +11,8 @@ import { linkEvent } from './link-events.js';
 // ready. The cap keeps a blocked script from growing the queue all visit.
 const pending = [];
 const MAX_PENDING = 50;
-// A list counts once it has been on screen this long, the same delay the
-// support banner uses, so clicking through settings counts only the last one.
+// A list counts once it has been on screen this long, so clicking through
+// settings counts only the last one.
 const LIST_VIEW_DELAY_MS = 1500;
 
 function flush() {
